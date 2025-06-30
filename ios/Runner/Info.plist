@@ -45,5 +45,11 @@
 	<true/>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
+	<key>NSPhotoLibraryUsageDescription</key>
+    <string>We need access to your photo library to pick files.</string>
+    <key>NSMicrophoneUsageDescription</key>
+    <string>We need access to your microphone for audio books.</string>
+    <key>NSDocumentsFolderUsageDescription</key>
+    <string>We need access to your files to import books.</string>
 </dict>
 </plist>

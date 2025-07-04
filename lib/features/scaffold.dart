@@ -26,12 +26,34 @@ class MainShell extends StatelessWidget {
             fontWeight: FontWeight.normal,
           ),
         ),
-        centerTitle: true,
+        centerTitle: false,
         backgroundColor: AppTheme.black,
         elevation: 0,
+        actions: [
+
+          IconButton(
+            icon: const Icon(Icons.search, color: AppTheme.white),
+            onPressed: () {
+              showSearch(
+                context: context,
+                delegate: MySearchDelegate(),
+              );
+            },
+          ),
+          Builder(
+            builder: (context) => IconButton(
+              icon: CircleAvatar(
+                backgroundColor: Colors.white,
+                radius: 16,
+              ),
+              onPressed: () {
+                Scaffold.of(context).openEndDrawer();
+              },
+            ),
+          ),
+        ],
       ),
-      // The new drawer is added here, pointing to our separate widget.
-      drawer: const AppDrawer(),
+      endDrawer: const AppDrawer(),
       body: navigationShell,
       bottomNavigationBar: FBottomNavigationBar(
         style: FBottomNavigationBarStyle(
@@ -82,5 +104,41 @@ class MainShell extends StatelessWidget {
         ],
       ),
     );
+  }
+}
+
+// Place this after MainShell in the same file
+
+class MySearchDelegate extends SearchDelegate<String> {
+  @override
+  List<Widget>? buildActions(BuildContext context) {
+    return [
+      IconButton(
+        icon: const Icon(Icons.clear),
+        onPressed: () {
+          query = '';
+        },
+      ),
+    ];
+  }
+
+  @override
+  Widget? buildLeading(BuildContext context) {
+    return IconButton(
+      icon: const Icon(Icons.arrow_back),
+      onPressed: () {
+        close(context, '');
+      },
+    );
+  }
+
+  @override
+  Widget buildResults(BuildContext context) {
+    return Center(child: Text('You searched for: $query'));
+  }
+
+  @override
+  Widget buildSuggestions(BuildContext context) {
+    return Container();
   }
 }

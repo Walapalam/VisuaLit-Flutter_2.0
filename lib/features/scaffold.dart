@@ -1,7 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
-import 'package:visualit/core/theme/app_theme.dart';
-
 import 'app_drawer.dart';
 
 class MainShell extends StatelessWidget {
@@ -16,21 +14,24 @@ class MainShell extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text(
+        title: Text(
           'Visualit',
           style: TextStyle(
             fontFamily: 'Jersey20',
-            color: AppTheme.white,
+            color: Theme.of(context).colorScheme.onPrimary,
             fontSize: 35.0,
             fontWeight: FontWeight.normal,
           ),
         ),
         centerTitle: false,
-        backgroundColor: AppTheme.black,
+        backgroundColor: Theme.of(context).colorScheme.primary,
         elevation: 0,
         actions: [
           IconButton(
-            icon: const Icon(Icons.search, color: AppTheme.white),
+            icon: Icon(
+              Icons.search,
+              color: Theme.of(context).colorScheme.onPrimary,
+            ),
             onPressed: () {
               showSearch(
                 context: context,
@@ -40,8 +41,8 @@ class MainShell extends StatelessWidget {
           ),
           Builder(
             builder: (context) => IconButton(
-              icon: const CircleAvatar(
-                backgroundColor: Colors.white,
+              icon: CircleAvatar(
+                backgroundColor: Theme.of(context).colorScheme.surface,
                 radius: 16,
               ),
               onPressed: () {
@@ -53,17 +54,13 @@ class MainShell extends StatelessWidget {
       ),
       endDrawer: const AppDrawer(),
       body: navigationShell,
-      // REPLACED: Using the standard Flutter BottomNavigationBar
       bottomNavigationBar: BottomNavigationBar(
-        // Styling to match your theme
-        backgroundColor: AppTheme.black,
-        selectedItemColor: AppTheme.white,     // Color for the selected icon and label
-        unselectedItemColor: AppTheme.grey,    // Color for unselected items
-        type: BottomNavigationBarType.fixed, // Ensures background color is applied
-        showUnselectedLabels: false,           // Hides labels for unselected items
-        showSelectedLabels: true,              // Shows label for the selected item
-
-        // Logic to handle navigation
+        backgroundColor: Theme.of(context).colorScheme.primary,
+        selectedItemColor: Theme.of(context).colorScheme.onPrimary,
+        unselectedItemColor: Theme.of(context).colorScheme.onPrimary.withOpacity(0.6),
+        type: BottomNavigationBarType.fixed,
+        showUnselectedLabels: false,
+        showSelectedLabels: true,
         currentIndex: navigationShell.currentIndex,
         onTap: (index) {
           navigationShell.goBranch(
@@ -71,11 +68,10 @@ class MainShell extends StatelessWidget {
             initialLocation: index == navigationShell.currentIndex,
           );
         },
-        // Navigation items
         items: const [
           BottomNavigationBarItem(
             icon: Icon(Icons.home_outlined),
-            activeIcon: Icon(Icons.home), // Optional: a different icon when selected
+            activeIcon: Icon(Icons.home),
             label: 'Home',
           ),
           BottomNavigationBarItem(
@@ -98,7 +94,6 @@ class MainShell extends StatelessWidget {
     );
   }
 }
-
 // Your MySearchDelegate code remains the same
 class MySearchDelegate extends SearchDelegate<String> {
   @override

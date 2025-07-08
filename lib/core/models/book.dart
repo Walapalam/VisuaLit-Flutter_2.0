@@ -2,6 +2,7 @@
 enum BookType { epub, pdf, audio }
 
 class Book {
+  // TO-DO : No ISBN in the book model, required for book lookup
   final String id;
   final String filePath;
   final String title;

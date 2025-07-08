@@ -1,8 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
-import 'package:forui/forui.dart';
-import 'package:visualit/core/theme/app_theme.dart';
-
 import 'app_drawer.dart';
 
 class MainShell extends StatelessWidget {
@@ -17,70 +14,117 @@ class MainShell extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text(
+        title: Text(
           'Visualit',
           style: TextStyle(
             fontFamily: 'Jersey20',
-            color: AppTheme.white,
+            color: Theme.of(context).colorScheme.onPrimary,
             fontSize: 35.0,
             fontWeight: FontWeight.normal,
           ),
         ),
-        centerTitle: true,
-        backgroundColor: AppTheme.black,
+        centerTitle: false,
+        backgroundColor: Theme.of(context).colorScheme.primary,
         elevation: 0,
-      ),
-      // The new drawer is added here, pointing to our separate widget.
-      drawer: const AppDrawer(),
-      body: navigationShell,
-      bottomNavigationBar: FBottomNavigationBar(
-        style: FBottomNavigationBarStyle(
-          decoration: BoxDecoration(
-            color: AppTheme.black,
+        actions: [
+          IconButton(
+            icon: Icon(
+              Icons.search,
+              color: Theme.of(context).colorScheme.onPrimary,
+            ),
+            onPressed: () {
+              showSearch(
+                context: context,
+                delegate: MySearchDelegate(),
+              );
+            },
           ),
-          itemStyle: FBottomNavigationBarItemStyle(
-            iconStyle: FWidgetStateMap<IconThemeData>({
-              WidgetState.pressed: const IconThemeData(color: AppTheme.primaryGreen),
-              WidgetState.selected: const IconThemeData(color: Colors.white),
-              WidgetState.any: const IconThemeData(color: Colors.grey),
-            }),
-            textStyle: FWidgetStateMap<TextStyle>({
-              WidgetState.selected: const TextStyle(color: AppTheme.white),
-              WidgetState.any: const TextStyle(color: Colors.grey),
-            }),
-            tappableStyle: FTappableStyle(),
-            focusedOutlineStyle: FFocusedOutlineStyle(
-              color: AppTheme.primaryGreen,
-              borderRadius: BorderRadius.circular(10.0),
+          Builder(
+            builder: (context) => IconButton(
+              icon: CircleAvatar(
+                backgroundColor: Theme.of(context).colorScheme.surface,
+                radius: 16,
+              ),
+              onPressed: () {
+                Scaffold.of(context).openEndDrawer();
+              },
             ),
           ),
-        ),
-        index: navigationShell.currentIndex,
-        onChange: (index) {
+        ],
+      ),
+      endDrawer: const AppDrawer(),
+      body: navigationShell,
+      bottomNavigationBar: BottomNavigationBar(
+        backgroundColor: Theme.of(context).colorScheme.primary,
+        selectedItemColor: Theme.of(context).colorScheme.onPrimary,
+        unselectedItemColor: Theme.of(context).colorScheme.onPrimary.withOpacity(0.6),
+        type: BottomNavigationBarType.fixed,
+        showUnselectedLabels: false,
+        showSelectedLabels: true,
+        currentIndex: navigationShell.currentIndex,
+        onTap: (index) {
           navigationShell.goBranch(
             index,
             initialLocation: index == navigationShell.currentIndex,
           );
         },
-        children: const [
-          FBottomNavigationBarItem(
-            icon: Icon(FIcons.house),
-            label: Text('Home'),
+        items: const [
+          BottomNavigationBarItem(
+            icon: Icon(Icons.home_outlined),
+            activeIcon: Icon(Icons.home),
+            label: 'Home',
           ),
-          FBottomNavigationBarItem(
-            icon: Icon(FIcons.book),
-            label: Text('Library'),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.book_outlined),
+            activeIcon: Icon(Icons.book),
+            label: 'Library',
           ),
-          FBottomNavigationBarItem(
-            icon: Icon(FIcons.headphones),
-            label: Text('Audio'),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.headphones_outlined),
+            activeIcon: Icon(Icons.headphones),
+            label: 'Audio',
           ),
-          FBottomNavigationBarItem(
-            icon: Icon(FIcons.settings),
-            label: Text('Settings'),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.settings_outlined),
+            activeIcon: Icon(Icons.settings),
+            label: 'Settings',
           ),
         ],
       ),
     );
+  }
+}
+// Your MySearchDelegate code remains the same
+class MySearchDelegate extends SearchDelegate<String> {
+  @override
+  List<Widget>? buildActions(BuildContext context) {
+    return [
+      IconButton(
+        icon: const Icon(Icons.clear),
+        onPressed: () {
+          query = '';
+        },
+      ),
+    ];
+  }
+
+  @override
+  Widget? buildLeading(BuildContext context) {
+    return IconButton(
+      icon: const Icon(Icons.arrow_back),
+      onPressed: () {
+        close(context, '');
+      },
+    );
+  }
+
+  @override
+  Widget buildResults(BuildContext context) {
+    return Center(child: Text('You searched for: $query'));
+  }
+
+  @override
+  Widget buildSuggestions(BuildContext context) {
+    return Container();
   }
 }

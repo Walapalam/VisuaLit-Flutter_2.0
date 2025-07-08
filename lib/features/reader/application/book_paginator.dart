@@ -8,6 +8,7 @@ class BookPaginator {
   final Size viewSize;
   final TextStyle textStyle;
   final EdgeInsets margins;
+  final int blocksPerPage;
 
   final Map<int, BookPage> _pageCache = {};
 
@@ -16,6 +17,7 @@ class BookPaginator {
     required this.viewSize,
     required this.textStyle,
     required this.margins,
+    required this.blocksPerPage,
   });
 
   BookPage getPage(int pageIndex) {

@@ -4,6 +4,7 @@ import 'package:isar/isar.dart';
 import 'package:visualit/core/providers/isar_provider.dart';
 import 'package:visualit/features/reader/application/book_paginator.dart';
 import 'package:visualit/features/reader/data/book_data.dart';
+import 'package:visualit/features/reader/presentation/reading_providers.dart'; // Add this
 import '../domain/book_page.dart';
 
 @immutable
@@ -38,10 +39,10 @@ class ReadingState {
 class ReadingController extends StateNotifier<ReadingState> {
   final Isar _isar;
   final Size _viewSize;
+  final int _blocksPerPage;
 
-  ReadingController(this._isar, int bookId, this._viewSize)
+  ReadingController(this._isar, int bookId, this._viewSize, this._blocksPerPage)
       : super(ReadingState(bookId: bookId, paginator: const AsyncValue.loading())) {
-    print('ReadingController: Initializing with bookId: $bookId, viewSize: $_viewSize');
     _initialize();
   }
 
@@ -56,8 +57,6 @@ class ReadingController extends StateNotifier<ReadingState> {
       final blocks = await _isar.contentBlocks
           .filter()
           .bookIdEqualTo(state.bookId)
-          .sortByChapterIndex()
-          .thenByBlockIndexInChapter()
           .findAll();
 
       print('ReadingController: Found ${blocks.length} content blocks for book ${state.bookId}');
@@ -88,6 +87,7 @@ class ReadingController extends StateNotifier<ReadingState> {
         textStyle: textStyle,
         viewSize: _viewSize,
         margins: margins,
+        blocksPerPage: _blocksPerPage, // For debugging, can be adjusted later
       );
 
       print('ReadingController: BookPaginator created successfully');
@@ -136,7 +136,7 @@ class ReadingController extends StateNotifier<ReadingState> {
     state = state.copyWith(currentPage: index);
     state.paginator.whenData((p) {
       getPage(index);
-      if (index + 1 < (p.allBlocks.length / 10)) getPage(index + 1);
+      if (index + 1 < (p.allBlocks.length / _blocksPerPage)) getPage(index + 1);
     });
   }
 }
@@ -144,6 +144,6 @@ class ReadingController extends StateNotifier<ReadingState> {
 final readingControllerProvider = StateNotifierProvider.family.autoDispose<ReadingController, ReadingState, (int, Size)>((ref, params) {
   final isar = ref.watch(isarDBProvider).value!;
   final (bookId, viewSize) = params;
-  print('ReadingControllerProvider: Creating controller for book $bookId with size $viewSize');
-  return ReadingController(isar, bookId, viewSize);
+  final blocksPerPage = ref.watch(readerSettingsProvider).blocksPerPage;
+  return ReadingController(isar, bookId, viewSize, blocksPerPage);
 });

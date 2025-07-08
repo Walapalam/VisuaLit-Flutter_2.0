@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:visualit/features/reader/presentation/reading_controller.dart';
 import 'package:visualit/features/reader/domain/book_page.dart';
 import 'package:visualit/features/reader/data/book_data.dart';
+import 'reading_scaffold.dart';
 
 class ReadingScreen extends ConsumerWidget {
   final int bookId;
@@ -11,59 +12,57 @@ class ReadingScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     print('ReadingScreen: Building screen for bookId: $bookId');
-
     final viewSize = MediaQuery.of(context).size;
-    print('ReadingScreen: ViewSize: $viewSize');
-
     final state = ref.watch(readingControllerProvider((bookId, viewSize)));
     final controller = ref.read(readingControllerProvider((bookId, viewSize)).notifier);
 
-    print('ReadingScreen: Controller state - paginator: ${state.paginator}, currentPage: ${state.currentPage}');
-    print('ReadingScreen: Page cache size: ${state.pageCache.length}');
+    return ReadingScaffold(
+      bookTitle: state.bookId.toString() ?? "Loading...", // Get actual book title from state
+      child: Container(
+        color: const Color(0xFFF5F0E5), // Preserve the parchment-like color
+        child: SafeArea(
+          child: state.paginator.when(
+            loading: () {
+              print('ReadingScreen: Showing loading indicator');
+              return const Center(child: CircularProgressIndicator());
+            },
+            error: (e, st) {
+              print('ReadingScreen: Error state - $e');
+              print('ReadingScreen: Stack trace - $st');
+              return Center(child: Text("Error: $e"));
+            },
+            data: (paginator) {
+              print('ReadingScreen: Paginator loaded with ${paginator.allBlocks.length} blocks');
+              return PageView.builder(
+                onPageChanged: (index) {
+                  print('ReadingScreen: Page changed to $index');
+                  controller.onPageChanged(index);
+                },
+                itemCount: (paginator.allBlocks.length / 10).ceil(),
+                itemBuilder: (context, index) {
+                  print('ReadingScreen: Building page $index');
+                  final page = state.pageCache[index];
 
-    return Scaffold(
-      backgroundColor: const Color(0xFFF5F0E5), // A parchment-like color
-      body: SafeArea(
-        child: state.paginator.when(
-          loading: () {
-            print('ReadingScreen: Showing loading indicator');
-            return const Center(child: CircularProgressIndicator());
-          },
-          error: (e, st) {
-            print('ReadingScreen: Error state - $e');
-            print('ReadingScreen: Stack trace - $st');
-            return Center(child: Text("Error: $e"));
-          },
-          data: (paginator) {
-            print('ReadingScreen: Paginator loaded with ${paginator.allBlocks.length} blocks');
-            print('ReadingScreen: Building PageView...');
+                  if (page == null) {
+                    print('ReadingScreen: Page $index not cached, requesting...');
+                    Future.microtask(() => controller.getPage(index));
+                    return const Center(
+                        child: CircularProgressIndicator(color: Colors.black54)
+                    );
+                  }
 
-            return PageView.builder(
-              onPageChanged: (index) {
-                print('ReadingScreen: Page changed to $index');
-                controller.onPageChanged(index);
-              },
-              itemCount: (paginator.allBlocks.length / 10).ceil(), // Estimate page count
-              itemBuilder: (context, index) {
-                print('ReadingScreen: Building page $index');
-
-                final page = state.pageCache[index];
-                if (page == null) {
-                  print('ReadingScreen: Page $index not cached, requesting...');
-                  Future.microtask(() => controller.getPage(index));
-                  return const Center(child: CircularProgressIndicator(color: Colors.black54));
-                }
-
-                print('ReadingScreen: Rendering page $index with ${page.blocks.length} blocks');
-                return BookPageView(page: page);
-              },
-            );
-          },
+                  print('ReadingScreen: Rendering page $index with ${page.blocks.length} blocks');
+                  return BookPageView(page: page);
+                },
+              );
+            },
+          ),
         ),
       ),
     );
   }
 }
+
 
 class BookPageView extends StatelessWidget {
   final BookPage page;

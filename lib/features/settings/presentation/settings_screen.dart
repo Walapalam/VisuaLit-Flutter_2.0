@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:visualit/core/providers/font_providers.dart';
 import 'package:visualit/core/theme/theme_controller.dart';
+import '../../../features/reader/presentation/reading_providers.dart' as reader_providers;
 
 class SettingsScreen extends ConsumerWidget {
   const SettingsScreen({super.key});
@@ -30,6 +31,11 @@ class SettingsScreen extends ConsumerWidget {
             _buildSection(
               context,
               children: [
+                _buildSettingItem(
+                  context,
+                  'Blocks per Page',
+                  _buildBlocksPerPageDropdown(context, ref),
+                ),
                 _buildSettingItem(
                   context,
                   'Dark Mode',
@@ -148,6 +154,25 @@ class SettingsScreen extends ConsumerWidget {
         DropdownMenuItem(value: 'en', child: Text('English')),
       ],
       onChanged: (_) {},
+      underline: Container(),
+    );
+  }
+
+  Widget _buildBlocksPerPageDropdown(BuildContext context, WidgetRef ref) {
+    return DropdownButton<int>(
+      value: ref.watch(reader_providers.readerSettingsProvider).blocksPerPage,
+      items: [5, 10, 15, 20, 25].map((blocks) {
+        return DropdownMenuItem(
+          value: blocks,
+          child: Text('$blocks blocks'),
+        );
+      }).toList(),
+      onChanged: (value) {
+        if (value != null) {
+          ref.read(reader_providers.readerSettingsProvider.notifier)
+              .setBlocksPerPage(value);
+        }
+      },
       underline: Container(),
     );
   }

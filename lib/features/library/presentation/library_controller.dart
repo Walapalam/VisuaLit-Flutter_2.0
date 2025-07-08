@@ -29,7 +29,7 @@ class LibraryController extends StateNotifier<AsyncValue<List<db.Book>>> {
     print('LibraryController: Loading books from database...');
     state = const AsyncValue.loading();
     try {
-      final books = await _isar.books.where().sortByTitle().findAll();
+      final books = await _isar.books.where().findAll();
       print('LibraryController: Loaded ${books.length} books from database');
 
       // Debug: Print details of each book

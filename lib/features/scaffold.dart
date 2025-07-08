@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
-import 'package:forui/forui.dart';
 import 'package:visualit/core/theme/app_theme.dart';
 
 import 'app_drawer.dart';
@@ -30,7 +29,6 @@ class MainShell extends StatelessWidget {
         backgroundColor: AppTheme.black,
         elevation: 0,
         actions: [
-
           IconButton(
             icon: const Icon(Icons.search, color: AppTheme.white),
             onPressed: () {
@@ -42,7 +40,7 @@ class MainShell extends StatelessWidget {
           ),
           Builder(
             builder: (context) => IconButton(
-              icon: CircleAvatar(
+              icon: const CircleAvatar(
                 backgroundColor: Colors.white,
                 radius: 16,
               ),
@@ -55,51 +53,45 @@ class MainShell extends StatelessWidget {
       ),
       endDrawer: const AppDrawer(),
       body: navigationShell,
-      bottomNavigationBar: FBottomNavigationBar(
-        style: FBottomNavigationBarStyle(
-          decoration: BoxDecoration(
-            color: AppTheme.black,
-          ),
-          itemStyle: FBottomNavigationBarItemStyle(
-            iconStyle: FWidgetStateMap<IconThemeData>({
-              WidgetState.pressed: const IconThemeData(color: AppTheme.primaryGreen),
-              WidgetState.selected: const IconThemeData(color: Colors.white),
-              WidgetState.any: const IconThemeData(color: Colors.grey),
-            }),
-            textStyle: FWidgetStateMap<TextStyle>({
-              WidgetState.selected: const TextStyle(color: AppTheme.white),
-              WidgetState.any: const TextStyle(color: Colors.grey),
-            }),
-            tappableStyle: FTappableStyle(),
-            focusedOutlineStyle: FFocusedOutlineStyle(
-              color: AppTheme.primaryGreen,
-              borderRadius: BorderRadius.circular(10.0),
-            ),
-          ),
-        ),
-        index: navigationShell.currentIndex,
-        onChange: (index) {
+      // REPLACED: Using the standard Flutter BottomNavigationBar
+      bottomNavigationBar: BottomNavigationBar(
+        // Styling to match your theme
+        backgroundColor: AppTheme.black,
+        selectedItemColor: AppTheme.white,     // Color for the selected icon and label
+        unselectedItemColor: AppTheme.grey,    // Color for unselected items
+        type: BottomNavigationBarType.fixed, // Ensures background color is applied
+        showUnselectedLabels: false,           // Hides labels for unselected items
+        showSelectedLabels: true,              // Shows label for the selected item
+
+        // Logic to handle navigation
+        currentIndex: navigationShell.currentIndex,
+        onTap: (index) {
           navigationShell.goBranch(
             index,
             initialLocation: index == navigationShell.currentIndex,
           );
         },
-        children: const [
-          FBottomNavigationBarItem(
-            icon: Icon(FIcons.house),
-            label: Text('Home'),
+        // Navigation items
+        items: const [
+          BottomNavigationBarItem(
+            icon: Icon(Icons.home_outlined),
+            activeIcon: Icon(Icons.home), // Optional: a different icon when selected
+            label: 'Home',
           ),
-          FBottomNavigationBarItem(
-            icon: Icon(FIcons.book),
-            label: Text('Library'),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.book_outlined),
+            activeIcon: Icon(Icons.book),
+            label: 'Library',
           ),
-          FBottomNavigationBarItem(
-            icon: Icon(FIcons.headphones),
-            label: Text('Audio'),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.headphones_outlined),
+            activeIcon: Icon(Icons.headphones),
+            label: 'Audio',
           ),
-          FBottomNavigationBarItem(
-            icon: Icon(FIcons.settings),
-            label: Text('Settings'),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.settings_outlined),
+            activeIcon: Icon(Icons.settings),
+            label: 'Settings',
           ),
         ],
       ),
@@ -107,8 +99,7 @@ class MainShell extends StatelessWidget {
   }
 }
 
-// Place this after MainShell in the same file
-
+// Your MySearchDelegate code remains the same
 class MySearchDelegate extends SearchDelegate<String> {
   @override
   List<Widget>? buildActions(BuildContext context) {

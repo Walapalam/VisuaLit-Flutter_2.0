@@ -1,176 +1,166 @@
-// lib/features/library/data/local_library_service.dart
 import 'dart:io';
-import 'package:permission_handler/permission_handler.dart';
 import 'package:file_picker/file_picker.dart';
-import 'package:epubx/epubx.dart';
-import 'package:visualit/core/models/book.dart';
+import 'package:permission_handler/permission_handler.dart';
 
 class LocalLibraryService {
-  /// Requests storage permission. Returns true if granted.
-  Future<bool> requestStoragePermission() async {
-    // On modern Android, we request specific media permissions.
-    // Permission.storage is largely ignored.
-    Map<Permission, PermissionStatus> statuses = await [
-      Permission.audio,
-      Permission.photos,
-      Permission.videos,
-    ].request();
+  /// Requests necessary storage permissions for mobile platforms.
+  ///
+  /// Returns `true` if permission is granted, otherwise `false`.
+  Future<bool> _requestPermission() async {
+    print('LocalLibraryService: Requesting storage permission...');
 
-    // We consider permission granted if any of the media types are allowed,
-    // as the user might only have books in one category.
-    bool isGranted = statuses.values.any((status) => status.isGranted || status.isLimited);
-
-    if (!isGranted) {
-      // If permission is permanently denied, it's good practice to guide the user
-      // to the app settings.
-      if (statuses.values.any((status) => status.isPermanentlyDenied)) {
-        openAppSettings();
-      }
+    // Permissions are generally only required on mobile platforms.
+    if (!Platform.isAndroid && !Platform.isIOS) {
+      print('LocalLibraryService: Running on desktop platform, skipping permission request');
+      return true;
     }
 
-    return isGranted;
+    print('LocalLibraryService: Running on mobile platform (${Platform.operatingSystem}), requesting storage permission');
+
+    final status = await Permission.storage.request();
+    print('LocalLibraryService: Permission status: ${status.toString()}');
+
+    if (status.isGranted) {
+      print('LocalLibraryService: Storage permission granted');
+      return true;
+    }
+
+    // If permission is permanently denied, guide the user to app settings.
+    if (status.isPermanentlyDenied) {
+      print('LocalLibraryService: Permission permanently denied, opening app settings');
+      await openAppSettings();
+    } else {
+      print('LocalLibraryService: Permission denied');
+    }
+
+    return false;
   }
 
-  Future<List<Book>> pickAndLoadBooks() async {
-    if (!await requestStoragePermission()) {
+  /// Opens the platform's file picker to select one or more EPUB files.
+  ///
+  /// This method handles storage permissions and returns a list of selected [File] objects.
+  /// It returns an empty list if no files are selected or if permissions are denied.
+  Future<List<File>> pickFiles() async {
+    print('LocalLibraryService: Starting file picker...');
 
+    if (!await _requestPermission()) {
+      print('LocalLibraryService: Permission denied, returning empty list');
       return [];
     }
 
-    final result = await FilePicker.platform.pickFiles(
-      allowMultiple: true,
-      type: FileType.custom,
-      allowedExtensions: ['epub', 'pdf', 'mp3', 'wav'],
-    );
-    if (result == null) return [];
+    print('LocalLibraryService: Permission granted, opening file picker');
 
-    final files = result.paths.whereType<String>().map((path) => File(path)).toList();
+    try {
+      final result = await FilePicker.platform.pickFiles(
+        allowMultiple: true,
+        type: FileType.custom,
+        allowedExtensions: ['epub'], // Restrict to EPUB files
+      );
 
-    List<Book> books = [];
-    for (final file in files) {
-      final ext = file.path.split('.').last.toLowerCase();
-      if (ext == 'epub') {
-        try {
-          final epubBook = await EpubReader.readBook(await file.readAsBytes());
-          books.add(Book(
-            id: file.path,
-            filePath: file.path,
-            title: epubBook.Title ?? _fileName(file),
-            author: epubBook.Author ?? 'Unknown',
-            coverImageUrl: null,
-            bookType: BookType.epub,
-          ));
-        } catch (_) {
-          books.add(Book(
-            id: file.path,
-            filePath: file.path,
-            title: _fileName(file),
-            author: 'Unknown',
-            coverImageUrl: null,
-            bookType: BookType.epub,
-          ));
-        }
-      } else if (ext == 'pdf') {
-        books.add(Book(
-          id: file.path,
-          filePath: file.path,
-          title: _fileName(file),
-          author: 'Unknown',
-          coverImageUrl: null,
-          bookType: BookType.pdf,
-        ));
-      } else if (ext == 'mp3' || ext == 'wav') {
-        books.add(Book(
-          id: file.path,
-          filePath: file.path,
-          title: _fileName(file),
-          author: 'Unknown',
-          coverImageUrl: null,
-          bookType: BookType.audio,
-        ));
+      print('LocalLibraryService: File picker result: ${result != null ? 'Files selected' : 'No files selected'}');
+
+      // If the user cancels the picker, the result is null.
+      if (result == null) {
+        print('LocalLibraryService: User cancelled file selection');
+        return [];
       }
+
+      print('LocalLibraryService: Number of files selected: ${result.files.length}');
+      print('LocalLibraryService: Selected file paths: ${result.paths}');
+
+      // Map the valid file paths to File objects and return the list.
+      final files = result.paths
+          .where((path) => path != null)
+          .map((path) => File(path!))
+          .toList();
+
+      print('LocalLibraryService: Number of valid files after filtering: ${files.length}');
+
+      // Debug: Verify file existence and readability
+      for (int i = 0; i < files.length; i++) {
+        final file = files[i];
+        print('LocalLibraryService: File $i - Path: ${file.path}');
+        print('LocalLibraryService: File $i - Exists: ${file.existsSync()}');
+        print('LocalLibraryService: File $i - Size: ${file.existsSync() ? file.lengthSync() : 'N/A'} bytes');
+      }
+
+      print('LocalLibraryService: Successfully returning ${files.length} files');
+      return files;
+    } catch (e) {
+      // Log any errors that occur during file picking.
+      print('LocalLibraryService: Error picking files: $e');
+      print('LocalLibraryService: Error type: ${e.runtimeType}');
+      print('LocalLibraryService: Stack trace: ${StackTrace.current}');
+      return [];
     }
-    return books;
   }
 
-  /// Scans the device for books (.epub, .pdf, .mp3, .wav).
-  Future<List<Book>> scanDeviceForBooks() async {
-    if (!await requestStoragePermission()) {
+  /// Opens the platform's directory picker and scans for all EPUB files within.
+  ///
+  /// This method recursively finds all files with the '.epub' extension
+  /// in the selected directory and its subdirectories.
+  /// It returns an empty list if no directory is selected or permissions are denied.
+  Future<List<File>> scanAndLoadBooks() async {
+    print('LocalLibraryService: Starting directory scan...');
+
+    if (!await _requestPermission()) {
+      print('LocalLibraryService: Permission denied, returning empty list');
       return [];
     }
 
-    String? directoryPath = await FilePicker.platform.getDirectoryPath();
-    if (directoryPath == null) return [];
+    print('LocalLibraryService: Permission granted, opening directory picker');
 
-    final dir = Directory(directoryPath);
-    final files = dir
-        .listSync(recursive: true)
-        .whereType<File>()
-        .where((f) =>
-    f.path.endsWith('.epub') ||
-        f.path.endsWith('.pdf') ||
-        f.path.endsWith('.mp3') ||
-        f.path.endsWith('.wav'))
-        .toList();
+    try {
+      final directoryPath = await FilePicker.platform.getDirectoryPath();
 
-    List<Book> books = [];
-    for (final file in files) {
-      final ext = file.path.split('.').last.toLowerCase();
-      if (ext == 'epub') {
-        try {
-          final epubBook = await EpubReader.readBook(await file.readAsBytes());
-          books.add(Book(
-            id: file.path,
-            filePath: file.path,
-            title: epubBook.Title ?? _fileName(file),
-            author: epubBook.Author ?? 'Unknown',
-            coverImageUrl: null, // You can extract cover as bytes if needed
-            bookType: BookType.epub,
-          ));
-        } catch (_) {
-          // Fallback if parsing fails
-          books.add(Book(
-            id: file.path,
-            filePath: file.path,
-            title: _fileName(file),
-            author: 'Unknown',
-            coverImageUrl: null,
-            bookType: BookType.epub,
-          ));
-        }
-      } else if (ext == 'pdf') {
-        books.add(Book(
-          id: file.path,
-          filePath: file.path,
-          title: _fileName(file),
-          author: 'Unknown',
-          coverImageUrl: null,
-          bookType: BookType.pdf,
-        ));
-      } else if (ext == 'mp3' || ext == 'wav') {
-        books.add(Book(
-          id: file.path,
-          filePath: file.path,
-          title: _fileName(file),
-          author: 'Unknown',
-          coverImageUrl: null,
-          bookType: BookType.audio,
-        ));
+      print('LocalLibraryService: Directory picker result: ${directoryPath ?? 'No directory selected'}');
+
+      // If the user cancels the directory picker, the path is null.
+      if (directoryPath == null) {
+        print('LocalLibraryService: User cancelled directory selection');
+        return [];
       }
+
+      print('LocalLibraryService: Selected directory: $directoryPath');
+
+      final dir = Directory(directoryPath);
+
+      if (!dir.existsSync()) {
+        print('LocalLibraryService: Selected directory does not exist');
+        return [];
+      }
+
+      print('LocalLibraryService: Starting recursive scan of directory...');
+
+      // Recursively list all entities, filter for files ending in .epub, and return them.
+      final allEntities = dir.listSync(recursive: true);
+      print('LocalLibraryService: Total entities found: ${allEntities.length}');
+
+      final allFiles = allEntities.whereType<File>();
+      print('LocalLibraryService: Total files found: ${allFiles.length}');
+
+      final epubFiles = allFiles
+          .where((file) => file.path.toLowerCase().endsWith('.epub'))
+          .toList();
+
+      print('LocalLibraryService: EPUB files found: ${epubFiles.length}');
+
+      // Debug: Verify each found file
+      for (int i = 0; i < epubFiles.length; i++) {
+        final file = epubFiles[i];
+        print('LocalLibraryService: EPUB $i - Path: ${file.path}');
+        print('LocalLibraryService: EPUB $i - Exists: ${file.existsSync()}');
+        print('LocalLibraryService: EPUB $i - Size: ${file.existsSync() ? file.lengthSync() : 'N/A'} bytes');
+      }
+
+      print('LocalLibraryService: Successfully returning ${epubFiles.length} EPUB files');
+      return epubFiles;
+    } catch (e) {
+      // Log any errors that occur during directory scanning.
+      print('LocalLibraryService: Error scanning directory: $e');
+      print('LocalLibraryService: Error type: ${e.runtimeType}');
+      print('LocalLibraryService: Stack trace: ${StackTrace.current}');
+      return [];
     }
-    return books;
   }
-
-  /// Placeholder: Save books to local cache (e.g., Hive/Isar).
-  Future<void> cacheBooks(List<Book> books) async {
-    // TODO: Implement with Hive/Isar
-  }
-
-  /// Placeholder: Load books from local cache (e.g., Hive/Isar).
-  Future<List<Book>> loadBooksFromCache() async {
-    // TODO: Implement with Hive/Isar
-    return [];
-  }
-
-  String _fileName(File file) => file.uri.pathSegments.last.split('.').first;
 }

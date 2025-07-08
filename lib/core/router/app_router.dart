@@ -13,6 +13,7 @@ import 'package:visualit/features/settings/presentation/settings_screen.dart';
 import 'package:visualit/main.dart';
 
 import '../../features/auth/presentation/splash_screen.dart';
+import '../../features/reader/presentation/reading_screen.dart';
 
 // A GlobalKey is needed for the root navigator.
 final _rootNavigatorKey = GlobalKey<NavigatorState>();
@@ -32,6 +33,11 @@ final goRouterProvider = Provider<GoRouter>((ref) {
       GoRoute(path: '/login', name: 'login', builder: (context, state) => const LoginScreen()),
       GoRoute(path: '/signup', name: 'signup', builder: (context, state) => const SignUpScreen()),
       GoRoute(path: '/onboarding', name: 'onboarding', builder: (context, state) => const OnboardingScreen()),
+      GoRoute(path: '/book/:bookId', name: 'bookReader', builder: (context, state) {
+          final bookId = int.tryParse(state.pathParameters['bookId'] ?? '0') ?? 0;
+          return ReadingScreen(bookId: bookId);
+        },
+      ),
       // TODO: Add '/preferences' route here when built
 
       // Main application shell route

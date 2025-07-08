@@ -1,18 +1,16 @@
-import 'package:cached_network_image/cached_network_image.dart';
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:visualit/core/theme/app_theme.dart';
 
-/// A reusable widget to display a book cover with its title and author.
-/// This will be the building block for our Netflix-style home screen.
 class BookCard extends StatelessWidget {
-  final String imageUrl;
+  final Uint8List? imageBytes;
   final String title;
   final String author;
   final VoidCallback onTap;
 
   const BookCard({
     super.key,
-    required this.imageUrl,
+    this.imageBytes,
     required this.title,
     required this.author,
     required this.onTap,
@@ -23,33 +21,31 @@ class BookCard extends StatelessWidget {
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        width: 130, // A fixed width for each card in the horizontal list
+        width: 130,
         margin: const EdgeInsets.only(right: 16.0),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Book Cover Image
             Expanded(
               child: ClipRRect(
                 borderRadius: BorderRadius.circular(12.0),
-                child: CachedNetworkImage(
-                  imageUrl: imageUrl,
-                  fit: BoxFit.cover,
-                  width: double.infinity, // Take the full width of the container
-                  placeholder: (context, url) => Container(
-                    color: AppTheme.darkGrey,
-                    child: const Center(child: CircularProgressIndicator()),
-                  ),
-                  errorWidget: (context, url, error) => Container(
-                    color: AppTheme.darkGrey,
-                    child: const Icon(Icons.book, color: AppTheme.grey),
-                  ),
+                child: Container(
+                  width: double.infinity,
+                  color: AppTheme.darkGrey,
+                  child: imageBytes != null
+                      ? Image.memory(
+                    imageBytes!,
+                    fit: BoxFit.cover,
+                    // This correctly handles any image decoding errors.
+                    errorBuilder: (context, error, stackTrace) {
+                      return const Icon(Icons.book, color: AppTheme.grey, size: 50);
+                    },
+                  )
+                      : const Icon(Icons.book, color: AppTheme.grey, size: 50),
                 ),
               ),
             ),
             const SizedBox(height: 8),
-
-            // Book Title
             Text(
               title,
               maxLines: 1,
@@ -61,8 +57,6 @@ class BookCard extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 4),
-
-            // Author Name
             Text(
               author,
               maxLines: 1,

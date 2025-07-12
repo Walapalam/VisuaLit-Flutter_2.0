@@ -1,37 +1,39 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:isar/isar.dart';
+import 'dart:async';
 import 'package:visualit/core/providers/isar_provider.dart';
 import 'package:visualit/features/reader/application/book_paginator.dart';
 import 'package:visualit/features/reader/data/book_data.dart';
-import 'package:visualit/features/reader/presentation/reading_providers.dart'; // Add this
-import '../domain/book_page.dart';
+import 'package:visualit/features/reader/domain/book_page.dart';
+import 'package:visualit/features/reader/data/toc_entry.dart';
+import 'package:visualit/features/reader/presentation/reading_preferences_controller.dart';
 
 @immutable
 class ReadingState {
   final int bookId;
-  final AsyncValue<BookPaginator> paginator;
-  final Map<int, BookPage> pageCache;
+  final BookPaginator? paginator;
   final int currentPage;
+  final bool isPaginating;
 
   const ReadingState({
     required this.bookId,
-    required this.paginator,
-    this.pageCache = const {},
+    this.paginator,
     this.currentPage = 0,
+    this.isPaginating = true,
   });
 
   ReadingState copyWith({
     int? bookId,
-    AsyncValue<BookPaginator>? paginator,
-    Map<int, BookPage>? pageCache,
+    BookPaginator? paginator,
     int? currentPage,
+    bool? isPaginating,
   }) {
     return ReadingState(
       bookId: bookId ?? this.bookId,
       paginator: paginator ?? this.paginator,
-      pageCache: pageCache ?? this.pageCache,
       currentPage: currentPage ?? this.currentPage,
+      isPaginating: isPaginating ?? this.isPaginating,
     );
   }
 }
@@ -39,111 +41,131 @@ class ReadingState {
 class ReadingController extends StateNotifier<ReadingState> {
   final Isar _isar;
   final Size _viewSize;
-  final int _blocksPerPage;
+  final ReadingPreferences _preferences;
+  final Ref _ref;
+  final _Debouncer _debouncer = _Debouncer(milliseconds: 1000);
 
-  ReadingController(this._isar, int bookId, this._viewSize, this._blocksPerPage)
-      : super(ReadingState(bookId: bookId, paginator: const AsyncValue.loading())) {
+  ReadingController(this._isar, this._ref, int bookId, this._viewSize)
+      : _preferences = _ref.read(readingPreferencesProvider),
+        super(ReadingState(bookId: bookId)) {
+    print("✅ [ReadingController] Initialized for book ID: $bookId");
     _initialize();
   }
 
   Future<void> _initialize() async {
+    print("⏳ [ReadingController] Starting initialization process...");
     try {
-      print('ReadingController: Starting initialization for book ${state.bookId}');
+      state = state.copyWith(isPaginating: true);
+      print("  [ReadingController] State set to: isPaginating = true");
 
-      final textStyle = const TextStyle(fontSize: 18, height: 1.6, fontFamily: 'Georgia');
-      final margins = const EdgeInsets.symmetric(horizontal: 20, vertical: 30);
+      final book = await _isar.books.get(state.bookId);
+      final initialPage = book?.lastReadPage ?? 0;
+      print("  [ReadingController] Found book in DB. Last read page: $initialPage");
 
-      print('ReadingController: Querying content blocks from database...');
       final blocks = await _isar.contentBlocks
           .filter()
           .bookIdEqualTo(state.bookId)
           .findAll();
 
-      print('ReadingController: Found ${blocks.length} content blocks for book ${state.bookId}');
+      print("  [ReadingController] Fetched ${blocks.length} content blocks from DB.");
 
       if (blocks.isEmpty) {
-        print('ReadingController: ERROR - No content blocks found for book ${state.bookId}');
-        state = state.copyWith(
-          paginator: AsyncValue.error(
-            'This book has no content to display.',
-            StackTrace.current,
-          ),
-        );
+        print("❌ [ReadingController] CRITICAL: No content blocks found for this book. Cannot proceed.");
+        state = state.copyWith(isPaginating: false);
+        print("  [ReadingController] State set to: isPaginating = false (with no paginator)");
         return;
       }
 
-      // Debug first few blocks
-      print('ReadingController: First block - Chapter: ${blocks.first.chapterIndex}, Block: ${blocks.first.blockIndexInChapter}');
-      print('ReadingController: First block text: ${blocks.first.textContent?.substring(0, blocks.first.textContent!.length > 100 ? 100 : blocks.first.textContent!.length)}...');
-
-      if (blocks.length > 1) {
-        print('ReadingController: Second block - Chapter: ${blocks[1].chapterIndex}, Block: ${blocks[1].blockIndexInChapter}');
-        print('ReadingController: Second block text: ${blocks[1].textContent?.substring(0, blocks[1].textContent!.length > 100 ? 100 : blocks[1].textContent!.length)}...');
-      }
-
-      print('ReadingController: Creating BookPaginator with ${blocks.length} blocks...');
-      final paginator = BookPaginator(
+      print("  [ReadingController] Creating BookPaginator...");
+      final paginator = await BookPaginator.create(
         allBlocks: blocks,
-        textStyle: textStyle,
         viewSize: _viewSize,
-        margins: margins,
-        blocksPerPage: _blocksPerPage, // For debugging, can be adjusted later
+        preferences: _preferences,
       );
+      print("✅ [ReadingController] BookPaginator created successfully.");
 
-      print('ReadingController: BookPaginator created successfully');
-      state = state.copyWith(paginator: AsyncValue.data(paginator));
-
-      print('ReadingController: Getting first page...');
-      getPage(0);
-      print('ReadingController: Initialization completed successfully');
+      state = state.copyWith(
+        paginator: paginator,
+        isPaginating: false,
+        currentPage: initialPage,
+      );
+      print("✅ [ReadingController] Initialization complete. State updated with paginator and isPaginating = false.");
 
     } catch (error, stackTrace) {
-      print('ReadingController: ERROR during initialization: $error');
-      print('ReadingController: Stack trace: $stackTrace');
-      state = state.copyWith(
-        paginator: AsyncValue.error(error, stackTrace),
-      );
+      print("❌ [ReadingController] FATAL ERROR during initialization: $error");
+      print(stackTrace);
+      state = state.copyWith(isPaginating: false);
     }
   }
 
-  void getPage(int pageIndex) {
-    print('ReadingController: Getting page $pageIndex');
+  void onPageChanged(int page) {
+    if (page != state.currentPage) {
+      state = state.copyWith(currentPage: page);
+      _debouncer.run(() => _saveProgress(page));
+    }
+  }
 
-    state.paginator.whenData((paginator) {
-      if (state.pageCache.containsKey(pageIndex)) {
-        print('ReadingController: Page $pageIndex already cached');
-        return;
-      }
-
-      print('ReadingController: Generating page $pageIndex...');
-      try {
-        final page = paginator.getPage(pageIndex);
-        print('ReadingController: Page $pageIndex generated with ${page.blocks.length} blocks');
-
-        final newCache = Map<int, BookPage>.from(state.pageCache);
-        newCache[pageIndex] = page;
-        state = state.copyWith(pageCache: newCache);
-
-        print('ReadingController: Page $pageIndex cached successfully');
-      } catch (error) {
-        print('ReadingController: ERROR generating page $pageIndex: $error');
+  Future<void> _saveProgress(int page) async {
+    print("ℹ️ [ReadingController] Saving progress. Page: $page");
+    await _isar.writeTxn(() async {
+      final book = await _isar.books.get(state.bookId);
+      if (book != null) {
+        book.lastReadPage = page;
+        book.lastReadTimestamp = DateTime.now();
+        await _isar.books.put(book);
       }
     });
   }
 
-  void onPageChanged(int index) {
-    print('ReadingController: Page changed to $index');
-    state = state.copyWith(currentPage: index);
-    state.paginator.whenData((p) {
-      getPage(index);
-      if (index + 1 < (p.allBlocks.length / _blocksPerPage)) getPage(index + 1);
+  Future<void> jumpToLocation(TOCEntry entry) async {
+    print("ℹ️ [ReadingController] Jumping to: ${entry.title} (src: ${entry.src}, fragment: ${entry.fragment})");
+    if (state.paginator == null || entry.src == null) {
+      print("⚠️ [ReadingController] Paginator or entry.src is null. Cannot jump.");
+      return;
+    }
+
+    final targetBlockIndex =
+    state.paginator!.findBlockIndexByLocation(entry.src!, entry.fragment);
+
+    if (targetBlockIndex != -1) {
+      final targetPage = state.paginator!.getPageForBlock(targetBlockIndex);
+      if (targetPage != null) {
+        print("✅ [ReadingController] Found block at index $targetBlockIndex on page $targetPage. Jumping.");
+        // Manually trigger the page change logic AND update the state.
+        // The listener will handle the page controller jump.
+        onPageChanged(targetPage);
+        if (mounted) { // Ensure the notifier is still active
+          state = state.copyWith(currentPage: targetPage);
+        }
+      } else {
+        print("⚠️ [ReadingController] Could not find page for block index $targetBlockIndex. Pagination might be incomplete.");
+      }
+    } else {
+      print("⚠️ [ReadingController] Could not find a matching block in the location map for: ${entry.title}");
+    }
+  }
+}
+
+class _Debouncer {
+  final int milliseconds;
+  VoidCallback? _action;
+  Timer? _timer;
+
+  _Debouncer({required this.milliseconds});
+
+  run(VoidCallback action) {
+    _action = action;
+    _timer?.cancel();
+    _timer = Timer(Duration(milliseconds: milliseconds), () {
+      _action?.call();
     });
   }
 }
 
-final readingControllerProvider = StateNotifierProvider.family.autoDispose<ReadingController, ReadingState, (int, Size)>((ref, params) {
+final readingControllerProvider = StateNotifierProvider.family.autoDispose<
+    ReadingController, ReadingState, (int, Size)>((ref, params) {
   final isar = ref.watch(isarDBProvider).value!;
   final (bookId, viewSize) = params;
-  final blocksPerPage = ref.watch(readerSettingsProvider).blocksPerPage;
-  return ReadingController(isar, bookId, viewSize, blocksPerPage);
+  ref.watch(readingPreferencesProvider);
+  return ReadingController(isar, ref, bookId, viewSize);
 });

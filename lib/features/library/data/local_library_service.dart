@@ -1,6 +1,16 @@
 import 'dart:io';
+import 'dart:typed_data'; // Import this
 import 'package:file_picker/file_picker.dart';
 import 'package:permission_handler/permission_handler.dart';
+
+// A new class to hold our picked file data securely
+class PickedFileData {
+  final String path;
+  final Uint8List bytes;
+
+  PickedFileData({required this.path, required this.bytes});
+}
+
 
 class LocalLibraryService {
   /// Requests necessary storage permissions for mobile platforms.
@@ -38,9 +48,9 @@ class LocalLibraryService {
 
   /// Opens the platform's file picker to select one or more EPUB files.
   ///
-  /// This method handles storage permissions and returns a list of selected [File] objects.
+  /// This method handles storage permissions and returns a list of selected [PickedFileData] objects.
   /// It returns an empty list if no files are selected or if permissions are denied.
-  Future<List<File>> pickFiles() async {
+  Future<List<PickedFileData>> pickFiles() async {
     print('LocalLibraryService: Starting file picker...');
 
     if (!await _requestPermission()) {
@@ -48,59 +58,44 @@ class LocalLibraryService {
       return [];
     }
 
-    print('LocalLibraryService: Permission granted, opening file picker');
-
     try {
+      // Ask for the file bytes directly
       final result = await FilePicker.platform.pickFiles(
         allowMultiple: true,
         type: FileType.custom,
-        allowedExtensions: ['epub'], // Restrict to EPUB files
+        allowedExtensions: ['epub'],
+        withData: true, // This is the crucial change!
       );
 
-      print('LocalLibraryService: File picker result: ${result != null ? 'Files selected' : 'No files selected'}');
-
-      // If the user cancels the picker, the result is null.
       if (result == null) {
         print('LocalLibraryService: User cancelled file selection');
         return [];
       }
 
-      print('LocalLibraryService: Number of files selected: ${result.files.length}');
-      print('LocalLibraryService: Selected file paths: ${result.paths}');
-
-      // Map the valid file paths to File objects and return the list.
-      final files = result.paths
-          .where((path) => path != null)
-          .map((path) => File(path!))
-          .toList();
-
-      print('LocalLibraryService: Number of valid files after filtering: ${files.length}');
-
-      // Debug: Verify file existence and readability
-      for (int i = 0; i < files.length; i++) {
-        final file = files[i];
-        print('LocalLibraryService: File $i - Path: ${file.path}');
-        print('LocalLibraryService: File $i - Exists: ${file.existsSync()}');
-        print('LocalLibraryService: File $i - Size: ${file.existsSync() ? file.lengthSync() : 'N/A'} bytes');
+      final List<PickedFileData> pickedFiles = [];
+      for (final file in result.files) {
+        if (file.path != null && file.bytes != null) {
+          print('LocalLibraryService: Successfully read ${file.bytes!.lengthInBytes} bytes from ${file.name}');
+          pickedFiles.add(PickedFileData(path: file.path!, bytes: file.bytes!));
+        } else {
+          print('LocalLibraryService: Warning - picked file ${file.name} was missing path or data.');
+        }
       }
 
-      print('LocalLibraryService: Successfully returning ${files.length} files');
-      return files;
+      return pickedFiles;
+
     } catch (e) {
-      // Log any errors that occur during file picking.
       print('LocalLibraryService: Error picking files: $e');
-      print('LocalLibraryService: Error type: ${e.runtimeType}');
-      print('LocalLibraryService: Stack trace: ${StackTrace.current}');
       return [];
     }
   }
+
 
   /// Opens the platform's directory picker and scans for all EPUB files within.
   ///
   /// This method recursively finds all files with the '.epub' extension
   /// in the selected directory and its subdirectories.
-  /// It returns an empty list if no directory is selected or permissions are denied.
-  Future<List<File>> scanAndLoadBooks() async {
+  Future<List<PickedFileData>> scanAndLoadBooks() async {
     print('LocalLibraryService: Starting directory scan...');
 
     if (!await _requestPermission()) {
@@ -108,58 +103,72 @@ class LocalLibraryService {
       return [];
     }
 
-    print('LocalLibraryService: Permission granted, opening directory picker');
-
     try {
       final directoryPath = await FilePicker.platform.getDirectoryPath();
-
-      print('LocalLibraryService: Directory picker result: ${directoryPath ?? 'No directory selected'}');
-
-      // If the user cancels the directory picker, the path is null.
       if (directoryPath == null) {
         print('LocalLibraryService: User cancelled directory selection');
         return [];
       }
 
-      print('LocalLibraryService: Selected directory: $directoryPath');
-
       final dir = Directory(directoryPath);
-
-      if (!dir.existsSync()) {
+      if (!await dir.exists()) {
         print('LocalLibraryService: Selected directory does not exist');
         return [];
       }
 
-      print('LocalLibraryService: Starting recursive scan of directory...');
+      final List<PickedFileData> pickedFiles = [];
+      await for (final entity in dir.list(recursive: true)) {
+        if (entity is File && entity.path.toLowerCase().endsWith('.epub')) {
+          try {
+            final bytes = await entity.readAsBytes();
+            pickedFiles.add(PickedFileData(path: entity.path, bytes: bytes));
+            print('LocalLibraryService: Scanned and read ${bytes.lengthInBytes} bytes from ${entity.path}');
+          } catch (e) {
+            print('LocalLibraryService: Error reading scanned file ${entity.path}: $e');
+          }
+        }
+      }
+      return pickedFiles;
 
-      // Recursively list all entities, filter for files ending in .epub, and return them.
-      final allEntities = dir.listSync(recursive: true);
-      print('LocalLibraryService: Total entities found: ${allEntities.length}');
+    } catch(e) {
+      print('LocalLibraryService: Error scanning directory: $e');
+      return [];
+    }
+  }
 
-      final allFiles = allEntities.whereType<File>();
-      print('LocalLibraryService: Total files found: ${allFiles.length}');
+  /// Opens the platform's file picker to select one or more MP3 files.
+  ///
+  /// Returns a list of selected audio files, or an empty list if no files are selected
+  /// or if permissions are denied.
+  Future<List<File>> pickAudiobooks() async {
+    print('LocalLibraryService: Starting audiobook picker...');
 
-      final epubFiles = allFiles
-          .where((file) => file.path.toLowerCase().endsWith('.epub'))
-          .toList();
+    if (!await _requestPermission()) {
+      print('LocalLibraryService: Permission denied for audiobook picking');
+      return [];
+    }
 
-      print('LocalLibraryService: EPUB files found: ${epubFiles.length}');
+    try {
+      final result = await FilePicker.platform.pickFiles(
+        allowMultiple: true,
+        type: FileType.custom,
+        allowedExtensions: ['mp3'], // Restrict to MP3 files
+      );
 
-      // Debug: Verify each found file
-      for (int i = 0; i < epubFiles.length; i++) {
-        final file = epubFiles[i];
-        print('LocalLibraryService: EPUB $i - Path: ${file.path}');
-        print('LocalLibraryService: EPUB $i - Exists: ${file.existsSync()}');
-        print('LocalLibraryService: EPUB $i - Size: ${file.existsSync() ? file.lengthSync() : 'N/A'} bytes');
+      if (result == null) {
+        print('LocalLibraryService: No audiobooks selected');
+        return [];
       }
 
-      print('LocalLibraryService: Successfully returning ${epubFiles.length} EPUB files');
-      return epubFiles;
+      final files = result.paths
+          .where((path) => path != null)
+          .map((path) => File(path!))
+          .toList();
+
+      print('LocalLibraryService: Selected ${files.length} audiobooks');
+      return files;
     } catch (e) {
-      // Log any errors that occur during directory scanning.
-      print('LocalLibraryService: Error scanning directory: $e');
-      print('LocalLibraryService: Error type: ${e.runtimeType}');
-      print('LocalLibraryService: Stack trace: ${StackTrace.current}');
+      print('LocalLibraryService: Error picking audiobooks: $e');
       return [];
     }
   }

@@ -1,64 +1,355 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:visualit/features/reader/presentation/reading_controller.dart';
-import 'package:visualit/features/reader/domain/book_page.dart';
+import 'package:visualit/core/theme/app_theme.dart';
 import 'package:visualit/features/reader/data/book_data.dart';
+import 'package:visualit/features/reader/domain/book_page.dart';
+import 'package:visualit/features/reader/presentation/reading_controller.dart';
+import 'package:visualit/features/reader/presentation/reading_preferences_controller.dart';
+import 'package:visualit/features/reader/presentation/widgets/line_guide_painter.dart';
+import 'package:visualit/features/reader/presentation/widgets/reading_settings_panel.dart';
+import 'package:visualit/features/reader/presentation/widgets/toc_panel.dart';
 
-class ReadingScreen extends ConsumerWidget {
+class ReadingScreen extends ConsumerStatefulWidget {
   final int bookId;
+
   const ReadingScreen({super.key, required this.bookId});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    print('ReadingScreen: Building screen for bookId: $bookId');
+  ConsumerState<ReadingScreen> createState() => _ReadingScreenState();
+}
 
+class _ReadingScreenState extends ConsumerState<ReadingScreen> {
+  bool _isUiVisible = false;
+  late final PageController _pageController;
+  double _lineGuideY = 150.0;
+
+  @override
+  void initState() {
+    super.initState();
+    SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersive);
+    _pageController = PageController();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
     final viewSize = MediaQuery.of(context).size;
-    print('ReadingScreen: ViewSize: $viewSize');
+    final initialPage = ref.read(readingControllerProvider((widget.bookId, viewSize))).currentPage;
 
-    final state = ref.watch(readingControllerProvider((bookId, viewSize)));
-    final controller = ref.read(readingControllerProvider((bookId, viewSize)).notifier);
+    if (!_pageController.hasClients || _pageController.page?.round() != initialPage) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (_pageController.hasClients) {
+          _pageController.jumpToPage(initialPage);
+        }
+      });
+    }
+  }
 
-    print('ReadingScreen: Controller state - paginator: ${state.paginator}, currentPage: ${state.currentPage}');
-    print('ReadingScreen: Page cache size: ${state.pageCache.length}');
+  @override
+  void dispose() {
+    SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
+    _pageController.dispose();
+    super.dispose();
+  }
 
-    return Scaffold(
-      backgroundColor: const Color(0xFFF5F0E5), // A parchment-like color
-      body: SafeArea(
-        child: state.paginator.when(
-          loading: () {
-            print('ReadingScreen: Showing loading indicator');
-            return const Center(child: CircularProgressIndicator());
-          },
-          error: (e, st) {
-            print('ReadingScreen: Error state - $e');
-            print('ReadingScreen: Stack trace - $st');
-            return Center(child: Text("Error: $e"));
-          },
-          data: (paginator) {
-            print('ReadingScreen: Paginator loaded with ${paginator.allBlocks.length} blocks');
-            print('ReadingScreen: Building PageView...');
+  void _toggleUiVisibility() {
+    setState(() {
+      _isUiVisible = !_isUiVisible;
+      if (_isUiVisible) {
+        SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
+      } else {
+        SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersive);
+      }
+    });
+  }
 
-            return PageView.builder(
-              onPageChanged: (index) {
-                print('ReadingScreen: Page changed to $index');
-                controller.onPageChanged(index);
-              },
-              itemCount: (paginator.allBlocks.length / 10).ceil(), // Estimate page count
-              itemBuilder: (context, index) {
-                print('ReadingScreen: Building page $index');
+  void _showSettingsPanel(BuildContext context) {
+    if (!_isUiVisible) _toggleUiVisibility();
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => const ReadingSettingsPanel(),
+    );
+  }
 
-                final page = state.pageCache[index];
-                if (page == null) {
-                  print('ReadingScreen: Page $index not cached, requesting...');
-                  Future.microtask(() => controller.getPage(index));
-                  return const Center(child: CircularProgressIndicator(color: Colors.black54));
-                }
+  void _showTocPanel(Size viewSize) {
+    if (!_isUiVisible) _toggleUiVisibility();
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => TOCPanel(
+        bookId: widget.bookId,
+        viewSize: viewSize,
+      ),
+    );
+  }
 
-                print('ReadingScreen: Rendering page $index with ${page.blocks.length} blocks');
-                return BookPageView(page: page);
-              },
-            );
-          },
+  @override
+  Widget build(BuildContext context) {
+    final viewSize = MediaQuery.of(context).size;
+    final provider = readingControllerProvider((widget.bookId, viewSize));
+
+    final state = ref.watch(provider);
+    final controller = ref.read(provider.notifier);
+    final prefs = ref.watch(readingPreferencesProvider);
+
+    print("🔄 [ReadingScreen] Build method called.");
+    print("  [ReadingScreen] Current state: isPaginating=${state.isPaginating}, paginator is null=${state.paginator == null}, totalPages=${state.paginator?.totalPages ?? 'N/A'}");
+
+
+    ref.listen(provider.select((s) => s.currentPage), (previous, next) {
+      if (_pageController.hasClients && _pageController.page?.round() != next) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (_pageController.hasClients) {
+            _pageController.jumpToPage(next);
+          }
+        });
+      }
+    });
+
+    return WillPopScope(
+      onWillPop: () async {
+        Navigator.of(context).pop();
+        return false;
+      },
+      child: Scaffold(
+        backgroundColor: prefs.pageColor,
+        body: Stack(
+          children: [
+            if (state.isPaginating || state.paginator == null)
+              Builder(builder: (context) {
+                print("  [ReadingScreen] UI: Building 'Preparing book...' indicator.");
+                return Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const CircularProgressIndicator(),
+                      const SizedBox(height: 16),
+                      Text('Preparing book...', style: TextStyle(color: prefs.textColor)),
+                    ],
+                  ),
+                );
+              })
+            else if (state.paginator!.totalPages == 0)
+              Builder(builder: (context) {
+                print("  [ReadingScreen] UI: Building 'Failed to Load' error message.");
+                return Center(
+                  child: Padding(
+                    padding: const EdgeInsets.all(24.0),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(Icons.error_outline, color: prefs.textColor, size: 60),
+                        const SizedBox(height: 20),
+                        Text(
+                          'Failed to Load Book',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(color: prefs.textColor, fontSize: 22, fontWeight: FontWeight.bold),
+                        ),
+                        const SizedBox(height: 10),
+                        Text(
+                          'The content could not be processed. The EPUB file might be empty, corrupted, or in an unsupported format.',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(color: prefs.textColor.withOpacity(0.8), fontSize: 16),
+                        ),
+                        const SizedBox(height: 30),
+                        ElevatedButton(
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: AppTheme.primaryGreen,
+                            foregroundColor: AppTheme.black,
+                          ),
+                          onPressed: () => Navigator.of(context).pop(),
+                          child: const Text('Back to Library'),
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              })
+            else
+              Builder(builder: (context) {
+                print("  [ReadingScreen] UI: Building PageView with ${state.paginator!.totalPages} pages.");
+                return PageView.builder(
+                  controller: _pageController,
+                  onPageChanged: controller.onPageChanged,
+                  itemCount: state.paginator!.totalPages,
+                  itemBuilder: (context, index) {
+                    final page = state.paginator!.getPage(index);
+                    if (page == null) {
+                      print("    [ReadingScreen] PageView trying to build page $index, but it's NULL.");
+                    }
+                    return page == null
+                        ? Center(child: Text("Error loading page $index", style: TextStyle(color: prefs.textColor)))
+                        : BookPageView(page: page, preferences: prefs);
+                  },
+                );
+              }),
+
+            _buildGestureDetector(),
+
+            if (prefs.isLineGuideEnabled)
+              GestureDetector(
+                onVerticalDragUpdate: (details) => setState(() => _lineGuideY = details.globalPosition.dy),
+                child: CustomPaint(
+                  painter: LineGuidePainter(lineGuideY: _lineGuideY, preferences: prefs),
+                  size: Size.infinite,
+                ),
+              ),
+
+            if (!state.isPaginating && state.paginator != null) ...[
+              _buildTopOverlay(prefs, state, viewSize),
+              _buildBottomOverlay(prefs, state),
+            ]
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildGestureDetector() {
+    return Row(
+      children: [
+        Expanded(
+          flex: 1,
+          child: GestureDetector(
+            onTap: () {
+              if (_isUiVisible) {
+                _toggleUiVisibility();
+              } else {
+                _pageController.previousPage(
+                  duration: const Duration(milliseconds: 250),
+                  curve: Curves.easeOut,
+                );
+              }
+            },
+          ),
+        ),
+        Expanded(
+          flex: 2,
+          child: GestureDetector(onTap: _toggleUiVisibility),
+        ),
+        Expanded(
+          flex: 1,
+          child: GestureDetector(
+            onTap: () {
+              if (_isUiVisible) {
+                _toggleUiVisibility();
+              } else {
+                _pageController.nextPage(
+                  duration: const Duration(milliseconds: 250),
+                  curve: Curves.easeOut,
+                );
+              }
+            },
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildTopOverlay(ReadingPreferences prefs, ReadingState state, Size viewSize) {
+    return AnimatedOpacity(
+      opacity: _isUiVisible ? 1.0 : 0.0,
+      duration: const Duration(milliseconds: 200),
+      child: IgnorePointer(
+        ignoring: !_isUiVisible,
+        child: Container(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+              colors: [
+                prefs.pageColor.withOpacity(0.9),
+                prefs.pageColor.withOpacity(0),
+              ],
+            ),
+          ),
+          child: SafeArea(
+            bottom: false,
+            child: AppBar(
+              backgroundColor: Colors.transparent,
+              elevation: 0,
+              leading: IconButton(
+                icon: Icon(Icons.arrow_back, color: prefs.textColor),
+                onPressed: () => Navigator.of(context).pop(),
+              ),
+              title: Text(
+                state.paginator?.allBlocks.first.textContent ?? '',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(color: prefs.textColor, fontSize: 16),
+              ),
+              actions: [
+                IconButton(
+                  icon: Icon(Icons.menu_book, color: prefs.textColor),
+                  onPressed: () => _showTocPanel(viewSize),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildBottomOverlay(ReadingPreferences prefs, ReadingState state) {
+    final paginator = state.paginator;
+    final totalPages = paginator?.totalPages ?? 1;
+    final currentPage = state.currentPage;
+
+    return AnimatedOpacity(
+      opacity: _isUiVisible ? 1.0 : 0.0,
+      duration: const Duration(milliseconds: 200),
+      child: IgnorePointer(
+        ignoring: !_isUiVisible,
+        child: Align(
+          alignment: Alignment.bottomCenter,
+          child: Container(
+            padding: const EdgeInsets.only(bottom: 16),
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.bottomCenter,
+                end: Alignment.topCenter,
+                colors: [
+                  prefs.pageColor.withOpacity(0.9),
+                  prefs.pageColor.withOpacity(0),
+                ],
+              ),
+            ),
+            child: SafeArea(
+              top: false,
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Slider(
+                      value: currentPage.toDouble().clamp(0, (totalPages > 0 ? totalPages - 1 : 0).toDouble()),
+                      min: 0,
+                      max: (totalPages > 0 ? totalPages - 1 : 0).toDouble(),
+                      onChanged: (value) => _pageController.jumpToPage(value.round()),
+                      activeColor: prefs.textColor,
+                      inactiveColor: prefs.textColor.withOpacity(0.3),
+                    ),
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                    child: Text(
+                      '${currentPage + 1} / $totalPages',
+                      style: TextStyle(color: prefs.textColor),
+                    ),
+                  ),
+                  IconButton(
+                    icon: const Text('Aa', style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
+                    color: prefs.textColor,
+                    onPressed: () => _showSettingsPanel(context),
+                  ),
+                ],
+              ),
+            ),
+          ),
         ),
       ),
     );
@@ -67,17 +358,24 @@ class ReadingScreen extends ConsumerWidget {
 
 class BookPageView extends StatelessWidget {
   final BookPage page;
-  const BookPageView({super.key, required this.page});
+  final ReadingPreferences preferences;
+
+  const BookPageView({super.key, required this.page, required this.preferences});
 
   @override
   Widget build(BuildContext context) {
-    print('BookPageView: Building page ${page.pageIndex} with ${page.blocks.length} blocks');
-    print('BookPageView: First block text: ${page.blocks.isNotEmpty ? page.blocks.first.textContent?.substring(0, page.blocks.first.textContent!.length > 50 ? 50 : page.blocks.first.textContent!.length) : 'No blocks'}...');
+    final textStyle = TextStyle(
+      fontSize: preferences.fontSize,
+      height: preferences.lineSpacing,
+      fontFamily: preferences.fontFamily,
+      color: preferences.textColor,
+    );
 
     return CustomPaint(
       painter: BookPagePainter(
         page: page,
-        textStyle: const TextStyle(fontSize: 18, height: 1.6, fontFamily: 'Georgia', color: Colors.black87),
+        textStyle: textStyle,
+        preferences: preferences,
         margins: const EdgeInsets.symmetric(horizontal: 20, vertical: 30),
       ),
       size: Size.infinite,
@@ -89,24 +387,20 @@ class BookPagePainter extends CustomPainter {
   final BookPage page;
   final TextStyle textStyle;
   final EdgeInsets margins;
+  final ReadingPreferences preferences;
 
-  BookPagePainter({
+  const BookPagePainter({
     required this.page,
     required this.textStyle,
     required this.margins,
+    required this.preferences,
   });
 
   @override
   void paint(Canvas canvas, Size size) {
-    print('BookPagePainter: Painting page ${page.pageIndex} with ${page.blocks.length} blocks');
-    print('BookPagePainter: Canvas size: $size');
-
     double currentY = margins.top;
 
-    for (int i = 0; i < page.blocks.length; i++) {
-      final block = page.blocks[i];
-      print('BookPagePainter: Painting block $i - Type: ${block.blockType}, Text length: ${block.textContent?.length ?? 0}');
-
+    for (final block in page.blocks) {
       final style = _getStyleForBlock(block.blockType);
       final textPainter = TextPainter(
         text: TextSpan(text: block.textContent, style: style),
@@ -114,23 +408,29 @@ class BookPagePainter extends CustomPainter {
         textDirection: TextDirection.ltr,
       );
       textPainter.layout(maxWidth: size.width - margins.left - margins.right);
-
-      print('BookPagePainter: Block $i painted at Y: $currentY, height: ${textPainter.height}');
       textPainter.paint(canvas, Offset(margins.left, currentY));
-      currentY += textPainter.height + 10; // Add spacing between paragraphs
-    }
 
-    print('BookPagePainter: Finished painting page ${page.pageIndex}, final Y: $currentY');
+      currentY += textPainter.height + (block.blockType != BlockType.p ? 16 : 4);
+    }
   }
 
   TextStyle _getStyleForBlock(BlockType type) {
     switch (type) {
       case BlockType.h1:
-        return textStyle.copyWith(fontSize: 28, fontWeight: FontWeight.bold);
+        return textStyle.copyWith(
+          fontSize: textStyle.fontSize! * 1.6,
+          fontWeight: FontWeight.bold,
+        );
       case BlockType.h2:
-        return textStyle.copyWith(fontSize: 24, fontWeight: FontWeight.bold);
+        return textStyle.copyWith(
+          fontSize: textStyle.fontSize! * 1.4,
+          fontWeight: FontWeight.bold,
+        );
       case BlockType.h3:
-        return textStyle.copyWith(fontSize: 22, fontWeight: FontWeight.w600);
+        return textStyle.copyWith(
+          fontSize: textStyle.fontSize! * 1.2,
+          fontWeight: FontWeight.w700,
+        );
       default:
         return textStyle;
     }
@@ -138,9 +438,8 @@ class BookPagePainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant BookPagePainter oldDelegate) {
-    final shouldRepaint = oldDelegate.page.startingBlockIndex != page.startingBlockIndex ||
-        oldDelegate.page.pageIndex != page.pageIndex;
-    print('BookPagePainter: shouldRepaint: $shouldRepaint');
-    return shouldRepaint;
+    return oldDelegate.page.startingBlockIndex != page.startingBlockIndex ||
+        oldDelegate.page.pageIndex != page.pageIndex ||
+        oldDelegate.preferences != preferences;
   }
 }

@@ -26,7 +26,7 @@ final goRouterProvider = Provider<GoRouter>((ref) {
     initialLocation: '/home',
     debugLogDiagnostics: true,
     routes: [
-      // Standalone routes (outside the shell)
+      // ... your routes remain the same
       GoRoute(path: '/splash', name: 'splash', builder: (context, state) => const SplashScreen()),
       GoRoute(path: '/login', name: 'login', builder: (context, state) => const LoginScreen()),
       GoRoute(path: '/signup', name: 'signup', builder: (context, state) => const SignUpScreen()),
@@ -44,9 +44,6 @@ final goRouterProvider = Provider<GoRouter>((ref) {
           return AudiobookPlayerScreen(audiobookId: audiobookId);
         },
       ),
-      // TODO: Add '/preferences' route here when built
-
-      // Main application shell route
       StatefulShellRoute.indexedStack(
         builder: (context, state, navigationShell) {
           return MainShell(navigationShell: navigationShell);
@@ -70,23 +67,31 @@ final goRouterProvider = Provider<GoRouter>((ref) {
     redirect: (context, state) {
       final location = state.matchedLocation;
       final publicRoutes = ['/splash', '/onboarding', '/login', '/signup'];
+      final isGoingToPublicRoute = publicRoutes.contains(location);
+      final authStatus = authState.status;
 
-      if (authState.status == AuthStatus.initial) {
+      if (authStatus == AuthStatus.initial) {
         return '/splash';
       }
 
-      if (authState.status == AuthStatus.authenticated) {
-        if (publicRoutes.contains(location)) {
+      // **THE FIX: Treat guest and authenticated users the same for routing.**
+      final isLoggedIn = authStatus == AuthStatus.authenticated || authStatus == AuthStatus.guest;
+
+      if (isLoggedIn) {
+        // If the user is logged in (as guest or real user) and trying
+        // to access a public-only page, send them to the home screen.
+        if (isGoingToPublicRoute) {
           return '/home';
         }
-      }
-
-      if (authState.status == AuthStatus.unauthenticated) {
-        if (!publicRoutes.contains(location)) {
+      } else if (authStatus == AuthStatus.unauthenticated) {
+        // If the user is not logged in and is trying to access a protected
+        // page, send them to the onboarding screen.
+        if (!isGoingToPublicRoute) {
           return '/onboarding';
         }
       }
 
+      // In all other cases, no redirect is needed.
       return null;
     },
   );

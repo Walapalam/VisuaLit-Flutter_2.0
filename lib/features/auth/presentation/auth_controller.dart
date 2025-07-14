@@ -1,5 +1,6 @@
 import 'package:appwrite/models.dart' as models;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:visualit/core/services/sync_service.dart';
 import 'package:visualit/features/auth/data/auth_repository.dart';
 
 // This StateNotifierProvider will be what our UI interacts with.
@@ -8,7 +9,7 @@ final authControllerProvider =
 StateNotifierProvider<AuthController, AuthState>((ref) {
   // The controller depends on the repository to perform actions.
   final authRepository = ref.watch(authRepositoryProvider);
-  return AuthController(authRepository: authRepository);
+  return AuthController(authRepository: authRepository, ref: ref);
 });
 
 // An enum to represent the different states of our authentication process.
@@ -44,12 +45,14 @@ class AuthState {
 /// It extends StateNotifier, which is a Riverpod class for managing state.
 class AuthController extends StateNotifier<AuthState> {
   final AuthRepository _authRepository;
+  final Ref _ref;
 
-  AuthController({required AuthRepository authRepository})
+  AuthController({required AuthRepository authRepository, required Ref ref})
       : _authRepository = authRepository,
+        _ref = ref,
         super(AuthState()) {
     // When the controller is created, immediately check the user's auth status.
-    _initializeAuthState();
+    checkCurrentUser();
   }
 
   /// Checks if a user is already logged in when the app starts.
@@ -58,20 +61,12 @@ class AuthController extends StateNotifier<AuthState> {
     try {
       final user = await _authRepository.getCurrentUser();
       if (user != null) {
-        state = state.copyWith(status: AuthStatus.authenticated, user: user);
-      } else {
-        state = state.copyWith(status: AuthStatus.unauthenticated);
-      }
-    } catch (e) {
-      state = state.copyWith(status: AuthStatus.unauthenticated);
-    }
-  }
-
-  Future<void> _initializeAuthState() async {
-    try {
-      final user = await _authRepository.getCurrentUser();
-      if (user != null) {
-        state = state.copyWith(status: AuthStatus.authenticated, user: user);
+        if (user.email.isEmpty) {
+          state = state.copyWith(status: AuthStatus.guest, user: user);
+        } else {
+          state = state.copyWith(status: AuthStatus.authenticated, user: user);
+        }
+        await _ref.read(syncServiceProvider).syncCloudToLocal(user.$id);
       } else {
         state = state.copyWith(status: AuthStatus.unauthenticated);
       }
@@ -86,7 +81,10 @@ class AuthController extends StateNotifier<AuthState> {
     try {
       await _authRepository.login(email: email, password: password);
       final user = await _authRepository.getCurrentUser();
-      state = state.copyWith(status: AuthStatus.authenticated, user: user);
+      if (user != null) {
+        state = state.copyWith(status: AuthStatus.authenticated, user: user);
+        await _ref.read(syncServiceProvider).syncCloudToLocal(user.$id);
+      }
     } catch (e) {
       state = state.copyWith(status: AuthStatus.error, errorMessage: e.toString());
     }
@@ -115,32 +113,46 @@ class AuthController extends StateNotifier<AuthState> {
     }
   }
 
+  /// Signs in the user as a guest.
   Future<void> signInAsGuest() async {
-    // Save guest info locally if needed
-    state = state.copyWith(status: AuthStatus.guest, user: null);
-  }
-
-  Future<void> signInWithGoogle() async {
-    // TODO: Implement Google OAuth2 logic
     state = state.copyWith(status: AuthStatus.loading);
     try {
-      // await _authRepository.signInWithGoogle();
-      // final user = await _authRepository.getCurrentUser();
-      // state = state.copyWith(status: AuthStatus.authenticated, user: user);
-      throw UnimplementedError('Google sign-in not implemented yet.');
+      await _authRepository.createAnonymousSession();
+      final user = await _authRepository.getCurrentUser();
+      state = state.copyWith(status: AuthStatus.guest, user: user);
+      if (user != null) {
+        await _ref.read(syncServiceProvider).syncCloudToLocal(user.$id);
+      }
     } catch (e) {
       state = state.copyWith(status: AuthStatus.error, errorMessage: e.toString());
     }
   }
 
-  Future<void> signInWithApple() async {
-    // TODO: Implement Apple OAuth2 logic
+  /// Signs in the user with Google.
+  Future<void> signInWithGoogle() async {
     state = state.copyWith(status: AuthStatus.loading);
     try {
-      // await _authRepository.signInWithApple();
-      // final user = await _authRepository.getCurrentUser();
-      // state = state.copyWith(status: AuthStatus.authenticated, user: user);
-      throw UnimplementedError('Apple sign-in not implemented yet.');
+      await _authRepository.signInWithGoogle();
+      final user = await _authRepository.getCurrentUser();
+      if (user != null) {
+        state = state.copyWith(status: AuthStatus.authenticated, user: user);
+        await _ref.read(syncServiceProvider).syncCloudToLocal(user.$id);
+      }
+    } catch (e) {
+      state = state.copyWith(status: AuthStatus.error, errorMessage: e.toString());
+    }
+  }
+
+  /// Signs in the user with Apple.
+  Future<void> signInWithApple() async {
+    state = state.copyWith(status: AuthStatus.loading);
+    try {
+      await _authRepository.signInWithApple();
+      final user = await _authRepository.getCurrentUser();
+      if (user != null) {
+        state = state.copyWith(status: AuthStatus.authenticated, user: user);
+        await _ref.read(syncServiceProvider).syncCloudToLocal(user.$id);
+      }
     } catch (e) {
       state = state.copyWith(status: AuthStatus.error, errorMessage: e.toString());
     }

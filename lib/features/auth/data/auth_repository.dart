@@ -1,4 +1,5 @@
 import 'package:appwrite/appwrite.dart';
+import 'package:appwrite/enums.dart';
 import 'package:appwrite/models.dart' as models;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:visualit/core/api/appwrite_client.dart';
@@ -31,13 +32,22 @@ class AuthRepository {
     required String password,
   }) async {
     try {
+      // **THE FIX: Delete any existing session (like guest) before logging in.**
+      try {
+        await _account.deleteSession(sessionId: 'current');
+      } catch (_) {
+        // Ignore errors if no session exists to be deleted.
+      }
+
+      // Now, create the new session with email and password.
       final session = await _account.createEmailPasswordSession(
         email: email,
         password: password,
       );
       return session;
     } on AppwriteException catch (e) {
-      throw Exception('Failed to login: ${e.message}');
+      // Provide a clearer error message for the user.
+      throw Exception('Failed to login: ${e.message ?? "Invalid credentials or network issue."}');
     } catch (e) {
       throw Exception('An unexpected error occurred: $e');
     }
@@ -75,11 +85,34 @@ class AuthRepository {
     }
   }
 
+  /// Creates an anonymous session for guest users.
   Future<void> createAnonymousSession() async {
     try {
       await _account.createAnonymousSession();
     } on AppwriteException catch (e) {
       throw Exception('Failed to create guest session: ${e.message}');
+    } catch (e) {
+      throw Exception('An unexpected error occurred: $e');
+    }
+  }
+
+  /// Initiates Google OAuth2 login.
+  Future<void> signInWithGoogle() async {
+    try {
+      await _account.createOAuth2Session(provider: OAuthProvider.google);
+    } on AppwriteException catch (e) {
+      throw Exception('Failed to sign in with Google: ${e.message}');
+    } catch (e) {
+      throw Exception('An unexpected error occurred: $e');
+    }
+  }
+
+  /// Initiates Apple OAuth2 login.
+  Future<void> signInWithApple() async {
+    try {
+      await _account.createOAuth2Session(provider: OAuthProvider.apple);
+    } on AppwriteException catch (e) {
+      throw Exception('Failed to sign in with Apple: ${e.message}');
     } catch (e) {
       throw Exception('An unexpected error occurred: $e');
     }

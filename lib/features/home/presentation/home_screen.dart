@@ -6,7 +6,6 @@ import 'package:visualit/core/theme/app_theme.dart';
 import 'package:visualit/features/library/presentation/library_controller.dart';
 import 'package:visualit/features/reader/data/book_data.dart' as db;
 import 'package:visualit/shared_widgets/book_card.dart';
-
 import '../../../core/providers/isar_provider.dart';
 
 class HomeScreen extends ConsumerWidget {
@@ -14,118 +13,139 @@ class HomeScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    // Watch the database provider itself
     final isarAsync = ref.watch(isarDBProvider);
 
-    // Handle the loading and error states of the database before building the rest of the UI
     return isarAsync.when(
       loading: () => const Center(child: CircularProgressIndicator()),
       error: (err, stack) => Center(child: Text('Database Error: $err')),
       data: (isar) {
-        // ONLY when the database is ready, do we watch the libraryController
         final libraryState = ref.watch(libraryControllerProvider);
         final libraryController = ref.read(libraryControllerProvider.notifier);
 
-        // Example streak data
         final streakHistory = List<bool>.generate(42, (i) => i % 3 != 0);
-        final currentStreak = 5;
-        final longestStreak = 12;
-        final totalDays = 30;
 
-        return libraryState.when(
-          loading: () => const Center(child: CircularProgressIndicator()),
-          error: (err, _) => Center(child: Text('Error: $err')),
-          data: (books) {
-            return Container(
-              color: AppTheme.darkGrey,
-              child: ListView(
-                children: [
-                  Padding(
-                    padding: const EdgeInsets.all(16.0),
-                    child: TextField(
+        return Scaffold(
+          backgroundColor: Theme.of(context).colorScheme.background,
+          body: SafeArea(
+            child: libraryState.when(
+              loading: () => const Center(child: CircularProgressIndicator()),
+              error: (err, _) => Center(child: Text('Error: $err')),
+              data: (books) => CustomScrollView(
+                slivers: [
+                  SliverAppBar(
+                    backgroundColor: Theme.of(context).colorScheme.background,
+                    floating: true,
+                    snap: true,
+                    title: TextField(
                       decoration: InputDecoration(
                         hintText: 'Search books, authors, genres...',
-                        hintStyle: const TextStyle(color: AppTheme.grey),
+                        hintStyle: TextStyle(color: Theme.of(context).colorScheme.onSurface.withOpacity(0.5)),
                         filled: true,
-                        fillColor: AppTheme.black,
+                        fillColor: Theme.of(context).colorScheme.surface,
                         contentPadding: const EdgeInsets.symmetric(vertical: 0, horizontal: 20),
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(30),
                           borderSide: BorderSide.none,
                         ),
-                        prefixIcon: const Icon(Icons.search, color: AppTheme.grey),
-                      ),
-                      style: const TextStyle(color: AppTheme.white),
-                    ),
-                  ),
-                  ReadingStreakCard(
-                    streakHistory: streakHistory,
-                    currentStreak: currentStreak,
-                    longestStreak: longestStreak,
-                    totalDays: totalDays,
-                  ),
-                  const SizedBox(height: 24),
-                  _BookShelf(
-                    title: 'Your Library',
-                    books: books,
-                    showViewAll: true,
-                    viewAllRoute: '/library',
-                  ),
-                  if (books.isEmpty)
-                    Padding(
-                      padding: const EdgeInsets.all(32.0),
-                      child: Center(
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Text(
-                              'No books found.\nStart by importing your first book!',
-                              textAlign: TextAlign.center,
-                              style: const TextStyle(color: AppTheme.grey, fontSize: 18),
-                            ),
-                            const SizedBox(height: 24),
-                            ElevatedButton.icon(
-                              icon: const Icon(Icons.upload_file),
-                              label: const Text('Select Your Books'),
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: AppTheme.primaryGreen,
-                                foregroundColor: AppTheme.black,
-                                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
-                              ),
-                              onPressed: () => libraryController.pickAndProcessBooks(),
-                            ),
-                          ],
+                        prefixIcon: Icon(Icons.search,
+                            color: Theme.of(context).colorScheme.onSurface.withOpacity(0.5)
                         ),
                       ),
+                      style: TextStyle(color: Theme.of(context).colorScheme.onSurface),
                     ),
-                  const SizedBox(height: 24),
-                  ElevatedButton.icon(
-                    icon: const Icon(Icons.folder_open),
-                    label: const Text('Add Books from Folder'),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppTheme.primaryGreen,
-                      foregroundColor: AppTheme.black,
-                      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
+                  ),
+                  SliverToBoxAdapter(
+                    child: Column(
+                      children: [
+                        ReadingStreakCard(
+                          streakHistory: streakHistory,
+                          currentStreak: 5,
+                          longestStreak: 12,
+                          totalDays: 30,
+                        ),
+                        const SizedBox(height: 24),
+                        _BookShelf(
+                          title: 'Your Library',
+                          books: books,
+                          showViewAll: true,
+                          viewAllRoute: '/library',
+                        ),
+                        if (books.isEmpty)
+                          _EmptyLibraryView(
+                            onSelectBooks: () => libraryController.pickAndProcessBooks(),
+                          ),
+                        const SizedBox(height: 24),
+                        Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                          child: ElevatedButton.icon(
+                            icon: const Icon(Icons.folder_open),
+                            label: const Text('Add Books from Folder'),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: AppTheme.primaryGreen,
+                              foregroundColor: AppTheme.black,
+                              minimumSize: const Size(double.infinity, 50),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                            ),
+                            onPressed: () => libraryController.scanAndProcessBooks(),
+                          ),
+                        ),
+                        const SizedBox(height: 24),
+                      ],
                     ),
-                    onPressed: () => libraryController.scanAndProcessBooks(),
                   ),
                 ],
               ),
-            );
-          },
+            ),
+          ),
         );
       },
     );
   }
 }
 
-// ** WIDGET DEFINITIONS ADDED HERE TO FIX THE ERROR **
+class _EmptyLibraryView extends StatelessWidget {
+  final VoidCallback onSelectBooks;
+
+  const _EmptyLibraryView({required this.onSelectBooks});
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.all(32.0),
+      child: Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              'No books found.\nStart by importing your first book!',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                color: Theme.of(context).colorScheme.onSurface.withOpacity(0.7),
+                fontSize: 18,
+              ),
+            ),
+            const SizedBox(height: 24),
+            ElevatedButton.icon(
+              icon: const Icon(Icons.upload_file),
+              label: const Text('Select Your Books'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppTheme.primaryGreen,
+                foregroundColor: AppTheme.black,
+                minimumSize: const Size(double.infinity, 50),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+              onPressed: onSelectBooks,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
 
 class _BookShelf extends StatelessWidget {
   final String title;
@@ -142,11 +162,7 @@ class _BookShelf extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final double shelfHeight = MediaQuery.of(context).size.width * 0.6;
-
-    if (books.isEmpty) {
-      return const SizedBox.shrink();
-    }
+    if (books.isEmpty) return const SizedBox.shrink();
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -158,23 +174,23 @@ class _BookShelf extends StatelessWidget {
             children: [
               Text(
                 title,
-                style: const TextStyle(color: AppTheme.white, fontSize: 22, fontWeight: FontWeight.bold),
+                style: Theme.of(context).textTheme.headlineMedium,
               ),
               if (showViewAll)
                 TextButton(
                   onPressed: () {
-                    if (viewAllRoute != null) {
-                      context.go(viewAllRoute!);
-                    }
+                    if (viewAllRoute != null) context.go(viewAllRoute!);
                   },
-                  child: const Text('View All', style: TextStyle(color: AppTheme.primaryGreen)),
+                  child: const Text('View All',
+                      style: TextStyle(color: AppTheme.primaryGreen)
+                  ),
                 ),
             ],
           ),
         ),
         const SizedBox(height: 12),
         SizedBox(
-          height: shelfHeight,
+          height: MediaQuery.of(context).size.width * 0.6,
           child: ListView.builder(
             scrollDirection: Axis.horizontal,
             padding: const EdgeInsets.symmetric(horizontal: 16.0),
@@ -182,12 +198,15 @@ class _BookShelf extends StatelessWidget {
             itemBuilder: (context, index) {
               final book = books[index];
               return BookCard(
-                imageBytes: book.coverImageBytes != null ? Uint8List.fromList(book.coverImageBytes!) : null,
+                imageBytes: book.coverImageBytes != null ?
+                Uint8List.fromList(book.coverImageBytes!) : null,
                 title: book.title ?? 'No Title',
                 author: book.author ?? 'Unknown Author',
                 onTap: () {
                   if (book.status == db.ProcessingStatus.ready) {
-                    context.goNamed('bookReader', pathParameters: {'bookId': book.id.toString()});
+                    context.goNamed('bookReader',
+                        pathParameters: {'bookId': book.id.toString()}
+                    );
                   } else {
                     ScaffoldMessenger.of(context).showSnackBar(SnackBar(
                       content: Text('${book.title ?? 'Book'} is still processing...'),
@@ -225,7 +244,7 @@ class ReadingStreakCard extends StatelessWidget {
     const double spacing = 2.0;
 
     return Card(
-      color: AppTheme.black,
+      color: Theme.of(context).colorScheme.surface,
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       child: Padding(
@@ -233,10 +252,10 @@ class ReadingStreakCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text(
+            Text(
               'Reading Streak',
               style: TextStyle(
-                color: Colors.white,
+                color: Theme.of(context).colorScheme.onSurface,
                 fontWeight: FontWeight.bold,
                 fontSize: 14,
               ),
@@ -260,7 +279,8 @@ class ReadingStreakCard extends StatelessWidget {
                     width: squareSize,
                     height: squareSize,
                     decoration: BoxDecoration(
-                      color: streakHistory[i] ? AppTheme.primaryGreen : Colors.grey[900],
+                      color: streakHistory[i] ? AppTheme.primaryGreen :
+                      Theme.of(context).colorScheme.onSurface.withOpacity(0.1),
                       borderRadius: BorderRadius.circular(2),
                     ),
                   );
@@ -268,14 +288,14 @@ class ReadingStreakCard extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 10),
-            const Divider(color: AppTheme.darkGrey),
+            Divider(color: Theme.of(context).colorScheme.onSurface.withOpacity(0.1)),
             const SizedBox(height: 2),
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceAround,
               children: [
-                _StreakStat(label: 'Current', value: currentStreak, fontSize: 14),
-                _StreakStat(label: 'Longest', value: longestStreak, fontSize: 14),
-                _StreakStat(label: 'Total Days', value: totalDays, fontSize: 14),
+                _StreakStat(label: 'Current', value: currentStreak),
+                _StreakStat(label: 'Longest', value: longestStreak),
+                _StreakStat(label: 'Total Days', value: totalDays),
               ],
             ),
           ],
@@ -290,15 +310,32 @@ class _StreakStat extends StatelessWidget {
   final int value;
   final double fontSize;
 
-  const _StreakStat({required this.label, required this.value, this.fontSize = 20});
+  const _StreakStat({
+    required this.label,
+    required this.value,
+    this.fontSize = 14
+  });
 
   @override
   Widget build(BuildContext context) {
     return Column(
       children: [
-        Text('$value', style: TextStyle(color: AppTheme.white, fontWeight: FontWeight.bold, fontSize: fontSize)),
+        Text(
+          '$value',
+          style: TextStyle(
+            color: Theme.of(context).colorScheme.onSurface,
+            fontWeight: FontWeight.bold,
+            fontSize: fontSize,
+          ),
+        ),
         const SizedBox(height: 2),
-        Text(label, style: const TextStyle(color: AppTheme.grey, fontSize: 10)),
+        Text(
+          label,
+          style: TextStyle(
+            color: Theme.of(context).colorScheme.onSurface.withOpacity(0.7),
+            fontSize: 10,
+          ),
+        ),
       ],
     );
   }

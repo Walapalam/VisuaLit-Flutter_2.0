@@ -1,30 +1,41 @@
-// lib/core/utils/error_parser.dart
 import 'package:appwrite/appwrite.dart';
 
 String parseAppwriteException(AppwriteException e) {
-  // Use a switch on the error type for specific messages.
   switch (e.type) {
-    case 'user_not_found':
-      return 'No account found with that email. Please sign up.';
-    case 'user_already_exists':
-      return 'An account with this email already exists. Please log in.';
     case 'user_invalid_credentials':
-      return 'Invalid email or password. Please try again.';
-    case 'user_invalid_phone':
-    case 'user_phone_not_found':
-      return 'Invalid phone number provided.';
+      return 'Incorrect email or password. Please try again.';
+    case 'user_already_exists':
+      return 'An account with this email already exists.';
     case 'user_unauthorized':
-      return 'You are not authorized for this action.';
-    case 'user_session_not_found':
-      return 'Your session has expired. Please log in again.';
-    case 'general_argument_invalid':
-    // This often happens with weak passwords during signup.
-      if (e.message != null && e.message!.contains('password')) {
-        return 'Password must be at least 8 characters long.';
-      }
-      return 'Invalid information provided. Please check the fields and try again.';
+      return 'Unauthorized access. Please log in again.';
+    case 'general_network_error':
+      return 'Network error. Please check your internet connection.';
+    case 'user_email_already_verified':
+      return 'This email is already verified.';
+    case 'user_invalid_token':
+      return 'Invalid or expired token. Please try again.';
+    case 'user_password_reset_required':
+      return 'Password reset required. Please check your email.';
+    case 'user_session_already_exists':
+      return 'A session is already active. Please log out first.';
+    case 'general_rate_limit_exceeded':
+      return 'Too many requests. Please try again later.';
     default:
-    // A fallback for any other errors.
-      return e.message ?? 'An unknown error occurred. Please try again.';
+      return e.message ?? 'An unexpected error occurred. Please try again.';
+  }
+}
+
+String getSuccessMessage(String action) {
+  switch (action) {
+    case 'login':
+      return 'Successfully logged in!';
+    case 'signup':
+      return 'Account created successfully!';
+    case 'password_reset':
+      return 'Password reset email sent. Please check your inbox.';
+    case 'logout':
+      return 'Successfully logged out!';
+    default:
+      return 'Operation completed successfully!';
   }
 }

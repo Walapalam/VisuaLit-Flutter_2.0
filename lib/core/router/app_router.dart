@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:visualit/features/auth/presentation/auth_controller.dart';
+import 'package:visualit/features/auth/presentation/forgot_password_screen.dart';
 import 'package:visualit/features/auth/presentation/login_screen.dart';
 import 'package:visualit/features/auth/presentation/onboarding_screen.dart';
 import 'package:visualit/features/auth/presentation/signup_screen.dart';
@@ -43,6 +44,11 @@ final goRouterProvider = Provider<GoRouter>((ref) {
         path: '/signup',
         name: 'signup',
         builder: (context, state) => const SignUpScreen(),
+      ),
+      GoRoute(
+        path: '/forgot-password',
+        name: 'forgot-password',
+        builder: (context, state) => const ForgotPasswordScreen(),
       ),
       GoRoute(
         path: '/book/:bookId',
@@ -105,25 +111,21 @@ final goRouterProvider = Provider<GoRouter>((ref) {
     redirect: (context, state) async {
       final status = authState.status;
       final location = state.matchedLocation;
-      final publicRoutes = ['/splash', '/onboarding', '/login', '/signup'];
+      final publicRoutes = ['/splash', '/onboarding', '/login', '/signup', '/forgot-password'];
 
-      // Stay on splash until initialization is complete
       if (status == AuthStatus.initial && location != '/splash') {
         return '/splash';
       }
 
-      // If authenticated or guest, redirect to home from public routes
       if ((status == AuthStatus.authenticated || status == AuthStatus.guest) &&
           publicRoutes.contains(location)) {
         return '/home';
       }
 
-      // If unauthenticated and not on a public route, redirect to onboarding
       if (status == AuthStatus.unauthenticated && !publicRoutes.contains(location)) {
         return '/onboarding';
       }
 
-      // If on splash and initialization is complete, redirect based on status
       if (location == '/splash' && status != AuthStatus.initial) {
         return status == AuthStatus.unauthenticated ? '/onboarding' : '/home';
       }

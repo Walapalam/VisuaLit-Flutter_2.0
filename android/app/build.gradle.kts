@@ -5,7 +5,7 @@ plugins {
 }
 
 android {
-    namespace = "com.visualit.app.visualit"
+    namespace = "com.visualit.app"
     compileSdk = flutter.compileSdkVersion
     ndkVersion = flutter.ndkVersion
 
@@ -20,7 +20,7 @@ android {
     }
 
     defaultConfig {
-        applicationId = "com.visualit.app.visualit"
+        applicationId = "com.visualit.app"
         minSdk = flutter.minSdkVersion
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode

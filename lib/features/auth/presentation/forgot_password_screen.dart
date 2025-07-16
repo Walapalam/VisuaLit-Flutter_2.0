@@ -5,31 +5,27 @@ import 'package:email_validator/email_validator.dart';
 import 'package:visualit/core/theme/app_theme.dart';
 import 'package:visualit/features/auth/presentation/auth_controller.dart';
 
-class LoginScreen extends ConsumerStatefulWidget {
-  const LoginScreen({super.key});
+class ForgotPasswordScreen extends ConsumerStatefulWidget {
+  const ForgotPasswordScreen({super.key});
 
   @override
-  ConsumerState<LoginScreen> createState() => _LoginScreenState();
+  ConsumerState<ForgotPasswordScreen> createState() => _ForgotPasswordScreenState();
 }
 
-class _LoginScreenState extends ConsumerState<LoginScreen> {
+class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
   final _formKey = GlobalKey<FormState>();
   final _emailController = TextEditingController();
-  final _passwordController = TextEditingController();
-  bool _obscurePassword = true;
 
   @override
   void dispose() {
     _emailController.dispose();
-    _passwordController.dispose();
     super.dispose();
   }
 
-  void _handleLogin() {
+  void _handleResetRequest() {
     if (_formKey.currentState!.validate()) {
-      ref.read(authControllerProvider.notifier).login(
+      ref.read(authControllerProvider.notifier).requestPasswordReset(
         _emailController.text.trim(),
-        _passwordController.text.trim(),
       );
     }
   }
@@ -51,9 +47,15 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
           SnackBar(
             content: Text(next.successMessage!),
             backgroundColor: AppTheme.primaryGreen,
-            duration: const Duration(seconds: 2),
+            duration: const Duration(seconds: 5),
           ),
         );
+        // Navigate back to login after successful reset request
+        Future.delayed(const Duration(seconds: 2), () {
+          if (mounted) {
+            context.goNamed('login');
+          }
+        });
       }
     });
 
@@ -64,7 +66,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       appBar: AppBar(
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
-          onPressed: () => context.goNamed('onboarding'),
+          onPressed: () => context.goNamed('login'),
         ),
         backgroundColor: Colors.transparent,
         elevation: 0,
@@ -80,13 +82,13 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   const Text(
-                    'Welcome Back!',
+                    'Reset Password',
                     textAlign: TextAlign.center,
                     style: TextStyle(fontSize: 32, fontWeight: FontWeight.bold),
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    'Log in to continue your journey.',
+                    'Enter your email to receive a password reset link.',
                     textAlign: TextAlign.center,
                     style: TextStyle(fontSize: 16, color: AppTheme.grey),
                   ),
@@ -111,53 +113,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                       return null;
                     },
                   ),
-                  const SizedBox(height: 16),
-                  TextFormField(
-                    controller: _passwordController,
-                    obscureText: _obscurePassword,
-                    decoration: InputDecoration(
-                      labelText: 'Password',
-                      prefixIcon: const Icon(Icons.lock_outline),
-                      suffixIcon: IconButton(
-                        icon: Icon(_obscurePassword ? Icons.visibility : Icons.visibility_off),
-                        onPressed: () {
-                          setState(() {
-                            _obscurePassword = !_obscurePassword;
-                          });
-                        },
-                      ),
-                      border: const OutlineInputBorder(
-                        borderRadius: BorderRadius.all(Radius.circular(12)),
-                      ),
-                    ),
-                    validator: (value) {
-                      if (value == null || value.isEmpty) {
-                        return 'Please enter your password';
-                      }
-                      if (value.length < 8) {
-                        return 'Password must be at least 8 characters';
-                      }
-                      if (!RegExp(r'^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$')
-                          .hasMatch(value)) {
-                        return 'Password must include uppercase, lowercase, number, and special character';
-                      }
-                      return null;
-                    },
-                  ),
-                  const SizedBox(height: 8),
-                  Align(
-                    alignment: Alignment.centerRight,
-                    child: TextButton(
-                      onPressed: isLoading
-                          ? null
-                          : () => context.goNamed('forgot-password'),
-                      child: const Text(
-                        'Forgot Password?',
-                        style: TextStyle(color: AppTheme.primaryGreen),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 16),
+                  const SizedBox(height: 24),
                   ElevatedButton(
                     style: ElevatedButton.styleFrom(
                       padding: const EdgeInsets.symmetric(vertical: 16),
@@ -165,7 +121,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                       foregroundColor: AppTheme.black,
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                     ),
-                    onPressed: isLoading ? null : _handleLogin,
+                    onPressed: isLoading ? null : _handleResetRequest,
                     child: isLoading
                         ? const SizedBox(
                       height: 20,
@@ -173,42 +129,19 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                       child: CircularProgressIndicator(strokeWidth: 3, color: AppTheme.black),
                     )
                         : const Text(
-                      'Login',
+                      'Send Reset Link',
                       style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
                     ),
-                  ),
-                  const SizedBox(height: 24),
-                  Row(
-                    children: [
-                      const Expanded(child: Divider()),
-                      Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 8),
-                        child: Text("OR", style: TextStyle(color: AppTheme.grey)),
-                      ),
-                      const Expanded(child: Divider()),
-                    ],
-                  ),
-                  const SizedBox(height: 24),
-                  ElevatedButton.icon(
-                    icon: const Icon(Icons.g_mobiledata),
-                    label: const Text('Sign in with Google'),
-                    style: ElevatedButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(vertical: 16),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                    ),
-                    onPressed: isLoading
-                        ? null
-                        : () => ref.read(authControllerProvider.notifier).signInWithGoogle(),
                   ),
                   const SizedBox(height: 16),
                   Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      const Text("Don't have an account?"),
+                      const Text("Remember your password?"),
                       TextButton(
-                        onPressed: isLoading ? null : () => context.goNamed('signup'),
+                        onPressed: isLoading ? null : () => context.goNamed('login'),
                         child: const Text(
-                          'Sign Up',
+                          'Login',
                           style: TextStyle(color: AppTheme.primaryGreen, fontWeight: FontWeight.bold),
                         ),
                       ),

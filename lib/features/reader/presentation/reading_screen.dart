@@ -13,6 +13,7 @@ import 'package:visualit/features/reader/presentation/widgets/line_guide_painter
 import 'package:visualit/features/reader/presentation/widgets/reader_speed_dial.dart';
 import 'package:visualit/features/reader/presentation/widgets/reading_app_bar.dart';
 import 'package:visualit/features/reader/presentation/widgets/reading_bottom_bar.dart';
+import 'package:visualit/features/reader/presentation/widgets/epub_view_widget.dart';
 
 // Provider for tracking if the current page is bookmarked
 class IsCurrentPageBookmarkedNotifier extends StateNotifier<bool> {
@@ -249,6 +250,23 @@ class ReadingScreen extends ConsumerWidget {
     }
 
     debugPrint("[DEBUG] ReadingScreen: Book has ${state.blocks.length} blocks and ${state.totalPages} pages");
+
+    // Use the epub_view renderer if selected
+    if (prefs.pageTurnStyle == PageTurnStyle.epubView) {
+      debugPrint("[DEBUG] ReadingScreen: Using epub_view for content");
+
+      return EpubViewWidget(
+        bookId: bookId,
+        viewSize: viewSize,
+        onPageChanged: (page) {
+          try {
+            ref.read(provider.notifier).onPageChanged(page);
+          } catch (e) {
+            debugPrint("[ERROR] ReadingScreen: Error in onPageChanged: $e");
+          }
+        },
+      );
+    }
 
     final controllers = ref.watch(_pageControllerProvider(bookId));
 

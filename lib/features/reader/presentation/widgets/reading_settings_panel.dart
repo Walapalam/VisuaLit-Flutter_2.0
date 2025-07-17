@@ -76,6 +76,7 @@ class ReadingSettingsPanel extends ConsumerWidget {
                   segments: const [
                     ButtonSegment(value: PageTurnStyle.paged, label: Text('Page')),
                     ButtonSegment(value: PageTurnStyle.scroll, label: Text('Scroll')),
+                    ButtonSegment(value: PageTurnStyle.epubView, label: Text('EpubView')),
                   ],
                   selected: {prefs.pageTurnStyle},
                   onSelectionChanged: (s) => prefsController.setPageTurnStyle(s.first),

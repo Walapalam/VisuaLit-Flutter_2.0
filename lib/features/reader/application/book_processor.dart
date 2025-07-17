@@ -1,4 +1,6 @@
 import 'dart:io';
+import 'dart:convert';
+import 'package:crypto/crypto.dart';
 import 'package:epubx/epubx.dart';
 import 'package:flutter/foundation.dart';
 import 'package:html/parser.dart' as html_parser;
@@ -128,10 +130,43 @@ class BookProcessor {
         }
 
         debugPrint("[DEBUG] BookProcessor: Saving ${newBlocks.length} content blocks and updating book status");
+
+        // Save blocks in batches to avoid transaction timeouts with large books
+        const int batchSize = 500; // Configurable batch size
+        int totalSaved = 0;
+
+        for (int i = 0; i < newBlocks.length; i += batchSize) {
+          final int end = (i + batchSize < newBlocks.length) ? i + batchSize : newBlocks.length;
+          final batch = newBlocks.sublist(i, end);
+
+          debugPrint("[DEBUG] BookProcessor: Saving batch ${i ~/ batchSize + 1} with ${batch.length} blocks (${i + 1}-$end of ${newBlocks.length})");
+
+          await isar.writeTxn(() async {
+            await isar.contentBlocks.putAll(batch);
+          });
+
+          totalSaved += batch.length;
+          debugPrint("[DEBUG] BookProcessor: Saved ${batch.length} blocks, total saved: $totalSaved/${newBlocks.length}");
+        }
+
+        // Calculate pagination
+        debugPrint("[DEBUG] BookProcessor: Calculating pagination for book");
+        final pages = _calculatePagination(newBlocks, existingBook.id);
+
+        // Convert pages to pageToBlockMap format
+        List<int> pageToBlockMap = [];
+        for (final page in pages) {
+          pageToBlockMap.add(page.pageIndex);
+          pageToBlockMap.add(page.startingBlockIndex);
+        }
+
+        // Update book with pagination data and status
         await isar.writeTxn(() async {
-          await isar.contentBlocks.putAll(newBlocks);
+          existingBook.pageToBlockMap = pageToBlockMap;
+          existingBook.totalPages = pages.isNotEmpty ? pages.last.pageIndex + 1 : 0;
           existingBook.status = ProcessingStatus.ready;
           await isar.books.put(existingBook);
+          debugPrint("[DEBUG] BookProcessor: Updated book with pagination data (${existingBook.totalPages} pages) and status");
         });
 
         debugPrint("[DEBUG] BookProcessor: Book processing completed successfully for book ID: ${existingBook.id}");
@@ -164,15 +199,26 @@ class BookProcessor {
 
       for (var node in nodes) {
         try {
+          // Skip non-element nodes (text nodes, comments, etc.)
           if (node.nodeType != 1) continue;
           processedNodes++;
 
           final element = node;
           final tagName = element.localName?.toLowerCase();
 
+          // Skip empty or null tags
+          if (tagName == null) {
+            debugPrint("[WARN] BookProcessor: Skipping node with null tag name");
+            continue;
+          }
+
+          // Get text content and check if it has content
           final textContent = element.text.trim();
           final hasContent = textContent.isNotEmpty;
+          final hasAttributes = element.attributes.isNotEmpty;
+          final hasChildren = element.nodes.isNotEmpty;
 
+          // Process image elements
           if (tagName == 'img') {
             final src = element.attributes['src'];
             if (src != null) {
@@ -189,7 +235,7 @@ class BookProcessor {
                 ..bookId = bookId
                 ..chapterIndex = chapterIndex
                 ..blockIndexInChapter = currentBlockIndex++
-                ..htmlContent = element.outerHtml
+                ..htmlContent = _basicSanitizeHtml(element.outerHtml)
                 ..textContent = element.attributes['alt'] ?? ''
                 ..blockType = BlockType.img
                 ..src = sourcePath
@@ -198,14 +244,16 @@ class BookProcessor {
               blocks.add(block);
               addedBlocks++;
             }
-          } else if (hasContent) {
+          } 
+          // Process elements with content or attributes (like links, spans with styles, etc.)
+          else if (hasContent || (hasAttributes && _isSignificantElement(tagName))) {
             final blockType = _getBlockType(tagName);
 
             final block = ContentBlock()
               ..bookId = bookId
               ..chapterIndex = chapterIndex
               ..blockIndexInChapter = currentBlockIndex++
-              ..htmlContent = element.outerHtml
+              ..htmlContent = _basicSanitizeHtml(element.outerHtml)
               ..textContent = textContent
               ..blockType = blockType
               ..src = sourcePath;
@@ -217,16 +265,45 @@ class BookProcessor {
               debugPrint("[DEBUG] BookProcessor: Added heading block: '$textContent' (${blockType.toString()})");
             }
           }
+          // Process container elements with no direct content but with children
+          else if (hasChildren && _isContainerElement(tagName)) {
+            debugPrint("[DEBUG] BookProcessor: Processing container element: $tagName");
 
-          if (element.nodes.isNotEmpty) {
+            // For container elements, we want to process their children
+            // but we don't create a block for the container itself
             final childrenCount = element.nodes.length;
             debugPrint("[DEBUG] BookProcessor: Processing $childrenCount child nodes of $tagName element");
 
             final initialBlocksCount = blocks.length;
-            // We need to pass the current block index as the offset for child elements
-            // but we shouldn't process child nodes if they've already been processed
-            // by a parent element to avoid duplicate blocks
-            if (element.parent == null || element.parent.localName == 'body') {
+
+            // Process child nodes
+            _processElements(
+              element.nodes,
+              chapterIndex,
+              bookId,
+              sourcePath,
+              blocks,
+              epubBook,
+              blockIndexOffset: currentBlockIndex,
+            );
+
+            final addedByChildren = blocks.length - initialBlocksCount;
+            currentBlockIndex += addedByChildren;
+            debugPrint("[DEBUG] BookProcessor: Added $addedByChildren blocks from child nodes of $tagName");
+          }
+          // Process child nodes for elements that might contain important content
+          else if (hasChildren) {
+            final childrenCount = element.nodes.length;
+            debugPrint("[DEBUG] BookProcessor: Element $tagName has no direct content but has $childrenCount children");
+
+            final initialBlocksCount = blocks.length;
+
+            // Only process children if this is a top-level element or a container
+            // This helps avoid duplicate processing
+            if (element.parent == null || 
+                element.parent.localName == 'body' || 
+                _isContainerElement(element.parent.localName)) {
+
               _processElements(
                 element.nodes,
                 chapterIndex,
@@ -241,11 +318,13 @@ class BookProcessor {
               currentBlockIndex += addedByChildren;
               debugPrint("[DEBUG] BookProcessor: Added $addedByChildren blocks from child nodes");
             } else {
-              debugPrint("[DEBUG] BookProcessor: Skipping child nodes processing as they will be handled by parent element");
+              debugPrint("[DEBUG] BookProcessor: Skipping child nodes of $tagName as they will be handled by parent element");
             }
           }
-        } catch (e) {
+        } catch (e, stack) {
           debugPrint("[ERROR] BookProcessor: Error processing node in chapter $chapterIndex: $e");
+          debugPrintStack(stackTrace: stack);
+          // Continue with next node instead of skipping the entire chapter
         }
       }
 
@@ -254,6 +333,29 @@ class BookProcessor {
       debugPrint("[ERROR] BookProcessor: Error in _processElements: $e");
       debugPrintStack(stackTrace: stack);
     }
+  }
+
+  // Helper method to determine if an element is a significant inline element
+  // that should be preserved even without text content
+  static bool _isSignificantElement(String tagName) {
+    const significantElements = [
+      'a', 'span', 'em', 'strong', 'b', 'i', 'u', 'sup', 'sub', 
+      'code', 'mark', 'small', 'big', 'strike', 'tt', 'cite'
+    ];
+    return significantElements.contains(tagName);
+  }
+
+  // Helper method to determine if an element is a container that should have its children processed
+  static bool _isContainerElement(String? tagName) {
+    if (tagName == null) return false;
+
+    const containerElements = [
+      'div', 'section', 'article', 'main', 'aside', 'nav',
+      'header', 'footer', 'ul', 'ol', 'li', 'dl', 'dt', 'dd',
+      'table', 'tr', 'td', 'th', 'thead', 'tbody', 'tfoot',
+      'blockquote', 'figure', 'figcaption'
+    ];
+    return containerElements.contains(tagName.toLowerCase());
   }
 
   // Helper method to extract bytes from EpubByteContentFile
@@ -336,101 +438,165 @@ class BookProcessor {
 
   static List<int>? _getImageBytes(EpubBook epubBook, String src, String? sourcePath) {
     try {
-      final cleanSrc = src.split('?').first.split('#').first.toLowerCase();
+      // Clean the source URL by removing query parameters and fragments
+      final cleanSrc = src.split('?').first.split('#').first;
+      final cleanSrcLower = cleanSrc.toLowerCase();
       debugPrint("[DEBUG] BookProcessor: Looking for image with cleaned src: $cleanSrc");
 
+      // Check if the book has images
       if (epubBook.Content?.Images == null) {
-        debugPrint("[WARN] BookProcessor: Book content or images are null");
+        debugPrint("[WARN] BookProcessor: Book content or images collection is null");
         return null;
       }
 
-      // Try multiple path resolution strategies
-      final List<String> possiblePaths = [];
+      final images = epubBook.Content!.Images!;
+      if (images.isEmpty) {
+        debugPrint("[WARN] BookProcessor: Book has no images");
+        return null;
+      }
 
-      // 1. Direct match with the src
-      possiblePaths.add(cleanSrc);
+      debugPrint("[DEBUG] BookProcessor: Book has ${images.length} images");
+
+      // Build a comprehensive list of possible paths to try
+      final List<String> possiblePaths = [];
+      final List<String> exactPaths = [];
+      final Map<String, String> pathMapping = {}; // Maps normalized paths to original keys
+
+      // 1. Direct match with the src (both original case and lowercase)
+      exactPaths.add(cleanSrc);
+      exactPaths.add(cleanSrcLower);
 
       // 2. Try to resolve relative to the chapter path
       if (sourcePath != null && sourcePath.isNotEmpty) {
         try {
-          final resolvedPath = p.normalize(p.join(p.dirname(sourcePath), cleanSrc)).toLowerCase();
-          possiblePaths.add(resolvedPath);
+          // Get directory of the current chapter
+          final sourceDir = p.dirname(sourcePath);
+
+          // Resolve path relative to chapter
+          final resolvedPath = p.normalize(p.join(sourceDir, cleanSrc));
+          final resolvedPathLower = resolvedPath.toLowerCase();
+
+          exactPaths.add(resolvedPath);
+          exactPaths.add(resolvedPathLower);
+
           debugPrint("[DEBUG] BookProcessor: Added resolved path: $resolvedPath");
 
-          // 3. Also try with different directory separators
-          final altPath = resolvedPath.replaceAll('\\', '/');
-          if (altPath != resolvedPath) {
-            possiblePaths.add(altPath);
-            debugPrint("[DEBUG] BookProcessor: Added alternative path with forward slashes: $altPath");
+          // Try with different directory separators
+          final forwardSlashPath = resolvedPath.replaceAll('\\', '/');
+          final backslashPath = resolvedPath.replaceAll('/', '\\');
+
+          if (forwardSlashPath != resolvedPath) {
+            exactPaths.add(forwardSlashPath);
+            exactPaths.add(forwardSlashPath.toLowerCase());
+            debugPrint("[DEBUG] BookProcessor: Added path with forward slashes: $forwardSlashPath");
+          }
+
+          if (backslashPath != resolvedPath) {
+            exactPaths.add(backslashPath);
+            exactPaths.add(backslashPath.toLowerCase());
+            debugPrint("[DEBUG] BookProcessor: Added path with backslashes: $backslashPath");
           }
         } catch (e) {
           debugPrint("[WARN] BookProcessor: Failed to resolve path for src: $cleanSrc, sourcePath: $sourcePath, error: $e");
         }
       }
 
-      // 4. Try just the filename without path
-      final fileName = p.basename(cleanSrc).toLowerCase();
+      // 3. Try just the filename without path (both original case and lowercase)
+      final fileName = p.basename(cleanSrc);
+      final fileNameLower = fileName.toLowerCase();
       possiblePaths.add(fileName);
-      debugPrint("[DEBUG] BookProcessor: Added filename-only path: $fileName");
+      possiblePaths.add(fileNameLower);
+      debugPrint("[DEBUG] BookProcessor: Added filename-only paths: $fileName, $fileNameLower");
 
-      final images = epubBook.Content!.Images!;
-      debugPrint("[DEBUG] BookProcessor: Searching through ${images.length} images using ${possiblePaths.length} possible paths");
-
-      // First try exact matches
+      // 4. Build a normalized map of all images for easier lookup
       for (var entry in images.entries) {
-        final key = entry.key.toLowerCase();
+        final originalKey = entry.key;
+        final normalizedKey = p.normalize(originalKey).toLowerCase();
+        pathMapping[normalizedKey] = originalKey;
 
-        for (final path in possiblePaths) {
-          if (key == path) {
-            debugPrint("[DEBUG] BookProcessor: Found exact match for image: ${entry.key}");
-            try {
-              final bytes = _extractBytes(entry.value);
-              if (bytes != null) {
-                debugPrint("[DEBUG] BookProcessor: Extracted ${bytes.length} bytes for image");
-                return bytes;
-              } else {
-                debugPrint("[WARN] BookProcessor: Could not extract bytes from image: ${entry.key}");
-              }
-            } catch (e, stack) {
-              debugPrint("[ERROR] BookProcessor: Failed to extract image bytes for ${entry.key}: $e");
-              debugPrintStack(stackTrace: stack);
-              continue; // Try next path
+        // Also add variants with different separators
+        pathMapping[normalizedKey.replaceAll('\\', '/')] = originalKey;
+        pathMapping[normalizedKey.replaceAll('/', '\\')] = originalKey;
+
+        // Add just the filename
+        final entryFileName = p.basename(originalKey).toLowerCase();
+        if (!pathMapping.containsKey(entryFileName)) {
+          pathMapping[entryFileName] = originalKey;
+        }
+      }
+
+      debugPrint("[DEBUG] BookProcessor: Created ${pathMapping.length} normalized path mappings");
+      debugPrint("[DEBUG] BookProcessor: Trying ${exactPaths.length} exact paths and ${possiblePaths.length} partial paths");
+
+      // First try exact matches (case sensitive and insensitive)
+      for (final exactPath in exactPaths) {
+        // Direct lookup in the images map
+        if (images.containsKey(exactPath)) {
+          debugPrint("[DEBUG] BookProcessor: Found direct match for image: $exactPath");
+          final bytes = _extractBytes(images[exactPath]);
+          if (bytes != null) {
+            debugPrint("[DEBUG] BookProcessor: Successfully extracted ${bytes.length} bytes");
+            return bytes;
+          }
+        }
+
+        // Lookup in our normalized path mapping
+        final normalizedPath = p.normalize(exactPath).toLowerCase();
+        if (pathMapping.containsKey(normalizedPath)) {
+          final originalKey = pathMapping[normalizedPath]!;
+          debugPrint("[DEBUG] BookProcessor: Found normalized match: $normalizedPath -> $originalKey");
+          final bytes = _extractBytes(images[originalKey]);
+          if (bytes != null) {
+            debugPrint("[DEBUG] BookProcessor: Successfully extracted ${bytes.length} bytes");
+            return bytes;
+          }
+        }
+      }
+
+      // Then try partial matches (ends with, contains)
+      for (final partialPath in [...exactPaths, ...possiblePaths]) {
+        for (var entry in images.entries) {
+          final key = entry.key;
+          final keyLower = key.toLowerCase();
+
+          // Check if the key ends with our path or vice versa
+          if (keyLower.endsWith(partialPath.toLowerCase()) || 
+              partialPath.toLowerCase().endsWith(keyLower)) {
+            debugPrint("[DEBUG] BookProcessor: Found partial match: $key ~ $partialPath");
+            final bytes = _extractBytes(entry.value);
+            if (bytes != null) {
+              debugPrint("[DEBUG] BookProcessor: Successfully extracted ${bytes.length} bytes");
+              return bytes;
             }
           }
         }
       }
 
-      // Then try partial matches
-      for (var entry in images.entries) {
-        final key = entry.key.toLowerCase();
-
-        for (final path in possiblePaths) {
-          if (key.endsWith(path) || path.endsWith(key)) {
-            debugPrint("[DEBUG] BookProcessor: Found partial match for image: ${entry.key} with path: $path");
-            try {
-              final bytes = _extractBytes(entry.value);
-              if (bytes != null) {
-                debugPrint("[DEBUG] BookProcessor: Extracted ${bytes.length} bytes for image");
-                return bytes;
-              } else {
-                debugPrint("[WARN] BookProcessor: Could not extract bytes from image: ${entry.key}");
-              }
-            } catch (e, stack) {
-              debugPrint("[ERROR] BookProcessor: Failed to extract image bytes for ${entry.key}: $e");
-              debugPrintStack(stackTrace: stack);
-              continue; // Try next path
+      // As a last resort, try to find an image with a similar name
+      final fileNameWithoutExt = p.basenameWithoutExtension(fileName).toLowerCase();
+      if (fileNameWithoutExt.isNotEmpty) {
+        debugPrint("[DEBUG] BookProcessor: Trying to find image with similar name: $fileNameWithoutExt");
+        for (var entry in images.entries) {
+          final entryFileName = p.basenameWithoutExtension(entry.key).toLowerCase();
+          if (entryFileName.contains(fileNameWithoutExt) || 
+              fileNameWithoutExt.contains(entryFileName)) {
+            debugPrint("[DEBUG] BookProcessor: Found similar filename: ${entry.key}");
+            final bytes = _extractBytes(entry.value);
+            if (bytes != null) {
+              debugPrint("[DEBUG] BookProcessor: Successfully extracted ${bytes.length} bytes");
+              return bytes;
             }
           }
         }
       }
 
       // Log all available image keys for debugging
-      debugPrint("[WARN] BookProcessor: No matching image found. Available images:");
+      debugPrint("[WARN] BookProcessor: No matching image found for: $cleanSrc");
+      debugPrint("[WARN] BookProcessor: Available images:");
       for (var entry in images.entries) {
         debugPrint("[WARN] BookProcessor: - ${entry.key}");
       }
 
-      debugPrint("[WARN] BookProcessor: No matching image found for any of these paths: $possiblePaths");
       return null;
     } catch (e, stack) {
       debugPrint("[ERROR] BookProcessor: Unexpected error in _getImageBytes: $e");
@@ -480,4 +646,135 @@ class BookProcessor {
 
     return result;
   }
+
+  // Basic HTML sanitization to remove potentially problematic content
+  static String _basicSanitizeHtml(String html) {
+    try {
+      debugPrint("[DEBUG] BookProcessor: Performing basic HTML sanitization");
+
+      // Very simple sanitization - just remove the most problematic elements
+      String sanitized = html;
+
+      // Remove script tags (simple approach)
+      if (sanitized.contains("<script")) {
+        sanitized = sanitized.replaceAll("<script", "<!-- script");
+        sanitized = sanitized.replaceAll("</script>", "end script -->");
+      }
+
+      // Remove style tags (simple approach)
+      if (sanitized.contains("<style")) {
+        sanitized = sanitized.replaceAll("<style", "<!-- style");
+        sanitized = sanitized.replaceAll("</style>", "end style -->");
+      }
+
+      return sanitized;
+    } catch (e) {
+      debugPrint("[ERROR] BookProcessor: Error in basic HTML sanitization: $e");
+      return html; // Return original HTML if there's an error
+    }
+  }
+
+  // Calculate pagination based on block content and type
+  static List<BookPage> _calculatePagination(List<ContentBlock> blocks, int bookId) {
+    try {
+      debugPrint("[DEBUG] BookProcessor: Calculating pagination for ${blocks.length} blocks");
+
+      // Constants for pagination calculation
+      const int averageCharsPerPage = 2000; // Approximate characters per page
+      const double headingMultiplier = 2.5; // Headings take more space
+      const double imageMultiplier = 5.0; // Images take more space
+
+      List<BookPage> pages = [];
+      int currentPageIndex = 0;
+      int currentPageSize = 0;
+      int startingBlockIndex = 0;
+      int? currentChapterIndex;
+
+      for (int i = 0; i < blocks.length; i++) {
+        final block = blocks[i];
+        int blockSize = 0;
+
+        // Update current chapter if needed
+        if (currentChapterIndex != block.chapterIndex) {
+          currentChapterIndex = block.chapterIndex;
+
+          // Start a new page for each chapter
+          if (i > 0 && currentPageSize > 0) {
+            // Save the current page
+            pages.add(BookPage()
+              ..bookId = bookId
+              ..pageIndex = currentPageIndex
+              ..startingBlockIndex = startingBlockIndex
+              ..endingBlockIndex = i - 1
+              ..chapterIndex = blocks[startingBlockIndex].chapterIndex);
+
+            // Start a new page
+            currentPageIndex++;
+            startingBlockIndex = i;
+            currentPageSize = 0;
+          }
+        }
+
+        // Calculate block size based on content and type
+        switch (block.blockType) {
+          case BlockType.h1:
+          case BlockType.h2:
+          case BlockType.h3:
+          case BlockType.h4:
+          case BlockType.h5:
+          case BlockType.h6:
+            // Headings take more space
+            blockSize = (block.textContent?.length ?? 0) * headingMultiplier.toInt();
+            break;
+          case BlockType.img:
+            // Images take a lot of space
+            blockSize = averageCharsPerPage * imageMultiplier.toInt();
+            break;
+          case BlockType.p:
+          case BlockType.unsupported:
+          default:
+            // Regular paragraphs
+            blockSize = block.textContent?.length ?? 0;
+            break;
+        }
+
+        // Check if we need to start a new page
+        if (currentPageSize + blockSize > averageCharsPerPage && i > startingBlockIndex) {
+          // Save the current page
+          pages.add(BookPage()
+            ..bookId = bookId
+            ..pageIndex = currentPageIndex
+            ..startingBlockIndex = startingBlockIndex
+            ..endingBlockIndex = i - 1
+            ..chapterIndex = blocks[startingBlockIndex].chapterIndex);
+
+          // Start a new page
+          currentPageIndex++;
+          startingBlockIndex = i;
+          currentPageSize = blockSize;
+        } else {
+          // Add to current page
+          currentPageSize += blockSize;
+        }
+      }
+
+      // Add the last page if there are any blocks left
+      if (startingBlockIndex < blocks.length) {
+        pages.add(BookPage()
+          ..bookId = bookId
+          ..pageIndex = currentPageIndex
+          ..startingBlockIndex = startingBlockIndex
+          ..endingBlockIndex = blocks.length - 1
+          ..chapterIndex = blocks[startingBlockIndex].chapterIndex);
+      }
+
+      debugPrint("[DEBUG] BookProcessor: Calculated ${pages.length} pages for ${blocks.length} blocks");
+      return pages;
+    } catch (e, stack) {
+      debugPrint("[ERROR] BookProcessor: Error calculating pagination: $e");
+      debugPrintStack(stackTrace: stack);
+      return [];
+    }
+  }
+
 }

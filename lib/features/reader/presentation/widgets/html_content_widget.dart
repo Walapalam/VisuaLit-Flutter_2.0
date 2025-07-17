@@ -43,44 +43,15 @@ class _HtmlContentWidgetState extends ConsumerState<HtmlContentWidget> {
       // Check for null bookId
       if (widget.block.bookId == null) {
         debugPrint("[ERROR] HtmlContentWidget: Block has null bookId");
-        return const SizedBox.shrink();
+        return _buildErrorWidget("Block has no book ID");
       }
 
       final preferences = ref.watch(readingPreferencesProvider);
       final highlightsAsync = ref.watch(highlightsProvider(widget.block.bookId!));
 
       // Handle image blocks
-      if (widget.block.blockType == BlockType.img && widget.block.imageBytes != null) {
-        debugPrint("[DEBUG] HtmlContentWidget: Rendering image block with ${widget.block.imageBytes!.length} bytes");
-        return GestureDetector(
-          onScaleStart: (details) {
-            debugPrint("[DEBUG] HtmlContentWidget: Image scale start: $_scale");
-            _baseScale = _scale;
-          },
-          onScaleUpdate: (details) {
-            setState(() {
-              _scale = (_baseScale * details.scale).clamp(0.8, 3.0);
-              debugPrint("[DEBUG] HtmlContentWidget: Image scale updated: $_scale");
-            });
-          },
-          child: Transform.scale(
-            scale: _scale,
-            child: Padding(
-              padding: const EdgeInsets.symmetric(vertical: 8.0),
-              child: Image.memory(
-                Uint8List.fromList(widget.block.imageBytes!),
-                fit: BoxFit.contain,
-                height: widget.viewSize.height * 0.6,
-                errorBuilder: (context, error, stackTrace) {
-                  debugPrint("[ERROR] HtmlContentWidget: Failed to render image: $error");
-                  return Center(
-                    child: Icon(Icons.broken_image, color: Colors.red.shade300, size: 48),
-                  );
-                },
-              ),
-            ),
-          ),
-        );
+      if (widget.block.blockType == BlockType.img) {
+        return _buildImageWidget(preferences);
       }
 
       // Handle empty content
@@ -106,66 +77,195 @@ class _HtmlContentWidgetState extends ConsumerState<HtmlContentWidget> {
       }
 
       // Render HTML content
-      debugPrint("[DEBUG] HtmlContentWidget: Rendering HTML content for block ${widget.blockIndex}");
-      return GestureDetector(
-        onScaleStart: (details) {
-          debugPrint("[DEBUG] HtmlContentWidget: Text scale start: $_scale");
-          _baseScale = _scale;
-        },
-        onScaleUpdate: (details) {
-          setState(() {
-            _scale = (_baseScale * details.scale).clamp(0.8, 3.0);
-            debugPrint("[DEBUG] HtmlContentWidget: Text scale updated: $_scale");
-          });
-        },
-        child: Transform.scale(
-          scale: _scale,
-          alignment: Alignment.topLeft,
-          child: SelectionArea(
-            child: HtmlWidget(
-              _injectHighlightTags(widget.block.htmlContent!, blockHighlights),
-              textStyle: preferences.getStyleForBlock(widget.block.blockType),
-              customStylesBuilder: (element) {
-                if (element.localName == 'highlight') {
-                  final colorValue = element.attributes['color'];
-                  if (colorValue != null) {
-                    return {'background-color': colorValue};
-                  }
-                }
-                return null;
-              },
-              onTapUrl: (url) {
-                try {
-                  debugPrint("[DEBUG] HtmlContentWidget: URL tapped: $url");
-                  if (widget.block.src != null && widget.block.bookId != null) {
-                    ref.read(readingControllerProvider(widget.block.bookId!).notifier)
-                       .jumpToHref(url, widget.block.src!);
-                    return true;
-                  }
-                  debugPrint("[WARN] HtmlContentWidget: Cannot handle URL tap, missing src or bookId");
-                  return false;
-                } catch (e) {
-                  debugPrint("[ERROR] HtmlContentWidget: Error handling URL tap: $e");
-                  return false;
-                }
-              },
-              onErrorBuilder: (context, element, error) {
-                debugPrint("[ERROR] HtmlContentWidget: Error rendering HTML: $error");
-                return Text(
-                  "Error rendering content: ${error.toString().substring(0, error.toString().length.clamp(0, 100))}...",
-                  style: TextStyle(color: Colors.red.shade300),
-                );
-              },
-            ),
-          ),
-        ),
-      );
+      return _buildHtmlWidget(preferences, blockHighlights);
     } catch (e, stack) {
       debugPrint("[ERROR] HtmlContentWidget: Unhandled error in build: $e");
       debugPrintStack(stackTrace: stack);
-      return const SizedBox.shrink();
+      return _buildErrorWidget("Error: ${e.toString().substring(0, e.toString().length.clamp(0, 50))}...");
     }
   }
+
+  // Build the image widget with proper error handling and scaling
+  Widget _buildImageWidget(ReadingPreferences preferences) {
+    debugPrint("[DEBUG] HtmlContentWidget: Building image widget for block ${widget.blockIndex}");
+
+    // Check if we have image bytes
+    if (widget.block.imageBytes == null || widget.block.imageBytes!.isEmpty) {
+      debugPrint("[WARN] HtmlContentWidget: Image block has no image bytes");
+      return Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.image_not_supported, color: Colors.grey.shade400, size: 48),
+            const SizedBox(height: 8),
+            Text(
+              "Missing image",
+              style: TextStyle(color: Colors.grey.shade500),
+            ),
+          ],
+        ),
+      );
+    }
+
+    debugPrint("[DEBUG] HtmlContentWidget: Rendering image with ${widget.block.imageBytes!.length} bytes");
+
+    return GestureDetector(
+      onScaleStart: (details) {
+        _baseScale = _scale;
+      },
+      onScaleUpdate: (details) {
+        setState(() {
+          _scale = (_baseScale * details.scale).clamp(0.8, 3.0);
+        });
+      },
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          // Calculate appropriate image size based on container constraints
+          final maxWidth = constraints.maxWidth;
+          final maxHeight = widget.viewSize.height * 0.6;
+
+          return Transform.scale(
+            scale: _scale,
+            alignment: Alignment.center,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 12.0),
+              child: Center(
+                child: ConstrainedBox(
+                  constraints: BoxConstraints(
+                    maxWidth: maxWidth,
+                    maxHeight: maxHeight,
+                  ),
+                  child: Image.memory(
+                    Uint8List.fromList(widget.block.imageBytes!),
+                    fit: BoxFit.contain,
+                    errorBuilder: (context, error, stackTrace) {
+                      debugPrint("[ERROR] HtmlContentWidget: Failed to render image: $error");
+                      return Center(
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.broken_image, color: Colors.red.shade300, size: 48),
+                            const SizedBox(height: 8),
+                            Text(
+                              "Failed to load image",
+                              style: TextStyle(color: Colors.red.shade300),
+                            ),
+                          ],
+                        ),
+                      );
+                    },
+                  ),
+                ),
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  // Build the HTML widget with proper error handling and scaling
+  Widget _buildHtmlWidget(ReadingPreferences preferences, List<Highlight> blockHighlights) {
+    debugPrint("[DEBUG] HtmlContentWidget: Building HTML widget for block ${widget.blockIndex}");
+
+    // Use the already sanitized HTML content
+    String htmlContent;
+    try {
+      // HTML content is already sanitized during processing
+      htmlContent = widget.block.htmlContent!;
+
+      // Add highlights if needed
+      if (blockHighlights.isNotEmpty) {
+        htmlContent = _injectHighlightTags(htmlContent, blockHighlights);
+      }
+    } catch (e) {
+      debugPrint("[ERROR] HtmlContentWidget: Error processing HTML content: $e");
+      htmlContent = widget.block.textContent ?? "Error processing content";
+    }
+
+    return GestureDetector(
+      onScaleStart: (details) {
+        _baseScale = _scale;
+      },
+      onScaleUpdate: (details) {
+        setState(() {
+          _scale = (_baseScale * details.scale).clamp(0.8, 3.0);
+        });
+      },
+      child: Transform.scale(
+        scale: _scale,
+        alignment: Alignment.topLeft,
+        child: SelectionArea(
+          child: HtmlWidget(
+            htmlContent,
+            textStyle: preferences.getStyleForBlock(widget.block.blockType),
+            customStylesBuilder: (element) {
+              if (element.localName == 'highlight') {
+                final colorValue = element.attributes['color'];
+                if (colorValue != null) {
+                  return {'background-color': colorValue};
+                }
+              }
+              return null;
+            },
+            onTapUrl: (url) {
+              try {
+                debugPrint("[DEBUG] HtmlContentWidget: URL tapped: $url");
+                if (widget.block.src != null && widget.block.bookId != null) {
+                  ref.read(readingControllerProvider(widget.block.bookId!).notifier)
+                     .jumpToHref(url, widget.block.src!);
+                  return true;
+                }
+                debugPrint("[WARN] HtmlContentWidget: Cannot handle URL tap, missing src or bookId");
+                return false;
+              } catch (e) {
+                debugPrint("[ERROR] HtmlContentWidget: Error handling URL tap: $e");
+                return false;
+              }
+            },
+            onErrorBuilder: (context, element, error) {
+              debugPrint("[ERROR] HtmlContentWidget: Error rendering HTML element: $error");
+              // Try to render just the text content of the element
+              final elementText = element.text;
+              if (elementText != null && elementText.isNotEmpty) {
+                return Text(
+                  elementText,
+                  style: preferences.getStyleForBlock(widget.block.blockType),
+                );
+              }
+              return Text(
+                "Error rendering element",
+                style: TextStyle(color: Colors.red.shade300),
+              );
+            },
+            // Add rendering options to improve compatibility
+            renderMode: RenderMode.column,
+            enableCaching: true,
+            buildAsync: true,
+            // Add key to force rebuild when content changes
+            key: ValueKey('html_${widget.blockIndex}_${widget.block.id}'),
+          ),
+        ),
+      ),
+    );
+  }
+
+  // Build a widget to display errors
+  Widget _buildErrorWidget(String message) {
+    return Container(
+      padding: const EdgeInsets.all(8.0),
+      margin: const EdgeInsets.symmetric(vertical: 4.0),
+      decoration: BoxDecoration(
+        border: Border.all(color: Colors.red.shade200),
+        borderRadius: BorderRadius.circular(4.0),
+      ),
+      child: Text(
+        message,
+        style: TextStyle(color: Colors.red.shade300),
+      ),
+    );
+  }
+
 
   String _injectHighlightTags(String html, List<Highlight> highlights) {
     try {

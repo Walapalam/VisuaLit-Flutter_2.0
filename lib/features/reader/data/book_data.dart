@@ -34,6 +34,15 @@ class Book {
   DateTime? lastReadTimestamp;
 
   List<TOCEntry> toc = [];
+
+  // Precomputed pagination data
+  // Map of page index to starting block index
+  // Stored as a list of alternating page indices and block indices
+  // [pageIndex1, blockIndex1, pageIndex2, blockIndex2, ...]
+  List<int> pageToBlockMap = [];
+
+  // Total number of pages in the book
+  int totalPages = 0;
 }
 
 // Extension methods for debugging Book class
@@ -94,39 +103,30 @@ class ContentBlock {
   List<byte>? imageBytes;
 }
 
-// Extension methods for debugging ContentBlock class
-extension ContentBlockDebug on ContentBlock {
-  // Log the content block details
-  void debugLog() {
-    debugPrint("[DEBUG] ContentBlock: id: $id, bookId: $bookId, chapter: $chapterIndex, blockIndex: $blockIndexInChapter");
-    debugPrint("[DEBUG] ContentBlock: type: $blockType, src: $src");
+// Collection for precomputed pagination information
+@collection
+class BookPage {
+  Id id = Isar.autoIncrement;
 
-    if (textContent != null && textContent!.isNotEmpty) {
-      final displayText = textContent!.length > 50 ? '${textContent!.substring(0, 47)}...' : textContent;
-      debugPrint("[DEBUG] ContentBlock: text: '$displayText'");
-    }
+  // Reference to the book this page belongs to
+  @Index()
+  int? bookId;
 
-    if (imageBytes != null) {
-      debugPrint("[DEBUG] ContentBlock: image data: ${imageBytes!.length} bytes");
-    }
+  // Page number/index
+  @Index()
+  int pageIndex = 0;
 
-    if (htmlContent != null) {
-      final htmlPreview = htmlContent!.length > 50 ? '${htmlContent!.substring(0, 47)}...' : htmlContent;
-      debugPrint("[DEBUG] ContentBlock: html: '$htmlPreview'");
-    }
-  }
+  // Starting block index for this page
+  int startingBlockIndex = 0;
 
-  // Get a string representation of the content block
-  String toDebugString() {
-    final textPreview = textContent != null && textContent!.isNotEmpty
-        ? (textContent!.length > 20 ? "'${textContent!.substring(0, 17)}...'" : "'$textContent'")
-        : "null";
+  // Ending block index for this page
+  int endingBlockIndex = 0;
 
-    return "ContentBlock(id: $id, bookId: $bookId, chapter: $chapterIndex, " +
-           "blockIndex: $blockIndexInChapter, type: $blockType, " +
-           "text: $textPreview, hasImage: ${imageBytes != null})";
-  }
+  // Chapter index this page belongs to (for chapter navigation)
+  @Index()
+  int? chapterIndex;
 }
+
 
 // Static helper methods for debugging
 class BookDataUtils {
@@ -142,11 +142,48 @@ class BookDataUtils {
   static void debugLogContentBlocks(List<ContentBlock> blocks, [String message = ""]) {
     debugPrint("[DEBUG] BookDataUtils: $message - ${blocks.length} content blocks");
     for (int i = 0; i < blocks.length && i < 10; i++) {
-      debugPrint("[DEBUG] BookDataUtils: [$i] ${blocks[i].toDebugString()}");
+      debugPrint("[DEBUG] BookDataUtils: [$i] ${_getContentBlockSummary(blocks[i])}");
     }
     if (blocks.length > 10) {
       debugPrint("[DEBUG] BookDataUtils: ... and ${blocks.length - 10} more blocks");
     }
+  }
+
+  // Log details of a single content block
+  static void debugLogContentBlock(ContentBlock block, [String message = ""]) {
+    debugPrint("[DEBUG] BookDataUtils: $message");
+    debugPrint("[DEBUG] BookDataUtils: Block ID: ${block.id}, Book ID: ${block.bookId}, Chapter: ${block.chapterIndex}, Index: ${block.blockIndexInChapter}");
+    debugPrint("[DEBUG] BookDataUtils: Type: ${block.blockType}, Source: ${block.src}");
+
+    if (block.textContent != null && block.textContent!.isNotEmpty) {
+      final displayText = block.textContent!.length > 50 ? '${block.textContent!.substring(0, 47)}...' : block.textContent;
+      debugPrint("[DEBUG] BookDataUtils: Text: '$displayText'");
+    }
+
+    if (block.blockType == BlockType.img) {
+      debugPrint("[DEBUG] BookDataUtils: Is an image block");
+      if (block.imageBytes != null) {
+        debugPrint("[DEBUG] BookDataUtils: Has image data: ${block.imageBytes!.length} bytes");
+      }
+    }
+
+    if (block.htmlContent != null) {
+      final htmlPreview = block.htmlContent!.length > 50 ? '${block.htmlContent!.substring(0, 47)}...' : block.htmlContent;
+      debugPrint("[DEBUG] BookDataUtils: HTML: '$htmlPreview'");
+    }
+  }
+
+  // Get a string summary of a content block
+  static String _getContentBlockSummary(ContentBlock block) {
+    final textPreview = block.textContent != null && block.textContent!.isNotEmpty
+        ? (block.textContent!.length > 20 ? "'${block.textContent!.substring(0, 17)}...'" : "'${block.textContent}'")
+        : "null";
+
+    final bool isImage = block.blockType == BlockType.img;
+
+    return "ContentBlock(id: ${block.id}, bookId: ${block.bookId}, chapter: ${block.chapterIndex}, " +
+           "blockIndex: ${block.blockIndexInChapter}, type: ${block.blockType}, " +
+           "text: $textPreview, isImage: $isImage)";
   }
 
   // Get a string representation of a processing status

@@ -4,7 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:visualit/features/reader/data/book_data.dart';
 
 // Enum for the new page turning style setting
-enum PageTurnStyle { paged, scroll, slide, curl, fastFade }
+enum PageTurnStyle { paged, scroll, slide, curl, fastFade, epubView }
 enum BackgroundDimming { none, low, medium, high }
 enum OrientationMode { auto, portrait, landscape }
 

@@ -120,6 +120,15 @@ class ReadingSettingsPanel extends ConsumerWidget {
                 secondary: const Icon(Icons.text_format_outlined),
                 contentPadding: EdgeInsets.zero,
               ),
+              const Divider(),
+              // Line Guide Toggle
+              SwitchListTile(
+                title: Text('Reading Line Guide', style: TextStyle(color: textColor)),
+                value: prefs.isLineGuideEnabled,
+                onChanged: prefsController.toggleLineGuide,
+                secondary: const Icon(Icons.horizontal_rule),
+                contentPadding: EdgeInsets.zero,
+              ),
             ],
           ),
         ),

@@ -14,7 +14,7 @@ import 'package:visualit/features/settings/presentation/settings_screen.dart';
 import 'package:visualit/main.dart';
 
 import '../../features/auth/presentation/splash_screen.dart';
-import '../../features/reader/presentation/reading_screen_temp.dart';
+import 'package:visualit/features/reader/presentation/reading_screen.dart';
 
 final _rootNavigatorKey = GlobalKey<NavigatorState>();
 

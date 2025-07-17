@@ -1,4 +1,5 @@
 import 'dart:typed_data';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -13,12 +14,21 @@ class HomeScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    debugPrint("[DEBUG] HomeScreen: Building home screen");
     final isarAsync = ref.watch(isarDBProvider);
 
     return isarAsync.when(
-      loading: () => const Center(child: CircularProgressIndicator()),
-      error: (err, stack) => Center(child: Text('Database Error: $err')),
+      loading: () {
+        debugPrint("[DEBUG] HomeScreen: Database is loading");
+        return const Center(child: CircularProgressIndicator());
+      },
+      error: (err, stack) {
+        debugPrint("[ERROR] HomeScreen: Database error: $err");
+        debugPrintStack(stackTrace: stack);
+        return Center(child: Text('Database Error: $err'));
+      },
       data: (isar) {
+        debugPrint("[DEBUG] HomeScreen: Database loaded successfully");
         final libraryState = ref.watch(libraryControllerProvider);
         final libraryController = ref.read(libraryControllerProvider.notifier);
 
@@ -28,9 +38,18 @@ class HomeScreen extends ConsumerWidget {
           backgroundColor: Theme.of(context).colorScheme.background,
           body: SafeArea(
             child: libraryState.when(
-              loading: () => const Center(child: CircularProgressIndicator()),
-              error: (err, _) => Center(child: Text('Error: $err')),
-              data: (books) => CustomScrollView(
+              loading: () {
+                debugPrint("[DEBUG] HomeScreen: Library is loading");
+                return const Center(child: CircularProgressIndicator());
+              },
+              error: (err, stack) {
+                debugPrint("[ERROR] HomeScreen: Library error: $err");
+                debugPrintStack(stackTrace: stack);
+                return Center(child: Text('Error: $err'));
+              },
+              data: (books) {
+                debugPrint("[DEBUG] HomeScreen: Library loaded with ${books.length} books");
+                return CustomScrollView(
                 slivers: [
                   SliverAppBar(
                     backgroundColor: Theme.of(context).colorScheme.background,
@@ -96,7 +115,8 @@ class HomeScreen extends ConsumerWidget {
                     ),
                   ),
                 ],
-              ),
+                );
+              },
             ),
           ),
         );
@@ -112,6 +132,7 @@ class _EmptyLibraryView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    debugPrint("[DEBUG] _EmptyLibraryView: Building empty library view");
     return Padding(
       padding: const EdgeInsets.all(32.0),
       child: Center(
@@ -138,7 +159,10 @@ class _EmptyLibraryView extends StatelessWidget {
                   borderRadius: BorderRadius.circular(12),
                 ),
               ),
-              onPressed: onSelectBooks,
+              onPressed: () {
+                debugPrint("[DEBUG] _EmptyLibraryView: 'Select Your Books' button pressed");
+                onSelectBooks();
+              },
             ),
           ],
         ),
@@ -162,7 +186,11 @@ class _BookShelf extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    if (books.isEmpty) return const SizedBox.shrink();
+    debugPrint("[DEBUG] _BookShelf: Building book shelf with title: '$title', books: ${books.length}");
+    if (books.isEmpty) {
+      debugPrint("[DEBUG] _BookShelf: No books to display, returning empty widget");
+      return const SizedBox.shrink();
+    }
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -179,7 +207,12 @@ class _BookShelf extends StatelessWidget {
               if (showViewAll)
                 TextButton(
                   onPressed: () {
-                    if (viewAllRoute != null) context.go(viewAllRoute!);
+                    if (viewAllRoute != null) {
+                      debugPrint("[DEBUG] _BookShelf: 'View All' button pressed, navigating to: $viewAllRoute");
+                      context.go(viewAllRoute!);
+                    } else {
+                      debugPrint("[WARN] _BookShelf: 'View All' button pressed but viewAllRoute is null");
+                    }
                   },
                   child: const Text('View All',
                       style: TextStyle(color: AppTheme.primaryGreen)

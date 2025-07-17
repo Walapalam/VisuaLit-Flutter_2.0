@@ -181,7 +181,19 @@ class LibraryController extends StateNotifier<AsyncValue<List<db.Book>>> {
         final language = metadata.findAllElements('dc:language').firstOrNull?.innerText;
         final pubDateStr = metadata.findAllElements('dc:date').firstOrNull?.innerText;
         final publicationDate = pubDateStr != null ? DateTime.tryParse(pubDateStr) : null;
-        print("  [LibraryController] Parsed Metadata -> Title: '$title', Author: '$author', Publisher: '$publisher'");
+
+        // Extract ISBN from metadata
+        String? isbn;
+        final identifiers = metadata.findAllElements('dc:identifier');
+        for (final identifier in identifiers) {
+          final scheme = identifier.getAttribute('opf:scheme')?.toLowerCase();
+          if (scheme == 'isbn' || identifier.innerText.toLowerCase().contains('isbn')) {
+            isbn = identifier.innerText.replaceAll(RegExp(r'[^\d]'), '');
+            break;
+          }
+        }
+
+        print("  [LibraryController] Parsed Metadata -> Title: '$title', Author: '$author', Publisher: '$publisher', ISBN: '$isbn'");
 
         final manifest = <String, String>{};
         final manifestItems = opfXml.findAllElements('item');
@@ -301,6 +313,7 @@ class LibraryController extends StateNotifier<AsyncValue<List<db.Book>>> {
             bookToUpdate.publisher = publisher;
             bookToUpdate.language = language;
             bookToUpdate.publicationDate = publicationDate;
+            bookToUpdate.isbn = isbn;
             await _isar.books.put(bookToUpdate);
           }
           await _isar.contentBlocks.putAll(allBlocks);

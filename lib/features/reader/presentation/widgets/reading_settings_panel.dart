@@ -111,6 +111,15 @@ class ReadingSettingsPanel extends ConsumerWidget {
                   secondary: const Icon(Icons.dark_mode_outlined),
                   contentPadding: EdgeInsets.zero,
                 ),
+              const Divider(),
+              // Hyphenation Toggle
+              SwitchListTile(
+                title: Text('Enable Hyphenation', style: TextStyle(color: textColor)),
+                value: prefs.enableHyphenation,
+                onChanged: prefsController.toggleHyphenation,
+                secondary: const Icon(Icons.text_format_outlined),
+                contentPadding: EdgeInsets.zero,
+              ),
             ],
           ),
         ),

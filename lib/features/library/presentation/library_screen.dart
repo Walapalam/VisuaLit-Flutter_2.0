@@ -1,5 +1,6 @@
 import 'dart:typed_data';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -12,6 +13,7 @@ class LibraryScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    debugPrint("[DEBUG] LibraryScreen: Building library screen");
     final libraryState = ref.watch(libraryControllerProvider);
     final libraryController = ref.read(libraryControllerProvider.notifier);
 
@@ -21,15 +23,27 @@ class LibraryScreen extends ConsumerWidget {
         actions: [
           IconButton(
             icon: const Icon(Icons.add),
-            onPressed: () => libraryController.pickAndProcessBooks(),
+            onPressed: () {
+              debugPrint("[DEBUG] LibraryScreen: Add books button pressed");
+              libraryController.pickAndProcessBooks();
+            },
           )
         ],
       ),
       body: libraryState.when(
-        loading: () => const Center(child: CircularProgressIndicator()),
-        error: (err, stack) => Center(child: Text('Error: $err')),
+        loading: () {
+          debugPrint("[DEBUG] LibraryScreen: Showing loading state");
+          return const Center(child: CircularProgressIndicator());
+        },
+        error: (err, stack) {
+          debugPrint("[ERROR] LibraryScreen: Error loading library: $err");
+          debugPrintStack(stackTrace: stack);
+          return Center(child: Text('Error: $err'));
+        },
         data: (books) {
+          debugPrint("[DEBUG] LibraryScreen: Loaded ${books.length} books");
           if (books.isEmpty) {
+            debugPrint("[DEBUG] LibraryScreen: Library is empty, showing empty state");
             return Center(
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
@@ -37,7 +51,10 @@ class LibraryScreen extends ConsumerWidget {
                   const Text('Your library is empty.'),
                   const SizedBox(height: 10),
                   ElevatedButton(
-                    onPressed: () => libraryController.pickAndProcessBooks(),
+                    onPressed: () {
+                      debugPrint("[DEBUG] LibraryScreen: Add books button pressed (empty state)");
+                      libraryController.pickAndProcessBooks();
+                    },
                     child: const Text('Add Books'),
                   )
                 ],
@@ -57,10 +74,13 @@ class LibraryScreen extends ConsumerWidget {
               final book = books[index];
               return GestureDetector(
                 onTap: () {
+                  debugPrint("[DEBUG] LibraryScreen: Book tapped - id: ${book.id}, title: ${book.title ?? 'Untitled'}, status: ${book.status}");
                   if (book.status == ProcessingStatus.ready) {
+                    debugPrint("[DEBUG] LibraryScreen: Navigating to book reader for book ID: ${book.id}");
                     context.goNamed('bookReader',
                         pathParameters: {'bookId': book.id.toString()});
                   } else {
+                    debugPrint("[WARN] LibraryScreen: Cannot open book - still processing");
                     ScaffoldMessenger.of(context).showSnackBar(SnackBar(
                         content:
                         Text('${book.title ?? 'Book'} is still processing...')));
@@ -78,6 +98,8 @@ class LibraryScreen extends ConsumerWidget {
                           width: double.infinity,
                           // ADDED: This handles errors if the image data is invalid.
                           errorBuilder: (context, error, stackTrace) {
+                            debugPrint("[ERROR] LibraryScreen: Failed to load cover image for book ${book.id}: $error");
+                            debugPrintStack(stackTrace: stackTrace);
                             return Container(
                               color: Colors.grey[800],
                               child: const Center(

@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 class AppTheme {
@@ -7,6 +8,14 @@ class AppTheme {
   static const Color darkGrey = Color(0xFF121212);
   static const Color white = Color(0xFFFFFFFF);
   static const Color grey = Color(0xFF888888);
+
+  // Static initializer for debugging
+  static void initialize() {
+    debugPrint("[DEBUG] AppTheme: Initializing application themes");
+    debugPrint("[DEBUG] AppTheme: Primary color: $primaryGreen");
+    debugPrint("[DEBUG] AppTheme: Dark theme background: $black");
+    debugPrint("[DEBUG] AppTheme: Light theme background: $white");
+  }
 
   // Dark Theme
   static final ThemeData darkTheme = ThemeData(
@@ -111,4 +120,19 @@ class AppTheme {
       type: BottomNavigationBarType.fixed,
     ),
   );
+  // Debug helper methods
+  static void logThemeInfo(ThemeData theme, String themeName) {
+    debugPrint("[DEBUG] AppTheme: Theme info for $themeName");
+    debugPrint("[DEBUG] AppTheme: Brightness: ${theme.brightness}");
+    debugPrint("[DEBUG] AppTheme: Primary color: ${theme.colorScheme.primary}");
+    debugPrint("[DEBUG] AppTheme: Background color: ${theme.colorScheme.background}");
+    debugPrint("[DEBUG] AppTheme: Surface color: ${theme.colorScheme.surface}");
+  }
+
+  static void logCurrentTheme(BuildContext context) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    debugPrint("[DEBUG] AppTheme: Current theme is ${isDark ? 'dark' : 'light'}");
+    logThemeInfo(theme, isDark ? "Dark Theme" : "Light Theme");
+  }
 }

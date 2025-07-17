@@ -1,3 +1,4 @@
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -107,8 +108,8 @@ final goRouterProvider = Provider<GoRouter>((ref) {
       final location = state.matchedLocation;
       final publicRoutes = ['/splash', '/onboarding', '/login', '/signup'];
 
-      // Stay on splash until initialization is complete
-      if (status == AuthStatus.initial && location != '/splash') {
+      // Stay on splash until initialization is complete (including loading state)
+      if ((status == AuthStatus.initial || status == AuthStatus.loading) && location != '/splash') {
         return '/splash';
       }
 
@@ -124,7 +125,7 @@ final goRouterProvider = Provider<GoRouter>((ref) {
       }
 
       // If on splash and initialization is complete, redirect based on status
-      if (location == '/splash' && status != AuthStatus.initial) {
+      if (location == '/splash' && status != AuthStatus.initial && status != AuthStatus.loading) {
         return status == AuthStatus.unauthenticated ? '/onboarding' : '/home';
       }
 

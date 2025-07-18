@@ -1,13 +1,14 @@
 import 'package:flutter/foundation.dart';
 import 'package:isar/isar.dart';
 import 'package:visualit/features/reader/data/toc_entry.dart';
+import 'package:visualit/features/reader/data/chapter_content.dart';
+import 'package:visualit/features/reader/data/book_image.dart';
+import 'package:visualit/features/reader/data/book_styling.dart';
 
 part 'book_data.g.dart';
 
 // ---- Enums ----
 enum ProcessingStatus { queued, processing, ready, error }
-
-enum BlockType { p, h1, h2, h3, h4, h5, h6, img, unsupported }
 
 // ---- Collections ----
 @collection
@@ -31,18 +32,16 @@ class Book {
   ProcessingStatus status = ProcessingStatus.queued;
 
   int lastReadPage = 0;
+  String? lastReadCfi; // EPUB Content Fragment Identifier for precise location tracking
   DateTime? lastReadTimestamp;
 
   List<TOCEntry> toc = [];
 
-  // Precomputed pagination data
-  // Map of page index to starting block index
-  // Stored as a list of alternating page indices and block indices
-  // [pageIndex1, blockIndex1, pageIndex2, blockIndex2, ...]
-  List<int> pageToBlockMap = [];
-
-  // Total number of pages in the book
-  int totalPages = 0;
+  // New fields for storing book content
+  // Chapters are now stored in a separate collection
+  IsarLinks<ChapterContent> chapters = IsarLinks<ChapterContent>();
+  List<BookImage> images = []; // Store images other than cover
+  BookStyling? styling; // Store styling information
 }
 
 // Extension methods for debugging Book class
@@ -66,66 +65,47 @@ extension BookDebug on Book {
         debugPrint("[DEBUG] Book: ... and ${toc.length - 5} more TOC entries");
       }
     }
+
+    // Log chapter content
+    // Note: IsarLinks requires special handling and can't be accessed directly in debug methods
+    // This will be populated after the code generator runs
+    debugPrint("[DEBUG] Book: Chapters stored in IsarLinks (count not available in debug method)");
+    // Detailed chapter logging is skipped as IsarLinks requires special handling
+
+    // Log images
+    debugPrint("[DEBUG] Book: Images: ${images.length}");
+    if (images.isNotEmpty) {
+      for (int i = 0; i < images.length && i < 3; i++) {
+        debugPrint("[DEBUG] Book: Image[$i]: ${images[i].name ?? 'Unnamed'}, type: ${images[i].mimeType}, size: ${images[i].imageBytes?.length ?? 0} bytes");
+      }
+      if (images.length > 3) {
+        debugPrint("[DEBUG] Book: ... and ${images.length - 3} more images");
+      }
+    }
+
+    // Log styling
+    if (styling != null) {
+      debugPrint("[DEBUG] Book: Styling: ${styling!.styleSheets.length} stylesheets");
+      for (int i = 0; i < styling!.styleSheets.length && i < 3; i++) {
+        debugPrint("[DEBUG] Book: StyleSheet[$i]: ${styling!.styleSheets[i].href}, length: ${styling!.styleSheets[i].content?.length ?? 0}");
+      }
+      if (styling!.styleSheets.length > 3) {
+        debugPrint("[DEBUG] Book: ... and ${styling!.styleSheets.length - 3} more stylesheets");
+      }
+    }
   }
 
   // Get a string representation of the book
   String toDebugString() {
     return "Book(id: $id, title: ${title ?? 'Untitled'}, author: ${author ?? 'Unknown'}, " +
-           "status: $status, lastReadPage: $lastReadPage, TOC: ${toc.length} entries)";
+           "status: $status, lastReadPage: $lastReadPage, TOC: ${toc.length} entries, " +
+           "chapters: IsarLinks, images: ${images.length}, stylesheets: ${styling?.styleSheets.length ?? 0})";
   }
 }
 
-@collection
-class ContentBlock {
-  Id id = Isar.autoIncrement;
+// ContentBlock class removed - EPUB View doesn't need it
 
-  @Index()
-  int? bookId;
-
-  @Index()
-  int? chapterIndex;
-
-  int? blockIndexInChapter;
-
-  @Index()
-  String? src; // The source XHTML file of this block
-
-  @enumerated
-  late BlockType blockType;
-
-  // Now the primary source for rendering
-  String? htmlContent;
-
-  // Keep plain text for searching, indexing, or simple displays
-  String? textContent;
-
-  // Store image data directly if the block is an image
-  List<byte>? imageBytes;
-}
-
-// Collection for precomputed pagination information
-@collection
-class BookPage {
-  Id id = Isar.autoIncrement;
-
-  // Reference to the book this page belongs to
-  @Index()
-  int? bookId;
-
-  // Page number/index
-  @Index()
-  int pageIndex = 0;
-
-  // Starting block index for this page
-  int startingBlockIndex = 0;
-
-  // Ending block index for this page
-  int endingBlockIndex = 0;
-
-  // Chapter index this page belongs to (for chapter navigation)
-  @Index()
-  int? chapterIndex;
-}
+// BookPage class removed - EPUB View doesn't need it
 
 
 // Static helper methods for debugging
@@ -138,53 +118,7 @@ class BookDataUtils {
     }
   }
 
-  // Log a list of content blocks
-  static void debugLogContentBlocks(List<ContentBlock> blocks, [String message = ""]) {
-    debugPrint("[DEBUG] BookDataUtils: $message - ${blocks.length} content blocks");
-    for (int i = 0; i < blocks.length && i < 10; i++) {
-      debugPrint("[DEBUG] BookDataUtils: [$i] ${_getContentBlockSummary(blocks[i])}");
-    }
-    if (blocks.length > 10) {
-      debugPrint("[DEBUG] BookDataUtils: ... and ${blocks.length - 10} more blocks");
-    }
-  }
-
-  // Log details of a single content block
-  static void debugLogContentBlock(ContentBlock block, [String message = ""]) {
-    debugPrint("[DEBUG] BookDataUtils: $message");
-    debugPrint("[DEBUG] BookDataUtils: Block ID: ${block.id}, Book ID: ${block.bookId}, Chapter: ${block.chapterIndex}, Index: ${block.blockIndexInChapter}");
-    debugPrint("[DEBUG] BookDataUtils: Type: ${block.blockType}, Source: ${block.src}");
-
-    if (block.textContent != null && block.textContent!.isNotEmpty) {
-      final displayText = block.textContent!.length > 50 ? '${block.textContent!.substring(0, 47)}...' : block.textContent;
-      debugPrint("[DEBUG] BookDataUtils: Text: '$displayText'");
-    }
-
-    if (block.blockType == BlockType.img) {
-      debugPrint("[DEBUG] BookDataUtils: Is an image block");
-      if (block.imageBytes != null) {
-        debugPrint("[DEBUG] BookDataUtils: Has image data: ${block.imageBytes!.length} bytes");
-      }
-    }
-
-    if (block.htmlContent != null) {
-      final htmlPreview = block.htmlContent!.length > 50 ? '${block.htmlContent!.substring(0, 47)}...' : block.htmlContent;
-      debugPrint("[DEBUG] BookDataUtils: HTML: '$htmlPreview'");
-    }
-  }
-
-  // Get a string summary of a content block
-  static String _getContentBlockSummary(ContentBlock block) {
-    final textPreview = block.textContent != null && block.textContent!.isNotEmpty
-        ? (block.textContent!.length > 20 ? "'${block.textContent!.substring(0, 17)}...'" : "'${block.textContent}'")
-        : "null";
-
-    final bool isImage = block.blockType == BlockType.img;
-
-    return "ContentBlock(id: ${block.id}, bookId: ${block.bookId}, chapter: ${block.chapterIndex}, " +
-           "blockIndex: ${block.blockIndexInChapter}, type: ${block.blockType}, " +
-           "text: $textPreview, isImage: $isImage)";
-  }
+  // ContentBlock debug methods removed - EPUB View doesn't need them
 
   // Get a string representation of a processing status
   static String processingStatusToString(ProcessingStatus status) {
@@ -197,19 +131,5 @@ class BookDataUtils {
     }
   }
 
-  // Get a string representation of a block type
-  static String blockTypeToString(BlockType type) {
-    switch (type) {
-      case BlockType.p: return "Paragraph";
-      case BlockType.h1: return "Heading 1";
-      case BlockType.h2: return "Heading 2";
-      case BlockType.h3: return "Heading 3";
-      case BlockType.h4: return "Heading 4";
-      case BlockType.h5: return "Heading 5";
-      case BlockType.h6: return "Heading 6";
-      case BlockType.img: return "Image";
-      case BlockType.unsupported: return "Unsupported";
-      default: return "Unknown";
-    }
-  }
+  // blockTypeToString method removed - EPUB View doesn't need it
 }

@@ -11,12 +11,10 @@ class ReadingScreenUiState with _$ReadingScreenUiState {
   const factory ReadingScreenUiState({
     /// Whether the UI elements (app bar, bottom bar, etc.) are visible
     @Default(false) bool isUiVisible,
-    
+
     /// Whether the screen is locked (prevents UI visibility toggling)
     @Default(false) bool isLocked,
-    
-    /// The current orientation of the device
-    @Default(DeviceOrientation.portraitUp) DeviceOrientation currentOrientation,
+
   }) = _ReadingScreenUiState;
 }
 
@@ -51,71 +49,6 @@ class ReadingScreenUiController extends Notifier<ReadingScreenUiState> {
     state = state.copyWith(isLocked: lock);
   }
 
-  /// Sets the orientation of the device
-  void setOrientation(DeviceOrientation orientation) {
-    state = state.copyWith(currentOrientation: orientation);
-  }
-
-  /// Toggles between portrait, landscape, and auto orientation modes
-  void toggleOrientation() {
-    debugPrint("[DEBUG] ReadingScreenUiController: Toggling orientation from ${state.currentOrientation}");
-    try {
-      switch (state.currentOrientation) {
-        case DeviceOrientation.portraitUp:
-          // Switch to landscape
-          setOrientation(DeviceOrientation.landscapeLeft);
-          SystemChrome.setPreferredOrientations([
-            DeviceOrientation.landscapeLeft,
-            DeviceOrientation.landscapeRight,
-          ]);
-          debugPrint("[DEBUG] ReadingScreenUiController: Switched to landscape orientation");
-          break;
-        case DeviceOrientation.landscapeLeft:
-        case DeviceOrientation.landscapeRight:
-          // Switch to auto (all orientations)
-          setOrientation(DeviceOrientation.portraitUp);
-          SystemChrome.setPreferredOrientations([]);
-          debugPrint("[DEBUG] ReadingScreenUiController: Switched to auto orientation");
-          break;
-        default:
-          // Switch to portrait
-          setOrientation(DeviceOrientation.portraitUp);
-          SystemChrome.setPreferredOrientations([
-            DeviceOrientation.portraitUp,
-          ]);
-          debugPrint("[DEBUG] ReadingScreenUiController: Switched to portrait orientation");
-          break;
-      }
-    } catch (e) {
-      debugPrint("[ERROR] ReadingScreenUiController: Failed to toggle orientation: $e");
-    }
-  }
-
-  /// Returns the appropriate icon for the current orientation
-  IconData getOrientationIcon() {
-    switch (state.currentOrientation) {
-      case DeviceOrientation.portraitUp:
-        return Icons.screen_rotation;
-      case DeviceOrientation.landscapeLeft:
-      case DeviceOrientation.landscapeRight:
-        return Icons.screen_lock_landscape;
-      default:
-        return Icons.screen_lock_portrait;
-    }
-  }
-
-  /// Returns the appropriate label for the current orientation
-  String getOrientationLabel() {
-    switch (state.currentOrientation) {
-      case DeviceOrientation.portraitUp:
-        return 'Switch to Landscape';
-      case DeviceOrientation.landscapeLeft:
-      case DeviceOrientation.landscapeRight:
-        return 'Auto Rotation';
-      default:
-        return 'Switch to Portrait';
-    }
-  }
 }
 
 /// Provider for the ReadingScreenUiController

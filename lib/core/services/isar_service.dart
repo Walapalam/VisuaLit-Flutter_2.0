@@ -2,9 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:isar/isar.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:visualit/features/reader/data/book_data.dart';
-import 'package:visualit/features/audiobook_player/data/audiobook.dart';
-import 'package:visualit/features/reader/data/highlight.dart';
-import 'package:visualit/features/reader/data/bookmark.dart';
+import 'package:visualit/features/reader/data/chapter_content.dart';
 
 class IsarService {
   late Future<Isar> _db;
@@ -46,10 +44,9 @@ class IsarService {
         final isar = await Isar.open(
           [
             BookSchema,
-            ContentBlockSchema,
-            AudiobookSchema,
-            HighlightSchema,
-            BookmarkSchema,
+            ChapterContentSchema,
+            // ContentBlockSchema, // Removed - EPUB View doesn't need it
+            // Audiobook, Highlight and Bookmark schemas removed
           ],
           directory: dir.path,
           name: _instanceName,
@@ -115,10 +112,9 @@ class IsarService {
       final stats = <String, int>{};
 
       stats['books'] = await isar.books.count();
-      stats['contentBlocks'] = await isar.contentBlocks.count();
-      stats['audiobooks'] = await isar.audiobooks.count();
-      stats['highlights'] = await isar.highlights.count();
-      stats['bookmarks'] = await isar.bookmarks.count();
+      stats['chapters'] = await isar.chapterContents.count();
+      // stats['contentBlocks'] = await isar.contentBlocks.count(); // Removed - EPUB View doesn't need it
+      // Audiobook, Highlight and Bookmark stats removed
 
       debugPrint("[DEBUG] IsarService: Database statistics: $stats");
       return stats;

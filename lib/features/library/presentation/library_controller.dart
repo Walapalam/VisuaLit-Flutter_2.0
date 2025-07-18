@@ -6,6 +6,9 @@ import 'package:visualit/core/providers/isar_provider.dart';
 import 'package:visualit/features/library/data/local_library_service.dart';
 import 'package:visualit/features/reader/data/book_data.dart' as db;
 import 'package:visualit/features/reader/data/toc_entry.dart';
+import 'package:visualit/features/reader/data/chapter_content.dart';
+import 'package:visualit/features/reader/data/book_image.dart';
+import 'package:visualit/features/reader/data/book_styling.dart';
 import 'package:archive/archive.dart';
 import 'package:xml/xml.dart';
 import 'package:html/parser.dart' as html_parser;
@@ -57,81 +60,8 @@ class LibraryController extends StateNotifier<AsyncValue<List<db.Book>>> {
     await _processFiles(files);
   }
 
-  /// Recursively traverses the HTML DOM to flatten it into a list of ContentBlocks.
-  /// This is the robust way to handle any chapter structure.
-  void _flattenAndParseElements({
-    required List<dom.Element> elements,
-    required List<db.ContentBlock> targetBlockList, // The list to add blocks to
-    required int bookId,
-    required int chapterIndex,
-    required String chapterPath,
-    required Archive archive,
-    required int Function() getNextBlockIndex, // Function to get and increment the index
-  }) {
-    for (final element in elements) {
-      final tagName = element.localName;
-      final blockType = _getBlockType(tagName);
-
-      // If it's a container tag, we don't create a block for it.
-      // Instead, we recurse into its children to find content.
-      if (tagName == 'div' || tagName == 'section' || tagName == 'article' || tagName == 'main') {
-        _flattenAndParseElements(
-          elements: element.children,
-          targetBlockList: targetBlockList,
-          bookId: bookId,
-          chapterIndex: chapterIndex,
-          chapterPath: chapterPath,
-          archive: archive,
-          getNextBlockIndex: getNextBlockIndex,
-        );
-        continue;
-      }
-
-      // If it's a content block we care about, we process it.
-      if (blockType != db.BlockType.unsupported) {
-        final textContent = element.text.replaceAll('\u00A0', ' ').trim();
-
-        // We skip blocks that are just empty text, but we must allow image blocks
-        // as they have no text content but are still valid.
-        if (textContent.isEmpty && blockType != db.BlockType.img) {
-          continue;
-        }
-
-        final block = db.ContentBlock()
-          ..bookId = bookId
-          ..chapterIndex = chapterIndex
-          ..blockIndexInChapter = getNextBlockIndex() // Use the closure to get a unique index
-          ..src = chapterPath
-          ..blockType = blockType
-          ..htmlContent = element.outerHtml // Store the raw HTML for the rendering engine
-          ..textContent = textContent;
-
-        // Specifically handle image data extraction
-        if (blockType == db.BlockType.img) {
-          // An image can be a direct <img> tag, an <image> tag (used in SVG), or an <svg> tag wrapping an <image>.
-          // We need to find the actual image reference.
-          final imgTag = (tagName == 'img' || tagName == 'image')
-              ? element
-              : element.querySelector('img, image');
-
-          // EPUBs can use 'src', 'href', or 'xlink:href' for image paths. Check all.
-          final hrefAttr = imgTag?.attributes['src'] ?? imgTag?.attributes['href'] ?? imgTag?.attributes['xlink:href'];
-
-          if (hrefAttr != null) {
-            // Resolve the relative image path against the chapter's path.
-            final imagePath = p.normalize(p.join(p.dirname(chapterPath), hrefAttr));
-            final imageFile = archive.findFile(imagePath);
-            if (imageFile != null) {
-              block.imageBytes = imageFile.content as Uint8List;
-            } else {
-              print("    ❌ [LibraryController] Image file not found at path: '$imagePath'");
-            }
-          }
-        }
-        targetBlockList.add(block);
-      }
-    }
-  }
+  // EPUB View handles content rendering directly, so we don't need to extract content blocks
+  // This method has been removed as it's no longer needed for EPUB View rendering
 
   Future<void> _processFiles(List<PickedFileData> files) async {
     if (files.isEmpty) {
@@ -166,7 +96,9 @@ class LibraryController extends StateNotifier<AsyncValue<List<db.Book>>> {
         final containerFile = archive.findFile('META-INF/container.xml');
         if (containerFile == null) throw Exception('container.xml not found');
         final containerXml = XmlDocument.parse(String.fromCharCodes(containerFile.content));
-        final opfPath = containerXml.findAllElements('rootfile').first.getAttribute('full-path');
+        final rootfiles = containerXml.findAllElements('rootfile');
+        if (rootfiles.isEmpty) throw Exception('No rootfile element found in container.xml');
+        final opfPath = rootfiles.first.getAttribute('full-path');
         if (opfPath == null) throw Exception('OPF path not found in container.xml');
 
         final opfFile = archive.findFile(opfPath);
@@ -174,7 +106,9 @@ class LibraryController extends StateNotifier<AsyncValue<List<db.Book>>> {
         final opfXml = XmlDocument.parse(String.fromCharCodes(opfFile.content));
         final opfDir = p.dirname(opfPath);
 
-        final metadata = opfXml.findAllElements('metadata').first;
+        final metadataElements = opfXml.findAllElements('metadata');
+        if (metadataElements.isEmpty) throw Exception('No metadata element found in OPF file');
+        final metadata = metadataElements.first;
         final title = metadata.findAllElements('dc:title').firstOrNull?.innerText ?? p.basenameWithoutExtension(filePath);
         final author = metadata.findAllElements('dc:creator').firstOrNull?.innerText ?? 'Unknown Author';
         final publisher = metadata.findAllElements('dc:publisher').firstOrNull?.innerText;
@@ -236,38 +170,89 @@ class LibraryController extends StateNotifier<AsyncValue<List<db.Book>>> {
         final spineItems = opfXml.findAllElements('itemref');
         final spine = spineItems.map((item) => item.getAttribute('idref')).whereType<String>().toList();
 
-        final List<db.ContentBlock> allBlocks = [];
-        for (int i = 0; i < spine.length; i++) {
-          final idref = spine[i];
-          final chapterPath = manifest[idref];
-          if (chapterPath == null) continue;
+        // Extract chapter content
+        List<ChapterContent> chapters = [];
+        for (final spineItemId in spine) {
+          final path = manifest[spineItemId];
+          if (path != null) {
+            final file = archive.findFile(path);
+            if (file != null) {
+              final content = String.fromCharCodes(file.content);
+              final document = html_parser.parse(content);
 
-          final chapterFile = archive.findFile(chapterPath);
-          if (chapterFile == null) continue;
+              // Extract text content
+              final textContent = document.body?.text ?? '';
 
-          final chapterContent = String.fromCharCodes(chapterFile.content);
-          final document = html_parser.parse(chapterContent);
-          final body = document.body;
-          if (body == null) continue;
+              // Create chapter content
+              final chapter = ChapterContent(
+                title: p.basenameWithoutExtension(path),
+                src: path,
+                textContent: textContent,
+                htmlContent: content,
+                bookId: bookId, // Set the bookId for the relationship
+              );
 
-          int blockCounter = 0;
-
-          // Use the robust recursive function to process the entire chapter body
-          _flattenAndParseElements(
-            elements: body.children,
-            targetBlockList: allBlocks, // Add directly to the main list
-            bookId: bookId,
-            chapterIndex: i,
-            chapterPath: chapterPath,
-            archive: archive,
-            getNextBlockIndex: () => blockCounter++, // Pass a closure to manage the index
-          );
+              chapters.add(chapter);
+              print("  ✅ [LibraryController] Extracted content for chapter: ${chapter.title}");
+            }
+          }
         }
 
-        print("  ✅ [LibraryController] FINAL RESULT: Extracted a total of ${allBlocks.length} content blocks from the entire book.");
-        if (allBlocks.isEmpty) {
-          print("  ❌ [LibraryController] CRITICAL FAILURE: No content blocks were extracted from the book.");
+        // Extract images (other than cover)
+        List<BookImage> images = [];
+        for (final item in manifestItems) {
+          final href = item.getAttribute('href');
+          final mediaType = item.getAttribute('media-type');
+
+          if (href != null && mediaType != null && 
+              mediaType.startsWith('image/') && 
+              manifest[coverId] != p.url.normalize(p.url.join(opfDir, href))) {
+
+            final imagePath = p.url.normalize(p.url.join(opfDir, href));
+            final imageFile = archive.findFile(imagePath);
+
+            if (imageFile != null) {
+              final image = BookImage(
+                src: imagePath,
+                name: p.basename(href),
+                mimeType: mediaType,
+                imageBytes: imageFile.content as Uint8List,
+              );
+
+              images.add(image);
+              print("  ✅ [LibraryController] Extracted image: ${image.name}");
+            }
+          }
         }
+
+        // Extract styling information
+        List<StyleSheet> styleSheets = [];
+        for (final item in manifestItems) {
+          final href = item.getAttribute('href');
+          final mediaType = item.getAttribute('media-type');
+
+          if (href != null && mediaType != null && 
+              (mediaType == 'text/css' || href.endsWith('.css'))) {
+
+            final cssPath = p.url.normalize(p.url.join(opfDir, href));
+            final cssFile = archive.findFile(cssPath);
+
+            if (cssFile != null) {
+              final styleSheet = StyleSheet(
+                href: cssPath,
+                content: String.fromCharCodes(cssFile.content),
+              );
+
+              styleSheets.add(styleSheet);
+              print("  ✅ [LibraryController] Extracted stylesheet: ${styleSheet.href}");
+            }
+          }
+        }
+
+        final bookStyling = BookStyling(styleSheets: styleSheets);
+
+        print("  ✅ [LibraryController] EPUB file processed successfully.");
+        print("  ℹ️ [LibraryController] Book contains ${spine.length} spine items, ${chapters.length} chapters, ${images.length} images, and ${styleSheets.length} stylesheets.");
 
         // TOC Parsing remains the same and is robust.
         List<TOCEntry> tocEntries = [];
@@ -314,11 +299,36 @@ class LibraryController extends StateNotifier<AsyncValue<List<db.Book>>> {
             bookToUpdate.language = language;
             bookToUpdate.publicationDate = publicationDate;
             bookToUpdate.isbn = isbn;
+
+            // Save the extracted content
+            bookToUpdate.images = images;
+            bookToUpdate.styling = bookStyling;
+
+            // Save the book first
             await _isar.books.put(bookToUpdate);
+
+            // Save chapters separately and link them to the book
+            // We'll handle chapters differently to avoid issues with IsarLinks
+
+            // Save each chapter and link it to the book
+            for (final chapter in chapters) {
+              // Save the chapter to get an ID
+              final chapterId = await _isar.chapterContents.put(chapter);
+
+              // Get the saved chapter and link it to the book
+              final savedChapter = await _isar.chapterContents.get(chapterId);
+              if (savedChapter != null) {
+                await bookToUpdate.chapters.add(savedChapter);
+              }
+            }
+
+            // Save the book again to update the links
+            await _isar.books.put(bookToUpdate);
+
+            print("  ✅ [LibraryController] Saved book with ${chapters.length} chapters, ${images.length} images, and ${bookStyling.styleSheets.length} stylesheets.");
           }
-          await _isar.contentBlocks.putAll(allBlocks);
         });
-        print("  ✅ [LibraryController] Successfully saved book metadata and ${allBlocks.length} blocks. Status: ready.");
+        print("  ✅ [LibraryController] Successfully saved book metadata. Status: ready.");
 
       } catch (e, s) {
         print("  ❌ [LibraryController] FATAL ERROR during processing for book ID $bookId: $e\n$s");
@@ -350,7 +360,7 @@ class LibraryController extends StateNotifier<AsyncValue<List<db.Book>>> {
       if (anchor == null) continue;
       final href = anchor.attributes['href'] ?? '';
       final parts = href.split('#');
-      final src = parts.length > 0 && parts[0].isNotEmpty ? parts[0] : null;
+      final src = parts.isNotEmpty && parts[0].isNotEmpty ? parts[0] : null;
       final fragment = parts.length > 1 ? parts[1] : null;
       final entry = TOCEntry()
         ..title = anchor.text.trim()
@@ -367,17 +377,28 @@ class LibraryController extends StateNotifier<AsyncValue<List<db.Book>>> {
 
   List<TOCEntry> _parseNcx(String content, String basePath) {
     final document = XmlDocument.parse(content);
-    final navMap = document.findAllElements('navMap').first;
+    final navMaps = document.findAllElements('navMap');
+    if (navMaps.isEmpty) return [];
+    final navMap = navMaps.first;
     return _parseNavPoints(navMap.findElements('navPoint').toList(), basePath);
   }
 
   List<TOCEntry> _parseNavPoints(List<XmlElement> navPoints, String basePath) {
     final entries = <TOCEntry>[];
     for (final navPoint in navPoints) {
-      final navLabel = navPoint.findElements('navLabel').first.findElements('text').first.innerText;
-      final contentSrc = navPoint.findElements('content').first.getAttribute('src') ?? '';
+      // Safely extract navLabel
+      final navLabels = navPoint.findElements('navLabel');
+      if (navLabels.isEmpty) continue;
+      final textElements = navLabels.first.findElements('text');
+      if (textElements.isEmpty) continue;
+      final navLabel = textElements.first.innerText;
+
+      // Safely extract contentSrc
+      final contentElements = navPoint.findElements('content');
+      if (contentElements.isEmpty) continue;
+      final contentSrc = contentElements.first.getAttribute('src') ?? '';
       final parts = contentSrc.split('#');
-      final src = parts.length > 0 && parts[0].isNotEmpty ? parts[0] : null;
+      final src = parts.isNotEmpty && parts[0].isNotEmpty ? parts[0] : null;
       final fragment = parts.length > 1 ? parts[1] : null;
       final entry = TOCEntry()
         ..title = navLabel.trim()
@@ -392,19 +413,4 @@ class LibraryController extends StateNotifier<AsyncValue<List<db.Book>>> {
     return entries;
   }
 
-  db.BlockType _getBlockType(String? tagName) {
-    switch (tagName?.toLowerCase()) {
-      case 'p': return db.BlockType.p;
-      case 'h1': return db.BlockType.h1;
-      case 'h2': return db.BlockType.h2;
-      case 'h3': return db.BlockType.h3;
-      case 'h4': return db.BlockType.h4;
-      case 'h5': return db.BlockType.h5;
-      case 'h6': return db.BlockType.h6;
-      case 'img': return db.BlockType.img;
-      case 'image': return db.BlockType.img;
-      case 'svg': return db.BlockType.img;
-      default: return db.BlockType.unsupported;
-    }
-  }
 }

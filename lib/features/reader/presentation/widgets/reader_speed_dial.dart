@@ -2,25 +2,18 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_speed_dial/flutter_speed_dial.dart';
 import 'package:share_plus/share_plus.dart';
-import 'package:visualit/features/reader/presentation/bookmarks_provider.dart';
 import 'package:visualit/features/reader/presentation/reading_controller.dart';
-import 'package:visualit/features/reader/presentation/reading_preferences_controller.dart';
 import 'package:visualit/features/reader/presentation/reading_screen_ui_controller.dart';
 import 'package:visualit/features/reader/presentation/widgets/reading_settings_panel.dart';
-import 'package:visualit/features/reader/presentation/widgets/search_dialog.dart';
 
 /// A widget that displays the speed dial for the reading screen.
 /// It watches the readingScreenUiProvider to control its visibility.
 class ReaderSpeedDial extends ConsumerWidget {
   final int bookId;
-  final bool isCurrentPageBookmarked;
-  final Function() onToggleBookmark;
 
   const ReaderSpeedDial({
     super.key,
     required this.bookId,
-    required this.isCurrentPageBookmarked,
-    required this.onToggleBookmark,
   });
 
   @override
@@ -31,9 +24,6 @@ class ReaderSpeedDial extends ConsumerWidget {
     final isLocked = uiState.isLocked;
     final uiController = ref.read(readingScreenUiProvider.notifier);
 
-    // Watch reading preferences for line guide state
-    final prefs = ref.watch(readingPreferencesProvider);
-    final prefsController = ref.read(readingPreferencesProvider.notifier);
 
     return Positioned(
       bottom: isVisible ? 90 : -60, // Position it above the bottom bar when visible
@@ -53,11 +43,6 @@ class ReaderSpeedDial extends ConsumerWidget {
           curve: Curves.bounceIn,
           children: [
             SpeedDialChild(
-              child: Icon(isCurrentPageBookmarked ? Icons.bookmark : Icons.bookmark_border),
-              label: isCurrentPageBookmarked ? 'Remove Bookmark' : 'Add Bookmark',
-              onTap: onToggleBookmark,
-            ),
-            SpeedDialChild(
               child: const Icon(Icons.share_outlined), 
               label: 'Share', 
               onTap: () => _shareReading(ref),
@@ -66,21 +51,6 @@ class ReaderSpeedDial extends ConsumerWidget {
               child: Icon(isLocked ? Icons.lock_open_outlined : Icons.lock_outline),
               label: isLocked ? 'Unlock' : 'Lock Screen',
               onTap: () => uiController.lockScreen(!isLocked),
-            ),
-            SpeedDialChild(
-              child: const Icon(Icons.search), 
-              label: 'Search', 
-              onTap: () => _showSearchDialog(context, ref),
-            ),
-            SpeedDialChild(
-              child: Icon(prefs.isLineGuideEnabled ? Icons.horizontal_rule : Icons.horizontal_rule_outlined),
-              label: prefs.isLineGuideEnabled ? 'Disable Line Guide' : 'Enable Line Guide',
-              onTap: () => prefsController.toggleLineGuide(!prefs.isLineGuideEnabled),
-            ),
-            SpeedDialChild(
-              child: Icon(uiController.getOrientationIcon()),
-              label: uiController.getOrientationLabel(),
-              onTap: uiController.toggleOrientation,
             ),
             SpeedDialChild(
               child: const Icon(Icons.tune_outlined), 
@@ -118,9 +88,9 @@ class ReaderSpeedDial extends ConsumerWidget {
           ? ' by ${book.author}' 
           : '';
       final currentPage = state.currentPage + 1;
-      final totalPages = state.totalPages;
 
-      final shareText = 'I\'m reading "$title"$author - Page $currentPage of $totalPages in VisuaLit';
+      // EPUB View doesn't track total pages, so we'll just share the current page
+      final shareText = 'I\'m reading "$title"$author - Page $currentPage in VisuaLit';
       debugPrint("[DEBUG] ReaderSpeedDial: Sharing text: $shareText");
 
       await Share.share(shareText);
@@ -130,21 +100,4 @@ class ReaderSpeedDial extends ConsumerWidget {
     }
   }
 
-  void _showSearchDialog(BuildContext context, WidgetRef ref) {
-    final state = ref.read(readingControllerProvider(bookId));
-    if (state.blocks.isEmpty) return;
-
-    showDialog(
-      context: context,
-      builder: (context) => SearchDialog(
-        bookId: bookId,
-        blocks: state.blocks,
-      ),
-    ).then((result) {
-      if (result is SearchNavigation) {
-        ref.read(readingControllerProvider(bookId).notifier)
-          .onPageChanged(result.page);
-      }
-    });
-  }
 }

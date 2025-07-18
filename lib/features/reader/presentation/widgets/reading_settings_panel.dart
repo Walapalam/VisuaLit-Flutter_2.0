@@ -69,17 +69,15 @@ class ReadingSettingsPanel extends ConsumerWidget {
                 ),
               ),
               const Divider(),
-              // Page Turn Style
+              // Page Turn Style - Only EPUB View is supported
               _SettingsRow(
                 icon: Icons.swipe_outlined,
                 child: SegmentedButton<PageTurnStyle>(
                   segments: const [
-                    ButtonSegment(value: PageTurnStyle.paged, label: Text('Page')),
-                    ButtonSegment(value: PageTurnStyle.scroll, label: Text('Scroll')),
-                    ButtonSegment(value: PageTurnStyle.epubView, label: Text('EpubView')),
+                    ButtonSegment(value: PageTurnStyle.epubView, label: Text('EPUB View')),
                   ],
-                  selected: {prefs.pageTurnStyle},
-                  onSelectionChanged: (s) => prefsController.setPageTurnStyle(s.first),
+                  selected: {PageTurnStyle.epubView},
+                  onSelectionChanged: (s) => {}, // No-op since there's only one option
                 ),
               ),
               const Divider(),

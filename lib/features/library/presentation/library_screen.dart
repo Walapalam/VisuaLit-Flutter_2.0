@@ -57,9 +57,101 @@ class LibraryScreen extends ConsumerWidget {
               final book = books[index];
               return GestureDetector(
                 onTap: () {
-                  if (book.status == ProcessingStatus.ready) {
+                  if (book.status == ProcessingStatus.ready || book.status == ProcessingStatus.partiallyReady) {
+                    // Allow reading for both ready and partially ready books
                     context.goNamed('bookReader',
                         pathParameters: {'bookId': book.id.toString()});
+
+                    // If partially ready, show a snackbar to inform the user
+                    if (book.status == ProcessingStatus.partiallyReady) {
+                      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                        content: Text('${book.title ?? 'Book'} is still being processed. Some chapters may not be available yet.'),
+                        duration: const Duration(seconds: 3),
+                      ));
+                    }
+                  } else if (book.status == ProcessingStatus.error) {
+                    // Show error details in a dialog
+                    showDialog(
+                      context: context,
+                      builder: (context) => AlertDialog(
+                        title: Text('Error Processing ${book.title ?? 'Book'}'),
+                        content: SingleChildScrollView(
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              // Status indicator
+                              Row(
+                                children: [
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                    decoration: BoxDecoration(
+                                      color: book.failedPermanently ? Colors.black : Colors.red,
+                                      borderRadius: BorderRadius.circular(4),
+                                    ),
+                                    child: Text(
+                                      book.failedPermanently 
+                                          ? 'PERMANENTLY FAILED' 
+                                          : 'ERROR',
+                                      style: const TextStyle(
+                                        color: Colors.white,
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 12,
+                                      ),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                    decoration: BoxDecoration(
+                                      color: Colors.grey[700],
+                                      borderRadius: BorderRadius.circular(4),
+                                    ),
+                                    child: Text(
+                                      'Retry: ${book.retryCount}/3',
+                                      style: const TextStyle(
+                                        color: Colors.white,
+                                        fontSize: 12,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 16),
+                              Text('Error: ${book.errorMessage ?? 'Unknown error'}'),
+                              const SizedBox(height: 16),
+                              const Text('Stack Trace:', style: TextStyle(fontWeight: FontWeight.bold)),
+                              const SizedBox(height: 8),
+                              Container(
+                                padding: const EdgeInsets.all(8),
+                                decoration: BoxDecoration(
+                                  color: Colors.grey[200],
+                                  borderRadius: BorderRadius.circular(4),
+                                ),
+                                child: Text(
+                                  book.errorStackTrace ?? 'No stack trace available',
+                                  style: const TextStyle(fontFamily: 'monospace', fontSize: 12),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        actions: [
+                          TextButton(
+                            onPressed: () => Navigator.pop(context),
+                            child: const Text('CLOSE'),
+                          ),
+                          if (!book.failedPermanently)
+                            ElevatedButton(
+                              onPressed: () {
+                                Navigator.pop(context);
+                                libraryController.retryProcessingBook(book.id);
+                              },
+                              child: const Text('RETRY'),
+                            ),
+                        ],
+                      ),
+                    );
                   } else {
                     ScaffoldMessenger.of(context).showSnackBar(SnackBar(
                         content:
@@ -70,26 +162,48 @@ class LibraryScreen extends ConsumerWidget {
                   elevation: 4,
                   child: Column(
                     children: [
-                      Expanded(
-                        child: book.coverImageBytes != null
-                            ? Image.memory(
-                          Uint8List.fromList(book.coverImageBytes!),
-                          fit: BoxFit.cover,
-                          width: double.infinity,
-                          // ADDED: This handles errors if the image data is invalid.
-                          errorBuilder: (context, error, stackTrace) {
-                            return Container(
+                      Stack(
+                        children: [
+                          Positioned.fill(
+                            child: book.coverImageBytes != null
+                                ? Image.memory(
+                              Uint8List.fromList(book.coverImageBytes!),
+                              fit: BoxFit.cover,
+                              width: double.infinity,
+                              // ADDED: This handles errors if the image data is invalid.
+                              errorBuilder: (context, error, stackTrace) {
+                                return Container(
+                                  color: Colors.grey[800],
+                                  child: const Center(
+                                      child: Icon(Icons.book, size: 40)),
+                                );
+                              },
+                            )
+                                : Container(
                               color: Colors.grey[800],
                               child: const Center(
                                   child: Icon(Icons.book, size: 40)),
-                            );
-                          },
-                        )
-                            : Container(
-                          color: Colors.grey[800],
-                          child: const Center(
-                              child: Icon(Icons.book, size: 40)),
-                        ),
+                            ),
+                          ),
+                          // Error badge
+                          if (book.status == ProcessingStatus.error)
+                            Positioned(
+                              top: 0,
+                              right: 0,
+                              child: Container(
+                                padding: const EdgeInsets.all(4),
+                                decoration: BoxDecoration(
+                                  color: book.failedPermanently ? Colors.black : Colors.red,
+                                  shape: BoxShape.circle,
+                                ),
+                                child: Icon(
+                                  book.failedPermanently ? Icons.block : Icons.error_outline,
+                                  color: Colors.white,
+                                  size: 16,
+                                ),
+                              ),
+                            ),
+                        ],
                       ),
                       Padding(
                         padding: const EdgeInsets.all(8.0),
@@ -101,8 +215,14 @@ class LibraryScreen extends ConsumerWidget {
                           style: const TextStyle(fontSize: 12),
                         ),
                       ),
-                      if (book.status != ProcessingStatus.ready)
+                      if (book.status == ProcessingStatus.processing)
                         const LinearProgressIndicator(),
+                      if (book.status == ProcessingStatus.partiallyReady)
+                        LinearProgressIndicator(
+                          value: book.processingProgress,
+                          backgroundColor: Colors.grey[300],
+                          valueColor: AlwaysStoppedAnimation<Color>(Colors.green),
+                        ),
                     ],
                   ),
                 ),

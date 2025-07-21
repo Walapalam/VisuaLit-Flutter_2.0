@@ -81,6 +81,12 @@ class _ReadingScreenState extends ConsumerState<ReadingScreen> {
     final state = ref.watch(provider);
     final prefs = ref.watch(readingPreferencesProvider);
 
+    // Update layout parameters whenever build is called
+    // This ensures layout cache is updated on screen size changes or preference changes
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      ref.read(provider.notifier).setLayoutParameters(prefs, viewSize);
+    });
+
     ref.listen(provider.select((s) => s.currentPage), (previous, next) {
       if (next != previous && _pageController?.hasClients == true) {
         if (_pageController!.page?.round() != next) {
@@ -89,8 +95,20 @@ class _ReadingScreenState extends ConsumerState<ReadingScreen> {
       }
     });
 
-    ref.listen(readingPreferencesProvider.select((p) => p.pageTurnStyle), (prev, next) {
-      if (prev != next) setState(_initializePageStyleControllers);
+    // Listen for changes in reading preferences that affect layout
+    ref.listen(readingPreferencesProvider, (prev, next) {
+      if (prev?.fontSize != next.fontSize ||
+          prev?.lineSpacing != next.lineSpacing ||
+          prev?.fontFamily != next.fontFamily ||
+          prev?.pageTurnStyle != next.pageTurnStyle) {
+        // Update layout parameters when layout-affecting preferences change
+        ref.read(provider.notifier).setLayoutParameters(next, viewSize);
+      }
+
+      // Initialize page controllers if page turn style changes
+      if (prev?.pageTurnStyle != next.pageTurnStyle) {
+        setState(_initializePageStyleControllers);
+      }
     });
 
     ref.listen(readingPreferencesProvider.select((p) => p.brightness), (_, next) async {

@@ -11,6 +11,7 @@ import 'package:visualit/features/home/presentation/home_screen.dart';
 import 'package:visualit/features/library/presentation/library_screen.dart';
 import 'package:visualit/features/scaffold.dart';
 import 'package:visualit/features/settings/presentation/settings_screen.dart';
+import 'package:visualit/features/settings/presentation/storage_settings_screen.dart';
 import 'package:visualit/main.dart';
 
 import '../../features/auth/presentation/splash_screen.dart';
@@ -43,6 +44,11 @@ final goRouterProvider = Provider<GoRouter>((ref) {
           final audiobookId = int.tryParse(state.pathParameters['audiobookId'] ?? '0') ?? 0;
           return AudiobookPlayerScreen(audiobookId: audiobookId);
         },
+      ),
+      GoRoute(
+        path: '/storage-settings',
+        name: 'storageSettings',
+        builder: (context, state) => const StorageSettingsScreen(),
       ),
       // TODO: Add '/preferences' route here when built
 

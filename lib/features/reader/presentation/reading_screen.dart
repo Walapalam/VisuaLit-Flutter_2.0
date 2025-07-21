@@ -81,8 +81,6 @@ class _ReadingScreenState extends ConsumerState<ReadingScreen> {
     final state = ref.watch(provider);
     final prefs = ref.watch(readingPreferencesProvider);
 
-    // Update layout parameters whenever build is called
-    // This ensures layout cache is updated on screen size changes or preference changes
     WidgetsBinding.instance.addPostFrameCallback((_) {
       ref.read(provider.notifier).setLayoutParameters(prefs, viewSize);
     });
@@ -95,24 +93,21 @@ class _ReadingScreenState extends ConsumerState<ReadingScreen> {
       }
     });
 
-    // Listen for changes in reading preferences that affect layout
     ref.listen(readingPreferencesProvider, (prev, next) {
       if (prev?.fontSize != next.fontSize ||
           prev?.lineSpacing != next.lineSpacing ||
           prev?.fontFamily != next.fontFamily ||
           prev?.pageTurnStyle != next.pageTurnStyle) {
-        // Update layout parameters when layout-affecting preferences change
         ref.read(provider.notifier).setLayoutParameters(next, viewSize);
       }
 
-      // Initialize page controllers if page turn style changes
       if (prev?.pageTurnStyle != next.pageTurnStyle) {
         setState(_initializePageStyleControllers);
       }
     });
 
     ref.listen(readingPreferencesProvider.select((p) => p.brightness), (_, next) async {
-      try { await ScreenBrightness().setScreenBrightness(next); } catch (e) { /* ignore */ }
+      try { await ScreenBrightness().setScreenBrightness(next); } catch (_) {}
     });
 
     final readerContent = Padding(
@@ -128,7 +123,9 @@ class _ReadingScreenState extends ConsumerState<ReadingScreen> {
           opacity: 1.0,
           duration: const Duration(milliseconds: 250),
           child: AppBar(
-            backgroundColor: _isUiVisible ? prefs.pageColor.withAlpha(200) : Colors.transparent,
+            backgroundColor: _isUiVisible
+                ? prefs.pageColor.withAlpha(200)
+                : Colors.transparent,
             elevation: 0,
             automaticallyImplyLeading: false,
             centerTitle: true,
@@ -152,26 +149,116 @@ class _ReadingScreenState extends ConsumerState<ReadingScreen> {
       bottomNavigationBar: AnimatedContainer(
         duration: const Duration(milliseconds: 250),
         height: _isUiVisible ? 80 : 0,
-        // --- FIX: The method signature is simplified ---
         child: _isUiVisible ? _buildBottomScrubber(state, prefs) : null,
       ),
-      floatingActionButton: _buildSpeedDialFab(),
+      floatingActionButton: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // Original FAB
+          AnimatedOpacity(
+            opacity: _isUiVisible ? 1.0 : 0.0,
+            duration: const Duration(milliseconds: 250),
+            child: Transform.translate(
+              offset: Offset(_isUiVisible ? 0 : 20, 0),
+              child: _buildSpeedDialFab(),
+            ),
+          ),
+          const SizedBox(width: 16),
+          // Visualization FAB
+          AnimatedOpacity(
+            opacity: _isUiVisible ? 1.0 : 0.0,
+            duration: const Duration(milliseconds: 250),
+            child: Transform.translate(
+              offset: Offset(_isUiVisible ? 0 : 20, 0),
+              child: _buildVisualizationFab(),
+            ),
+          ),
+        ],
+      ),
       body: GestureDetector(
         onTap: _toggleUiVisibility,
         child: AbsorbPointer(
           absorbing: _isLocked,
           child: Stack(
-            children: [
-              readerContent,
-            ],
+            children: [readerContent],
           ),
         ),
       ),
     );
   }
 
-  Widget _buildBody(ReadingState state, Size viewSize,
-      AutoDisposeStateNotifierProvider<ReadingController, ReadingState> provider, ReadingPreferences prefs) {
+  Widget _buildSpeedDialFab() {
+    return SpeedDial(
+      icon: Icons.more_horiz,
+      activeIcon: Icons.close,
+      backgroundColor: Theme.of(context).colorScheme.secondary,
+      foregroundColor: Theme.of(context).colorScheme.onSecondary,
+      overlayColor: Colors.black,
+      overlayOpacity: 0.5,
+      buttonSize: const Size(48, 48),
+      childrenButtonSize: const Size(44, 44),
+      curve: Curves.bounceIn,
+      visible: _isUiVisible,
+      children: [
+        SpeedDialChild(
+            child: const Icon(Icons.bookmark_border),
+            label: 'Bookmark',
+            onTap: () {}),
+        SpeedDialChild(
+            child: const Icon(Icons.share_outlined),
+            label: 'Share',
+            onTap: () {}),
+        SpeedDialChild(
+          child: Icon(
+              _isLocked ? Icons.lock_open_outlined : Icons.lock_outline),
+          label: _isLocked ? 'Unlock' : 'Lock Screen',
+          onTap: () => setState(() => _isLocked = !_isLocked),
+        ),
+        SpeedDialChild(
+            child: const Icon(Icons.search), label: 'Search', onTap: () {}),
+        SpeedDialChild(
+            child: const Icon(Icons.tune_outlined),
+            label: 'Theme & Settings',
+            onTap: _showMainSettingsPanel),
+      ],
+    );
+  }
+
+  Widget _buildVisualizationFab() {
+    return SpeedDial(
+      icon: Icons.visibility,
+      activeIcon: Icons.visibility_off,
+      backgroundColor: Theme.of(context).colorScheme.secondary,
+      foregroundColor: Theme.of(context).colorScheme.onSecondary,
+      overlayColor: Colors.black,
+      overlayOpacity: 0.5,
+      buttonSize: const Size(48, 48),
+      childrenButtonSize: const Size(44, 44),
+      curve: Curves.bounceIn,
+      visible: _isUiVisible,
+      children: [
+        SpeedDialChild(
+            child: const Icon(Icons.visibility),
+            label: 'Toggle Visualization',
+            onTap: () {
+              // TODO: integrate visualization toggle
+            }),
+        SpeedDialChild(
+            child: const Icon(Icons.tune),
+            label: 'Adjust Visualization Settings',
+            onTap: () {
+              // TODO: open visualization settings
+            }),
+      ],
+    );
+  }
+
+  Widget _buildBody(
+      ReadingState state,
+      Size viewSize,
+      AutoDisposeStateNotifierProvider<ReadingController, ReadingState>
+      provider,
+      ReadingPreferences prefs) {
     if (!state.isBookLoaded) return const Center(child: CircularProgressIndicator());
     if (state.blocks.isEmpty) return const Center(child: Text('This book has no content.'));
 
@@ -209,33 +296,6 @@ class _ReadingScreenState extends ConsumerState<ReadingScreen> {
     }
   }
 
-  Widget _buildSpeedDialFab() {
-    return SpeedDial(
-      icon: Icons.more_horiz,
-      activeIcon: Icons.close,
-      backgroundColor: Theme.of(context).colorScheme.secondary,
-      foregroundColor: Theme.of(context).colorScheme.onSecondary,
-      overlayColor: Colors.black,
-      overlayOpacity: 0.5,
-      buttonSize: const Size(48, 48),
-      childrenButtonSize: const Size(44, 44),
-      curve: Curves.bounceIn,
-      visible: _isUiVisible,
-      children: [
-        SpeedDialChild(child: const Icon(Icons.bookmark_border), label: 'Bookmark', onTap: () {}),
-        SpeedDialChild(child: const Icon(Icons.share_outlined), label: 'Share', onTap: () {}),
-        SpeedDialChild(
-          child: Icon(_isLocked ? Icons.lock_open_outlined : Icons.lock_outline),
-          label: _isLocked ? 'Unlock' : 'Lock Screen',
-          onTap: () => setState(() => _isLocked = !_isLocked),
-        ),
-        SpeedDialChild(child: const Icon(Icons.search), label: 'Search', onTap: () {}),
-        SpeedDialChild(child: const Icon(Icons.tune_outlined), label: 'Theme & Settings', onTap: _showMainSettingsPanel),
-      ],
-    );
-  }
-
-  // --- FIX: The method no longer needs the provider passed to it ---
   Widget _buildBottomScrubber(ReadingState state, ReadingPreferences prefs) {
     if (prefs.pageTurnStyle == PageTurnStyle.scroll) return const SizedBox.shrink();
 
@@ -246,19 +306,29 @@ class _ReadingScreenState extends ConsumerState<ReadingScreen> {
         padding: const EdgeInsets.symmetric(horizontal: 16.0),
         child: Row(
           children: [
-            Text('Page ${state.currentPage + 1}', style: TextStyle(color: prefs.textColor, fontSize: 12)),
+            Text('Page ${state.currentPage + 1}',
+                style: TextStyle(color: prefs.textColor, fontSize: 12)),
             Expanded(
               child: Slider(
-                value: state.currentPage.toDouble().clamp(0, (state.totalPages > 0 ? state.totalPages - 1 : 0).toDouble()),
+                value: state.currentPage
+                    .toDouble()
+                    .clamp(0, (state.totalPages > 0 ? state.totalPages - 1 : 0).
+                toDouble()),
                 min: 0,
-                max: (state.totalPages > 0 ? state.totalPages - 1 : 0).toDouble(),
-                // It can now access the provider directly using `ref`.
-                onChanged: (value) => ref.read(readingControllerProvider(widget.bookId).notifier).onPageChanged(value.round()),
+                max: (state.totalPages > 0
+                    ? state.totalPages - 1
+                    : 0)
+                    .toDouble(),
+                onChanged: (value) => ref
+                    .read(readingControllerProvider(widget.bookId)
+                    .notifier)
+                    .onPageChanged(value.round()),
                 activeColor: prefs.textColor,
                 inactiveColor: prefs.textColor.withAlpha(77),
               ),
             ),
-            Text('${state.totalPages}', style: TextStyle(color: prefs.textColor, fontSize: 12)),
+            Text('${state.totalPages}',
+                style: TextStyle(color: prefs.textColor, fontSize: 12)),
           ],
         ),
       ),

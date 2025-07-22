@@ -17,7 +17,7 @@ import '../../features/auth/presentation/splash_screen.dart';
 import '../../features/reader/presentation/reading_screen.dart';
 import 'package:visualit/features/marketplace/presentation/marketplace_screen.dart';
 
-import 'package:visualit/features/marketplace/presentation/CartScreen.dart';
+import 'package:visualit/features/Cart/presentation/CartScreen.dart';
 
 final _rootNavigatorKey = GlobalKey<NavigatorState>();
 

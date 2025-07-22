@@ -3,6 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'package:go_router/go_router.dart';
+import 'package:visualit/features/Cart/presentation/CartNotifier.dart';
+
 
 final gutenbergBooksProvider = FutureProvider<List<dynamic>>((ref) async {
   final response = await http.get(Uri.parse('https://gutendex.com/books/'));
@@ -91,12 +93,15 @@ class _MarketplaceScreenState extends ConsumerState<MarketplaceScreen> {
                     context: context,
                     builder: (context) {
                       return AlertDialog(
-                        content: SizedBox(
-                          width: MediaQuery.of(context).size.width * 0.8,
-                          height: MediaQuery.of(context).size.height * 0.5,
+                        content: ConstrainedBox(
+                          constraints: BoxConstraints(
+                            maxWidth: MediaQuery.of(context).size.width * 0.8,
+                            maxHeight: MediaQuery.of(context).size.height * 0.5,
+                          ),
                           child: SingleChildScrollView(
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
+                              mainAxisSize: MainAxisSize.min,
                               children: [
                                 // Book Cover
                                 Center(
@@ -147,6 +152,7 @@ class _MarketplaceScreenState extends ConsumerState<MarketplaceScreen> {
                                         ),
                                       ),
                                       onPressed: () {
+                                        ref.read(cartProvider.notifier).addBook(book);
                                         Navigator.of(context).pop();
                                         ScaffoldMessenger.of(context).showSnackBar(
                                           SnackBar(content: Text('${book['title']} added to cart')),

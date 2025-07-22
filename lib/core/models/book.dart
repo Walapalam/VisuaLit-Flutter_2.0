@@ -1,4 +1,6 @@
 // lib/core/models/book.dart
+import 'package:flutter/widgets.dart';
+
 enum BookType { epub, pdf, audio }
 
 class Book {
@@ -8,6 +10,8 @@ class Book {
   final String? author;
   final String? coverImageUrl;
   final BookType bookType;
+  final Map<String, Image> images;
+  final List<Chapter> chapters;
 
   Book({
     required this.id,
@@ -16,5 +20,17 @@ class Book {
     this.author,
     this.coverImageUrl,
     required this.bookType,
+    this.images = const {},
+    this.chapters = const [],
+  });
+}
+
+class Chapter {
+  final String title;
+  final String content;
+
+  Chapter({
+    required this.title,
+    required this.content,
   });
 }

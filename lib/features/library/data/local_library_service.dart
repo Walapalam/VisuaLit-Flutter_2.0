@@ -52,6 +52,11 @@ class LocalLibraryService {
       if (ext == 'epub') {
         try {
           final epubBook = await EpubReader.readBook(await file.readAsBytes());
+          final chapters = epubBook.Chapters?.map((chapter) => Chapter(
+            title: chapter.Title ?? 'Untitled Chapter',
+            content: chapter.HtmlContent ?? '',
+          )).toList() ?? [];
+
           books.add(Book(
             id: file.path,
             filePath: file.path,
@@ -59,6 +64,7 @@ class LocalLibraryService {
             author: epubBook.Author ?? 'Unknown',
             coverImageUrl: null,
             bookType: BookType.epub,
+            chapters: chapters,  // Add the chapters here
           ));
         } catch (_) {
           books.add(Book(

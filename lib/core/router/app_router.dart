@@ -8,11 +8,14 @@ import 'package:visualit/features/auth/presentation/signup_screen.dart';
 import 'package:visualit/features/auth/presentation/onboarding_screen.dart';
 import 'package:visualit/features/home/presentation/home_screen.dart';
 import 'package:visualit/features/library/presentation/library_screen.dart';
+import 'package:visualit/features/reader/presentation/reading_screen.dart';
 import 'package:visualit/features/scaffold.dart';
 import 'package:visualit/features/settings/presentation/settings_screen.dart';
+
 import 'package:visualit/main.dart';
 
 import '../../features/auth/presentation/splash_screen.dart';
+import '../models/book.dart';
 
 // A GlobalKey is needed for the root navigator.
 final _rootNavigatorKey = GlobalKey<NavigatorState>();
@@ -32,6 +35,13 @@ final goRouterProvider = Provider<GoRouter>((ref) {
       GoRoute(path: '/login', name: 'login', builder: (context, state) => const LoginScreen()),
       GoRoute(path: '/signup', name: 'signup', builder: (context, state) => const SignUpScreen()),
       GoRoute(path: '/onboarding', name: 'onboarding', builder: (context, state) => const OnboardingScreen()),
+      GoRoute(
+        path: '/reader',
+        name: 'reader',
+        builder: (context, state) => ReadingScreen(
+          book: state.extra as Book,
+        ),
+      ),
       // TODO: Add '/preferences' route here when built
 
       // Main application shell route
@@ -60,34 +70,30 @@ final goRouterProvider = Provider<GoRouter>((ref) {
     // Corrected redirect logic for robust authentication flow.
     redirect: (context, state) {
       final location = state.matchedLocation;
-
-      // Define all the routes a user can be on *before* they are fully authenticated.
       final publicRoutes = ['/splash', '/onboarding', '/login', '/signup'];
 
-      // If auth state is still loading, stay on the splash screen.
+      // If auth state is still loading, stay on splash
       if (authState.status == AuthStatus.initial) {
         return '/splash';
       }
 
-      // If the user is authenticated (as a real user or guest).
-      if (authState.status == AuthStatus.authenticated) {
-        // If they are on any of the initial public routes, send them home.
+      // Handle authenticated users (including guests)
+      if (authState.status == AuthStatus.authenticated || authState.status == AuthStatus.guest) {
+        // If on public routes, redirect to home
         if (publicRoutes.contains(location)) {
           return '/home';
         }
+        // Allow access to all other routes
+        return null;
       }
 
-      // If the user is unauthenticated.
-      if (authState.status == AuthStatus.unauthenticated) {
-        // If they are trying to access a protected route (not in the public list),
-        // send them to the onboarding screen.
-        if (!publicRoutes.contains(location)) {
-          return '/onboarding';
-        }
+      // If unauthenticated and trying to access protected route
+      if (!publicRoutes.contains(location)) {
+        return '/login';
       }
 
-      // No redirection needed, let the user stay where they are.
       return null;
     },
   );
 });
+

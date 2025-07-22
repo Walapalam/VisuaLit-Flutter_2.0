@@ -6,6 +6,14 @@ import 'package:visualit/core/models/book.dart';
 import 'package:visualit/features/library/presentation/library_controller.dart';
 import 'package:visualit/shared_widgets/book_card.dart';
 
+// At the top of lib/features/home/presentation/home_screen.dart
+import 'dart:io';
+import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
+import 'package:visualit/core/models/book.dart';
+import 'package:visualit/core/models/book_metadata.dart';
+import 'package:visualit/features/book_sheet/scrollable_book_sheet.dart';
+
 class HomeScreen extends ConsumerWidget {
   const HomeScreen({super.key});
 
@@ -161,9 +169,9 @@ class _BookShelf extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final double shelfHeight = MediaQuery.of(context).size.width * 0.6;
+    final bool isRecentlyRead = title == 'Recently Read' || title == 'Recently Listened';
 
     if (books.isEmpty) {
-      // Optionally show a skeleton/empty shelf
       return const SizedBox.shrink();
     }
 
@@ -201,11 +209,35 @@ class _BookShelf extends StatelessWidget {
             itemBuilder: (context, index) {
               final book = books[index];
               return BookCard(
-                imageUrl: book.coverImageUrl ?? '', // Use a placeholder if null
+                imageUrl: book.coverImageUrl ?? '',
                 title: book.title,
                 author: book.author ?? 'Unknown',
                 onTap: () {
-                  // TODO: Navigate to book details screen
+                  if (isRecentlyRead) {
+                    // Navigate directly to reading screen
+                    context.push('/reader', extra: book);
+                  } else {
+                    // Show book details sheet
+                    showModalBottomSheet(
+                      context: context,
+                      isScrollControlled: true,
+                      backgroundColor: Colors.transparent,
+                      builder: (context) => BookDetailsSheet(
+                        bookMetadata: BookMetadata(
+                          title: book.title,
+                          authors: [book.author ?? 'Unknown'],
+                          filePath: book.filePath,
+                          coverImage: book.coverImageUrl != null
+                              ? Image.file(File(book.coverImageUrl!))
+                              : null,
+                        ),
+                        onStartListening: () {
+                          // Implement audio functionality
+                          debugPrint('Start listening pressed');
+                        },
+                      ),
+                    );
+                  }
                 },
               );
             },

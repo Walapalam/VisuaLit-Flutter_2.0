@@ -44,6 +44,9 @@ dependencies:
   permission_handler: ^12.0.0+1
   file_picker: ^10.2.0
   epubx: ^4.0.0
+  flutter_html: ^3.0.0-beta.2
+  flutter_speed_dial: ^7.0.0
+
 
 dev_dependencies:
   flutter_test:

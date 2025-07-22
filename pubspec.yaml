@@ -38,6 +38,7 @@ dependencies:
   screen_brightness: ^2.1.5
   device_info_plus: ^10.1.2
   english_words: ^4.0.0
+  shared_preferences: ^2.2.2
 
 dev_dependencies:
   flutter_test:

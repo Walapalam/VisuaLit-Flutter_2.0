@@ -50,3 +50,10 @@ final appwriteStorageProvider = Provider<Storage>((ref) {
   final client = ref.watch(appwriteClientProvider);
   return Storage(client);
 });
+
+// Provider for the Appwrite Realtime service.
+// This service will handle real-time subscriptions to changes in the database.
+final appwriteRealtimeProvider = Provider<Realtime>((ref) {
+  final client = ref.watch(appwriteClientProvider);
+  return Realtime(client);
+});

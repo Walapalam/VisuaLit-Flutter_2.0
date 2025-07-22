@@ -1,52 +1,42 @@
 import 'dart:typed_data';
-import 'dart:math' as math;
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:html/dom.dart' as dom;
 import 'package:isar/isar.dart';
+import 'package:visualit/core/models/book_schema.dart';
+import 'package:visualit/core/models/content_block_schema.dart';
+import 'package:visualit/core/models/parsed_book_dto.dart';
+import 'package:visualit/core/models/toc_entry_schema.dart';
 import 'package:visualit/core/providers/isar_provider.dart';
-import 'package:visualit/features/library/data/background_task_queue.dart';
-import 'package:visualit/features/library/data/book_processing_task.dart';
+import 'package:visualit/core/services/book_processor.dart';
 import 'package:visualit/features/library/data/local_library_service.dart';
-import 'package:visualit/features/reader/data/book_data.dart' as db;
-import 'package:visualit/features/reader/data/toc_entry.dart';
-import 'package:archive/archive.dart';
-import 'package:xml/xml.dart';
-import 'package:html/parser.dart' as html_parser;
 import 'package:path/path.dart' as p;
 
 final localLibraryServiceProvider = Provider<LocalLibraryService>((ref) {
   return LocalLibraryService();
 });
 
-final libraryControllerProvider = StateNotifierProvider.autoDispose<LibraryController, AsyncValue<List<db.Book>>>(
-        (ref) {
-      final isar = ref.watch(isarDBProvider).requireValue;
-      final localLibraryService = ref.watch(localLibraryServiceProvider);
-      final backgroundTaskQueue = ref.watch(backgroundTaskQueueProvider);
-      return LibraryController(localLibraryService, isar, backgroundTaskQueue);
-    }
+final libraryControllerProvider = StateNotifierProvider.autoDispose<LibraryController, AsyncValue<List<BookSchema>>>(
+  (ref) {
+    final isar = ref.watch(isarDBProvider).requireValue;
+    final localLibraryService = ref.watch(localLibraryServiceProvider);
+    return LibraryController(localLibraryService, isar);
+  }
 );
 
-class LibraryController extends StateNotifier<AsyncValue<List<db.Book>>> {
+class LibraryController extends StateNotifier<AsyncValue<List<BookSchema>>> {
   final LocalLibraryService _localLibraryService;
   final Isar _isar;
-  final BackgroundTaskQueue _backgroundTaskQueue;
 
-  LibraryController(this._localLibraryService, this._isar, this._backgroundTaskQueue) : super(const AsyncValue.loading()) {
+  LibraryController(this._localLibraryService, this._isar) : super(const AsyncValue.loading()) {
     print("✅ [LibraryController] Initialized.");
     loadBooksFromDb();
-
-    // Listen to task status changes
-    _backgroundTaskQueue.taskStream.listen((_) {
-      loadBooksFromDb(); // Reload books when tasks change status
-    });
   }
 
   Future<void> loadBooksFromDb() async {
     print("🔄 [LibraryController] Loading all books from database...");
     state = const AsyncValue.loading();
     try {
-      final books = await _isar.books.where().sortByTitle().findAll();
+      final books = await _isar.bookSchemas.where().sortByTitle().findAll();
       print("  [LibraryController] Found ${books.length} books in DB.");
       state = AsyncValue.data(books);
     } catch (e, st) {
@@ -71,13 +61,13 @@ class LibraryController extends StateNotifier<AsyncValue<List<db.Book>>> {
     print("ℹ️ [LibraryController] User initiated retry for book ID: $bookId");
 
     // Get the book from the database
-    final book = await _isar.books.get(bookId);
+    final book = await _isar.bookSchemas.get(bookId);
     if (book == null) {
       print("❌ [LibraryController] Book not found with ID: $bookId");
       return;
     }
 
-    if (book.status != db.ProcessingStatus.error) {
+    if (book.status != ProcessingStatus.error) {
       print("⚠️ [LibraryController] Book is not in error state. Current status: ${book.status}");
       return;
     }
@@ -91,119 +81,36 @@ class LibraryController extends StateNotifier<AsyncValue<List<db.Book>>> {
         throw Exception("Could not load file from path: $filePath");
       }
 
-      // Reset the book status to queued
+      // Reset the book status to processing
       await _isar.writeTxn(() async {
-        book.status = db.ProcessingStatus.queued;
+        book.status = ProcessingStatus.processing;
         book.errorMessage = null;
         book.errorStackTrace = null;
-        await _isar.books.put(book);
+        await _isar.bookSchemas.put(book);
       });
 
       // Reload the book list to show the updated status
       await loadBooksFromDb();
 
-      // Create and enqueue a new task
-      final task = BookProcessingTask(
-        id: bookId,
-        filePath: filePath,
-        fileBytes: fileData.bytes,
-      );
-
-      _backgroundTaskQueue.enqueueTask(task);
-      print("✅ [LibraryController] Enqueued retry task for book ID: $bookId");
+      // Process the book in the background
+      _processBookInBackground(bookId, fileData.bytes);
 
     } catch (e, s) {
       print("❌ [LibraryController] Error preparing book for retry: $e\n$s");
 
       // Update the book status back to error with the new error message
       await _isar.writeTxn(() async {
-        final bookToUpdate = await _isar.books.get(bookId);
+        final bookToUpdate = await _isar.bookSchemas.get(bookId);
         if (bookToUpdate != null) {
-          bookToUpdate.status = db.ProcessingStatus.error;
+          bookToUpdate.status = ProcessingStatus.error;
           bookToUpdate.errorMessage = e.toString();
           bookToUpdate.errorStackTrace = s.toString();
-          await _isar.books.put(bookToUpdate);
+          await _isar.bookSchemas.put(bookToUpdate);
         }
       });
 
       // Reload the book list to show the updated status
       await loadBooksFromDb();
-    }
-  }
-
-  /// Recursively traverses the HTML DOM to flatten it into a list of ContentBlocks.
-  /// This is the robust way to handle any chapter structure.
-  void _flattenAndParseElements({
-    required List<dom.Element> elements,
-    required List<db.ContentBlock> targetBlockList, // The list to add blocks to
-    required int bookId,
-    required int chapterIndex,
-    required String chapterPath,
-    required Archive archive,
-    required int Function() getNextBlockIndex, // Function to get and increment the index
-  }) {
-    for (final element in elements) {
-      final tagName = element.localName;
-      final blockType = _getBlockType(tagName);
-
-      // If it's a container tag, we don't create a block for it.
-      // Instead, we recurse into its children to find content.
-      if (tagName == 'div' || tagName == 'section' || tagName == 'article' || tagName == 'main') {
-        _flattenAndParseElements(
-          elements: element.children,
-          targetBlockList: targetBlockList,
-          bookId: bookId,
-          chapterIndex: chapterIndex,
-          chapterPath: chapterPath,
-          archive: archive,
-          getNextBlockIndex: getNextBlockIndex,
-        );
-        continue;
-      }
-
-      // If it's a content block we care about, we process it.
-      if (blockType != db.BlockType.unsupported) {
-        final textContent = element.text.replaceAll('\u00A0', ' ').trim();
-
-        // We skip blocks that are just empty text, but we must allow image blocks
-        // as they have no text content but are still valid.
-        if (textContent.isEmpty && blockType != db.BlockType.img) {
-          continue;
-        }
-
-        final block = db.ContentBlock()
-          ..bookId = bookId
-          ..chapterIndex = chapterIndex
-          ..blockIndexInChapter = getNextBlockIndex() // Use the closure to get a unique index
-          ..src = chapterPath
-          ..blockType = blockType
-          ..htmlContent = element.outerHtml // Store the raw HTML for the rendering engine
-          ..textContent = textContent;
-
-        // Specifically handle image data extraction
-        if (blockType == db.BlockType.img) {
-          // An image can be a direct <img> tag, an <image> tag (used in SVG), or an <svg> tag wrapping an <image>.
-          // We need to find the actual image reference.
-          final imgTag = (tagName == 'img' || tagName == 'image')
-              ? element
-              : element.querySelector('img, image');
-
-          // EPUBs can use 'src', 'href', or 'xlink:href' for image paths. Check all.
-          final hrefAttr = imgTag?.attributes['src'] ?? imgTag?.attributes['href'] ?? imgTag?.attributes['xlink:href'];
-
-          if (hrefAttr != null) {
-            // Resolve the relative image path against the chapter's path.
-            final imagePath = p.normalize(p.join(p.dirname(chapterPath), hrefAttr));
-            final imageFile = archive.findFile(imagePath);
-            if (imageFile != null) {
-              block.imageBytes = imageFile.content as Uint8List;
-            } else {
-              print("    ❌ [LibraryController] Image file not found at path: '$imagePath'");
-            }
-          }
-        }
-        targetBlockList.add(block);
-      }
     }
   }
 
@@ -213,149 +120,168 @@ class LibraryController extends StateNotifier<AsyncValue<List<db.Book>>> {
       return;
     }
 
-    print("⏳ [LibraryController] Starting to process ${files.length} file(s) using BackgroundTaskQueue.");
+    print("⏳ [LibraryController] Starting to process ${files.length} file(s).");
 
     for (final fileData in files) {
       final filePath = fileData.path;
-      print("\n--- 📖 Preparing Book for Queue: $filePath ---");
+      print("\n--- 📖 Preparing Book: $filePath ---");
 
-      final existingBook = await _isar.books.where().epubFilePathEqualTo(filePath).findFirst();
+      final existingBook = await _isar.bookSchemas.where().epubFilePathEqualTo(filePath).findFirst();
       if (existingBook != null) {
         print("  ⚠️ [LibraryController] Book already exists in DB. Skipping.");
         continue;
       }
 
-      // Create initial book entry with queued status
-      final newBook = db.Book()
+      // Create initial book entry with processing status
+      final fileName = p.basename(filePath);
+      final newBook = BookSchema()
         ..epubFilePath = filePath
-        ..status = db.ProcessingStatus.queued;
+        ..title = p.basenameWithoutExtension(fileName) // Use filename as initial title
+        ..status = ProcessingStatus.processing
+        ..createdAt = DateTime.now();
 
-      final bookId = await _isar.writeTxn(() async => await _isar.books.put(newBook));
-      print("  ✅ [LibraryController] Created initial book entry with ID: $bookId, status: queued");
+      final bookId = await _isar.writeTxn(() async => await _isar.bookSchemas.put(newBook));
+      print("  ✅ [LibraryController] Created initial book entry with ID: $bookId, status: processing");
 
-      // Create and enqueue task
-      final task = BookProcessingTask(
-        id: bookId,
-        filePath: filePath,
-        fileBytes: fileData.bytes,
-      );
-
-      _backgroundTaskQueue.enqueueTask(task);
-      print("  ✅ [LibraryController] Enqueued book processing task for ID: $bookId");
+      // Process the book in the background
+      _processBookInBackground(bookId, fileData.bytes);
     }
 
-    // Reload books to show queued status
+    // Reload books to show processing status
     await loadBooksFromDb();
   }
 
-  List<TOCEntry> _parseNavXhtml(String content, String basePath) {
-    final document = html_parser.parse(content);
-    final nav = document.querySelector('nav[epub\\:type="toc"]');
-    if (nav == null) return [];
-    final ol = nav.querySelector('ol');
-    if (ol == null) return [];
-    return _parseNavList(ol, basePath);
+  void _processBookInBackground(int bookId, Uint8List fileBytes) {
+    // Use compute to run the processing in a separate isolate
+    compute(BookProcessor.processEpub, fileBytes).then((parsedBook) async {
+      // When processing completes successfully, update the database
+      await _saveProcessedBook(bookId, parsedBook);
+    }).catchError((e, stackTrace) async {
+      print("❌ [LibraryController] Error processing book: $e");
+      
+      // Update the book status to error
+      await _isar.writeTxn(() async {
+        final book = await _isar.bookSchemas.get(bookId);
+        if (book != null) {
+          book.status = ProcessingStatus.error;
+          book.errorMessage = e.toString();
+          book.errorStackTrace = stackTrace.toString();
+          await _isar.bookSchemas.put(book);
+        }
+      });
+      
+      // Reload the book list to show the updated status
+      await loadBooksFromDb();
+    });
   }
 
-  List<TOCEntry> _parseNavList(dom.Element listElement, String basePath) {
-    final entries = <TOCEntry>[];
-    for (final item in listElement.children.where((e) => e.localName == 'li')) {
-      final anchor = item.querySelector('a');
-      if (anchor == null) continue;
-      final href = anchor.attributes['href'] ?? '';
-      final parts = href.split('#');
-      final src = parts.length > 0 && parts[0].isNotEmpty ? parts[0] : null;
-      final fragment = parts.length > 1 ? parts[1] : null;
-      final entry = TOCEntry()
-        ..title = anchor.text.trim()
-        ..src = src != null ? p.normalize(p.join(basePath, src)) : null
-        ..fragment = fragment;
-      final nestedOl = item.querySelector('ol');
-      if (nestedOl != null) {
-        entry.children = _parseNavList(nestedOl, basePath);
+  Future<void> _saveProcessedBook(int bookId, ParsedBookDTO parsedBook) async {
+    print("✅ [LibraryController] Book processing completed, saving to database...");
+    
+    try {
+      await _isar.writeTxn(() async {
+        // 1. Update the book metadata
+        final book = await _isar.bookSchemas.get(bookId);
+        if (book == null) {
+          print("❌ [LibraryController] Book not found with ID: $bookId");
+          return;
+        }
+        
+        book.title = parsedBook.title;
+        book.author = parsedBook.author;
+        book.publisher = parsedBook.publisher;
+        book.language = parsedBook.language;
+        book.publicationDate = parsedBook.publicationDate;
+        book.coverImageBytes = parsedBook.coverImageBytes;
+        book.status = ProcessingStatus.ready;
+        book.updatedAt = DateTime.now();
+        
+        await _isar.bookSchemas.put(book);
+        
+        // 2. Save content blocks
+        final contentBlocks = <ContentBlockSchema>[];
+        for (final chapter in parsedBook.chapters) {
+          for (int i = 0; i < chapter.blocks.length; i++) {
+            final block = chapter.blocks[i];
+            final contentBlock = ContentBlockSchema()
+              ..bookId = bookId
+              ..blockType = block.blockType
+              ..htmlContent = block.htmlContent
+              ..textContent = block.textContent
+              ..imageBytes = block.imageBytes
+              ..chapterIndex = chapter.index
+              ..blockIndexInChapter = i
+              ..src = chapter.path;
+            
+            contentBlocks.add(contentBlock);
+          }
+        }
+        
+        await _isar.contentBlockSchemas.putAll(contentBlocks);
+        print("  ✅ [LibraryController] Saved ${contentBlocks.length} content blocks");
+        
+        // 3. Save TOC entries
+        final tocEntries = _convertTocEntriesToSchema(parsedBook.tocEntries, bookId);
+        await _isar.tOCEntrySchemas.putAll(tocEntries);
+        print("  ✅ [LibraryController] Saved ${tocEntries.length} TOC entries");
+      });
+      
+      // Reload the book list to show the updated status
+      await loadBooksFromDb();
+      
+    } catch (e, stackTrace) {
+      print("❌ [LibraryController] Error saving processed book: $e");
+      print(stackTrace);
+      
+      // Update the book status to error
+      await _isar.writeTxn(() async {
+        final book = await _isar.bookSchemas.get(bookId);
+        if (book != null) {
+          book.status = ProcessingStatus.error;
+          book.errorMessage = "Error saving processed book: $e";
+          book.errorStackTrace = stackTrace.toString();
+          await _isar.bookSchemas.put(book);
+        }
+      });
+      
+      // Reload the book list to show the updated status
+      await loadBooksFromDb();
+    }
+  }
+
+  List<TOCEntrySchema> _convertTocEntriesToSchema(List<ParsedTOCEntryDTO> entries, int bookId, {int level = 0, int orderIndex = 0, int? parentId}) {
+    final result = <TOCEntrySchema>[];
+    
+    for (int i = 0; i < entries.length; i++) {
+      final entry = entries[i];
+      final schema = TOCEntrySchema()
+        ..bookId = bookId
+        ..title = entry.title
+        ..src = entry.src
+        ..fragment = entry.fragment
+        ..level = level
+        ..orderIndex = orderIndex + i
+        ..parentId = parentId;
+      
+      result.add(schema);
+      
+      // Process children recursively
+      if (entry.children.isNotEmpty) {
+        // We need to save the parent first to get its ID
+        final parentId = _isar.writeTxnSync(() => _isar.tOCEntrySchemas.putSync(schema));
+        
+        final children = _convertTocEntriesToSchema(
+          entry.children, 
+          bookId, 
+          level: level + 1, 
+          orderIndex: 0, // Children start at 0 within their parent
+          parentId: parentId
+        );
+        
+        result.addAll(children);
       }
-      entries.add(entry);
     }
-    return entries;
-  }
-
-  List<TOCEntry> _parseNcx(String content, String basePath) {
-    final document = XmlDocument.parse(content);
-    final navMap = document.findAllElements('navMap').first;
-    return _parseNavPoints(navMap.findElements('navPoint').toList(), basePath);
-  }
-
-  List<TOCEntry> _parseNavPoints(List<XmlElement> navPoints, String basePath) {
-    final entries = <TOCEntry>[];
-    for (final navPoint in navPoints) {
-      final navLabel = navPoint.findElements('navLabel').first.findElements('text').first.innerText;
-      final contentSrc = navPoint.findElements('content').first.getAttribute('src') ?? '';
-      final parts = contentSrc.split('#');
-      final src = parts.length > 0 && parts[0].isNotEmpty ? parts[0] : null;
-      final fragment = parts.length > 1 ? parts[1] : null;
-      final entry = TOCEntry()
-        ..title = navLabel.trim()
-        ..src = src != null ? p.normalize(p.join(basePath, src)) : null
-        ..fragment = fragment;
-      final children = navPoint.findElements('navPoint').toList();
-      if (children.isNotEmpty) {
-        entry.children = _parseNavPoints(children, basePath);
-      }
-      entries.add(entry);
-    }
-    return entries;
-  }
-
-  /// Process a single chapter and extract its content blocks
-  Future<void> _processChapter({
-    required List<String> spine,
-    required int i,
-    required Map<String, String> manifest,
-    required Archive archive,
-    required int bookId,
-    required List<db.ContentBlock> allBlocks,
-  }) async {
-    final idref = spine[i];
-    final chapterPath = manifest[idref];
-    if (chapterPath == null) return;
-
-    final chapterFile = archive.findFile(chapterPath);
-    if (chapterFile == null) return;
-
-    final chapterContent = String.fromCharCodes(chapterFile.content);
-    final document = html_parser.parse(chapterContent);
-    final body = document.body;
-    if (body == null) return;
-
-    int blockCounter = 0;
-
-    // Use the robust recursive function to process the chapter body
-    _flattenAndParseElements(
-      elements: body.children,
-      targetBlockList: allBlocks,
-      bookId: bookId,
-      chapterIndex: i,
-      chapterPath: chapterPath,
-      archive: archive,
-      getNextBlockIndex: () => blockCounter++,
-    );
-
-    print("  ✅ [LibraryController] Processed chapter $i with ${blockCounter} blocks");
-  }
-
-  db.BlockType _getBlockType(String? tagName) {
-    switch (tagName?.toLowerCase()) {
-      case 'p': return db.BlockType.p;
-      case 'h1': return db.BlockType.h1;
-      case 'h2': return db.BlockType.h2;
-      case 'h3': return db.BlockType.h3;
-      case 'h4': return db.BlockType.h4;
-      case 'h5': return db.BlockType.h5;
-      case 'h6': return db.BlockType.h6;
-      case 'img': return db.BlockType.img;
-      case 'image': return db.BlockType.img;
-      case 'svg': return db.BlockType.img;
-      default: return db.BlockType.unsupported;
-    }
+    
+    return result;
   }
 }

@@ -38,3 +38,17 @@ class FontStyleNotifier extends StateNotifier<String> {
     state = style;
   }
 }
+
+/// Provider that combines font size and style into a single map
+final fontSettingsProvider = Provider<Map<String, dynamic>>((ref) {
+  final fontSize = ref.watch(fontSizeProvider);
+  final fontStyle = ref.watch(fontStyleProvider);
+  final fontSizeValue = ref.read(fontSizeProvider.notifier).getFontSizeValue();
+
+  return {
+    'fontSize': fontSizeValue,
+    'fontFamily': fontStyle,
+    'fontSizeName': fontSize,
+    'lineSpacing': 1.5, // Default line spacing
+  };
+});

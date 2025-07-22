@@ -32,24 +32,26 @@ class SyncStatusIndicator extends ConsumerWidget {
 
     // Listen to sync operations and update status
     ref.listen(syncProvider, (previous, next) {
-      if (next.isLoading) {
-        ref.read(syncStatusProvider.notifier).state = SyncStatus.syncing;
-      } else if (next.hasError) {
-        ref.read(syncStatusProvider.notifier).state = SyncStatus.error;
-        // Reset to idle after a delay
-        // Use a local variable to capture the notifier
-        final notifier = ref.read(syncStatusProvider.notifier);
-        Future.delayed(const Duration(seconds: 3), () {
-          notifier.state = SyncStatus.idle;
-        });
-      } else if (next.hasValue) {
-        ref.read(syncStatusProvider.notifier).state = SyncStatus.success;
-        // Reset to idle after a delay
-        // Use a local variable to capture the notifier
-        final notifier = ref.read(syncStatusProvider.notifier);
-        Future.delayed(const Duration(seconds: 2), () {
-          notifier.state = SyncStatus.idle;
-        });
+      if (next != null) {
+        if (next.isLoading) {
+          ref.read(syncStatusProvider.notifier).state = SyncStatus.syncing;
+        } else if (next.hasError) {
+          ref.read(syncStatusProvider.notifier).state = SyncStatus.error;
+          // Reset to idle after a delay
+          // Use a local variable to capture the notifier
+          final notifier = ref.read(syncStatusProvider.notifier);
+          Future.delayed(const Duration(seconds: 3), () {
+            notifier.state = SyncStatus.idle;
+          });
+        } else if (next.hasValue) {
+          ref.read(syncStatusProvider.notifier).state = SyncStatus.success;
+          // Reset to idle after a delay
+          // Use a local variable to capture the notifier
+          final notifier = ref.read(syncStatusProvider.notifier);
+          Future.delayed(const Duration(seconds: 2), () {
+            notifier.state = SyncStatus.idle;
+          });
+        }
       }
     });
 

@@ -4,7 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:visualit/core/theme/app_theme.dart';
 import 'package:visualit/features/library/presentation/library_controller.dart';
-import 'package:visualit/features/reader/data/book_data.dart' as db;
+import 'package:visualit/core/models/book_schema.dart';
 import 'package:visualit/shared_widgets/book_card.dart';
 import '../../../core/providers/isar_provider.dart';
 
@@ -149,7 +149,7 @@ class _EmptyLibraryView extends StatelessWidget {
 
 class _BookShelf extends StatelessWidget {
   final String title;
-  final List<db.Book> books;
+  final List<BookSchema> books;
   final bool showViewAll;
   final String? viewAllRoute;
 
@@ -203,8 +203,8 @@ class _BookShelf extends StatelessWidget {
                 title: book.title ?? 'No Title',
                 author: book.author ?? 'Unknown Author',
                 onTap: () {
-                  if (book.status == db.ProcessingStatus.ready) {
-                    context.goNamed('bookReader',
+                  if (book.status == ProcessingStatus.ready) {
+                    context.goNamed('reader',
                         pathParameters: {'bookId': book.id.toString()}
                     );
                   } else {

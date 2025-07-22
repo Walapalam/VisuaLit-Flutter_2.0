@@ -39,4 +39,45 @@ class IsarService {
       await isar.clear();
     });
   }
+
+  // Watch all books in the database
+  Stream<List<Book>> watchAllBooks() async* {
+    final isar = await db;
+    yield* isar.books.where().watch(fireImmediately: true);
+  }
+
+  // Add a book to the database
+  Future<int> addBook(Book book) async {
+    final isar = await db;
+    return await isar.writeTxn(() async {
+      return await isar.books.put(book);
+    });
+  }
+
+  // Get all highlights for a specific book
+  Future<List<Highlight>> getHighlightsForBook(int bookId) async {
+    final isar = await db;
+    return await isar.highlights.filter().bookIdEqualTo(bookId).findAll();
+  }
+
+  // Save a highlight to the database
+  Future<int> saveHighlight(Highlight highlight) async {
+    final isar = await db;
+    return await isar.writeTxn(() async {
+      return await isar.highlights.put(highlight);
+    });
+  }
+
+  // Update a book's reading progress
+  Future<void> updateBookProgress(int bookId, int lastReadPage) async {
+    final isar = await db;
+    await isar.writeTxn(() async {
+      final book = await isar.books.get(bookId);
+      if (book != null) {
+        book.lastReadPage = lastReadPage;
+        book.lastReadTimestamp = DateTime.now();
+        await isar.books.put(book);
+      }
+    });
+  }
 }

@@ -65,7 +65,7 @@ class BookProcessor {
 
           for (int j = 0; j < elements.length; j++) {
             final element = elements[j];
-            final textContent = element.text.trim();
+            final textContent = _decodeHtmlEntities(element.text.trim());
             if (textContent.isNotEmpty) {
               final block = ContentBlock()
                 ..bookId = existingBook.id
@@ -114,5 +114,21 @@ class BookProcessor {
       default:
         return BlockType.unsupported;
     }
+  }
+
+  /// Decodes HTML entities in the given text
+  /// Handles common entities like apostrophes, quotes, etc.
+  static String _decodeHtmlEntities(String text) {
+    // Replace common HTML entities
+    return text
+        .replaceAll('&apos;', "'")
+        .replaceAll('&#39;', "'")
+        .replaceAll('&#x27;', "'")
+        .replaceAll('&quot;', '"')
+        .replaceAll('&#34;', '"')
+        .replaceAll('&amp;', '&')
+        .replaceAll('&lt;', '<')
+        .replaceAll('&gt;', '>')
+        .replaceAll('&nbsp;', ' ');
   }
 }

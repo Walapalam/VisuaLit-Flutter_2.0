@@ -1,3 +1,5 @@
+// lib/core/api/appwrite_client.dart
+
 import 'package:appwrite/appwrite.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -21,10 +23,9 @@ final appwriteClientProvider = Provider<Client>((ref) {
   Client client = Client();
   client
     ..setEndpoint(endpoint)
-    ..setProject(projectId)
-  // We set selfSigned to true for development.
-  // In production, you should have a valid SSL certificate.
-    ..setSelfSigned(status: true);
+    ..setProject(projectId);
+  // setSelfSigned has been removed for production use with Appwrite Cloud
+  // Only use setSelfSigned(status: true) for local development with self-signed certificates
 
   return client;
 });

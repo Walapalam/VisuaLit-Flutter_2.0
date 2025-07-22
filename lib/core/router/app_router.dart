@@ -15,6 +15,9 @@ import 'package:visualit/main.dart';
 
 import '../../features/auth/presentation/splash_screen.dart';
 import '../../features/reader/presentation/reading_screen.dart';
+import 'package:visualit/features/marketplace/presentation/marketplace_screen.dart';
+
+import 'package:visualit/features/Cart/presentation/CartScreen.dart';
 
 final _rootNavigatorKey = GlobalKey<NavigatorState>();
 
@@ -44,6 +47,11 @@ final goRouterProvider = Provider<GoRouter>((ref) {
           return AudiobookPlayerScreen(audiobookId: audiobookId);
         },
       ),
+      GoRoute(
+        path: '/cart',
+        name: 'cart',
+        builder: (context, state) => const CartScreen(),
+      ),
       // TODO: Add '/preferences' route here when built
 
       // Main application shell route
@@ -61,6 +69,15 @@ final goRouterProvider = Provider<GoRouter>((ref) {
           StatefulShellBranch(routes: [
             GoRoute(path: '/audio', name: 'audio', builder: (context, state) => const AudiobooksScreen()),
           ]),
+          StatefulShellBranch(
+            routes: [
+              GoRoute(
+                path: '/marketplace', name: 'marketplace',
+                builder: (context, state) => const MarketplaceScreen(),
+              ),
+            ],
+          ),
+
           StatefulShellBranch(routes: [
             GoRoute(path: '/settings', name: 'settings', builder: (context, state) => const SettingsScreen()),
           ]),

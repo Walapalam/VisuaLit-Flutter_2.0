@@ -10,6 +10,8 @@ import 'package:archive/archive.dart';
 import 'package:xml/xml.dart';
 import 'package:html/parser.dart' as html_parser;
 import 'package:path/path.dart' as p;
+import 'package:visualit/core/models/book.dart';
+
 
 final localLibraryServiceProvider = Provider<LocalLibraryService>((ref) {
   return LocalLibraryService();
@@ -378,6 +380,23 @@ class LibraryController extends StateNotifier<AsyncValue<List<db.Book>>> {
     }
     return entries;
   }
+  Future<void> addBookFromCart(Map<String, dynamic> bookData) async {
+    final currentBooks = state.value ?? [];
+
+    // Create an instance of db.Book
+    final book = db.Book()
+      ..id = int.parse(bookData['id'].toString())
+      ..title = bookData['title'] ?? 'Untitled'
+      ..author = bookData['authors'] != null && bookData['authors'].isNotEmpty
+          ? bookData['authors'][0]['name']
+          : null
+      ..epubFilePath = ''
+      ..status = db.ProcessingStatus.ready;
+
+    // Update the state with the new book
+    state = AsyncValue.data([...currentBooks, book]);
+  }
+
 
   db.BlockType _getBlockType(String? tagName) {
     switch (tagName?.toLowerCase()) {

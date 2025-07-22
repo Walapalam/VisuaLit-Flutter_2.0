@@ -7,7 +7,7 @@ import 'package:screen_brightness/screen_brightness.dart';
 import 'package:visualit/features/reader/presentation/reading_controller.dart';
 import 'package:visualit/features/reader/presentation/reading_preferences_controller.dart';
 import 'package:visualit/features/reader/presentation/widgets/book_page_widget.dart';
-import 'package:visualit/features/reader/presentation/widgets/html_content_widget.dart';
+import 'package:visualit/features/reader/presentation/widgets/optimized_html_content_widget.dart';
 import 'package:visualit/features/reader/presentation/widgets/reading_settings_panel.dart';
 
 class ReadingScreen extends ConsumerStatefulWidget {
@@ -175,12 +175,54 @@ class _ReadingScreenState extends ConsumerState<ReadingScreen> {
     if (!state.isBookLoaded) return const Center(child: CircularProgressIndicator());
     if (state.blocks.isEmpty) return const Center(child: Text('This book has no content.'));
 
+    // Show layout calculation progress if in progress
+    if (state.isCalculatingLayout) {
+      return Stack(
+        children: [
+          // Show the content behind the progress indicator
+          _buildContent(state, viewSize, provider, prefs),
+
+          // Overlay with a semi-transparent progress indicator
+          Positioned.fill(
+            child: Container(
+              color: Colors.black.withOpacity(0.3),
+              child: Center(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    CircularProgressIndicator(
+                      value: state.layoutCalculationProgress,
+                      valueColor: AlwaysStoppedAnimation<Color>(prefs.textColor),
+                    ),
+                    const SizedBox(height: 16),
+                    Text(
+                      'Calculating page layouts...\n${(state.layoutCalculationProgress * 100).toStringAsFixed(0)}%',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        color: prefs.textColor,
+                        fontSize: 16,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ],
+      );
+    }
+
+    return _buildContent(state, viewSize, provider, prefs);
+  }
+
+  Widget _buildContent(ReadingState state, Size viewSize,
+      AutoDisposeStateNotifierProvider<ReadingController, ReadingState> provider, ReadingPreferences prefs) {
     if (prefs.pageTurnStyle == PageTurnStyle.scroll) {
       return ListView.builder(
         controller: _scrollController,
         itemCount: state.blocks.length,
         itemBuilder: (context, index) {
-          return HtmlContentWidget(
+          return OptimizedHtmlContentWidget(
             key: ValueKey('block_${state.blocks[index].id}'),
             block: state.blocks[index],
             blockIndex: index,
@@ -196,6 +238,14 @@ class _ReadingScreenState extends ConsumerState<ReadingScreen> {
         itemBuilder: (context, index) {
           final startingBlockIndex = state.pageToBlockIndexMap[index];
           if (startingBlockIndex == null) return const Center(child: CircularProgressIndicator());
+          // Determine if we have pre-calculated layout information
+          final nextPageIndex = index + 1;
+          final endingBlockIndex = nextPageIndex < state.totalPages && state.pageToBlockIndexMap.containsKey(nextPageIndex)
+              ? state.pageToBlockIndexMap[nextPageIndex]! - 1
+              : null;
+          final usePreCalculatedLayout = state.isUsingCachedLayout || 
+              (endingBlockIndex != null && !state.isCalculatingLayout);
+
           return BookPageWidget(
             key: ValueKey('page_${index}_$startingBlockIndex'),
             allBlocks: state.blocks,
@@ -203,6 +253,8 @@ class _ReadingScreenState extends ConsumerState<ReadingScreen> {
             viewSize: viewSize,
             pageIndex: index,
             onPageBuilt: ref.read(provider.notifier).updatePageLayout,
+            endingBlockIndex: endingBlockIndex,
+            usePreCalculatedLayout: usePreCalculatedLayout,
           );
         },
       );

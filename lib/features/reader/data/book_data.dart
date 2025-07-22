@@ -6,7 +6,7 @@ part 'book_data.g.dart';
 // ---- Enums ----
 enum ProcessingStatus { queued, processing, ready, error, partiallyReady }
 
-enum BlockType { p, h1, h2, h3, h4, h5, h6, img, unsupported }
+enum BlockType { p, h1, h2, h3, h4, h5, h6, blockquote, li, hr, img, pre, div, unsupported }
 
 // ---- Collections ----
 @collection
@@ -31,6 +31,7 @@ class Book {
   // Error tracking
   String? errorMessage;
   String? errorStackTrace;
+  String? processingMetadata; // Additional metadata for debugging
   bool failedPermanently = false;
   int retryCount = 0;
 
@@ -46,6 +47,9 @@ class Book {
   List<int> processedChapters = [];
   int totalChapters = 0;
   double processingProgress = 0.0; // 0.0 to 1.0
+
+  // Format versioning
+  bool isNewFormat = false; // Indicates if the book is stored using the new block-based format
 
   List<TOCEntry> toc = [];
 }

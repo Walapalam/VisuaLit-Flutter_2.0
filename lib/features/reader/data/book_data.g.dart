@@ -52,70 +52,80 @@ const BookSchema = CollectionSchema(
       name: r'fileSizeInBytes',
       type: IsarType.long,
     ),
-    r'language': PropertySchema(
+    r'isNewFormat': PropertySchema(
       id: 7,
+      name: r'isNewFormat',
+      type: IsarType.bool,
+    ),
+    r'language': PropertySchema(
+      id: 8,
       name: r'language',
       type: IsarType.string,
     ),
     r'lastAccessedAt': PropertySchema(
-      id: 8,
+      id: 9,
       name: r'lastAccessedAt',
       type: IsarType.dateTime,
     ),
     r'lastReadPage': PropertySchema(
-      id: 9,
+      id: 10,
       name: r'lastReadPage',
       type: IsarType.long,
     ),
     r'lastReadTimestamp': PropertySchema(
-      id: 10,
+      id: 11,
       name: r'lastReadTimestamp',
       type: IsarType.dateTime,
     ),
     r'processedChapters': PropertySchema(
-      id: 11,
+      id: 12,
       name: r'processedChapters',
       type: IsarType.longList,
     ),
+    r'processingMetadata': PropertySchema(
+      id: 13,
+      name: r'processingMetadata',
+      type: IsarType.string,
+    ),
     r'processingProgress': PropertySchema(
-      id: 12,
+      id: 14,
       name: r'processingProgress',
       type: IsarType.double,
     ),
     r'publicationDate': PropertySchema(
-      id: 13,
+      id: 15,
       name: r'publicationDate',
       type: IsarType.dateTime,
     ),
     r'publisher': PropertySchema(
-      id: 14,
+      id: 16,
       name: r'publisher',
       type: IsarType.string,
     ),
     r'retryCount': PropertySchema(
-      id: 15,
+      id: 17,
       name: r'retryCount',
       type: IsarType.long,
     ),
     r'status': PropertySchema(
-      id: 16,
+      id: 18,
       name: r'status',
       type: IsarType.byte,
       enumMap: _BookstatusEnumValueMap,
     ),
     r'title': PropertySchema(
-      id: 17,
+      id: 19,
       name: r'title',
       type: IsarType.string,
     ),
     r'toc': PropertySchema(
-      id: 18,
+      id: 20,
       name: r'toc',
       type: IsarType.objectList,
       target: r'TOCEntry',
     ),
     r'totalChapters': PropertySchema(
-      id: 19,
+      id: 21,
       name: r'totalChapters',
       type: IsarType.long,
     )
@@ -187,6 +197,12 @@ int _bookEstimateSize(
   }
   bytesCount += 3 + object.processedChapters.length * 8;
   {
+    final value = object.processingMetadata;
+    if (value != null) {
+      bytesCount += 3 + value.length * 3;
+    }
+  }
+  {
     final value = object.publisher;
     if (value != null) {
       bytesCount += 3 + value.length * 3;
@@ -222,24 +238,26 @@ void _bookSerialize(
   writer.writeString(offsets[4], object.errorStackTrace);
   writer.writeBool(offsets[5], object.failedPermanently);
   writer.writeLong(offsets[6], object.fileSizeInBytes);
-  writer.writeString(offsets[7], object.language);
-  writer.writeDateTime(offsets[8], object.lastAccessedAt);
-  writer.writeLong(offsets[9], object.lastReadPage);
-  writer.writeDateTime(offsets[10], object.lastReadTimestamp);
-  writer.writeLongList(offsets[11], object.processedChapters);
-  writer.writeDouble(offsets[12], object.processingProgress);
-  writer.writeDateTime(offsets[13], object.publicationDate);
-  writer.writeString(offsets[14], object.publisher);
-  writer.writeLong(offsets[15], object.retryCount);
-  writer.writeByte(offsets[16], object.status.index);
-  writer.writeString(offsets[17], object.title);
+  writer.writeBool(offsets[7], object.isNewFormat);
+  writer.writeString(offsets[8], object.language);
+  writer.writeDateTime(offsets[9], object.lastAccessedAt);
+  writer.writeLong(offsets[10], object.lastReadPage);
+  writer.writeDateTime(offsets[11], object.lastReadTimestamp);
+  writer.writeLongList(offsets[12], object.processedChapters);
+  writer.writeString(offsets[13], object.processingMetadata);
+  writer.writeDouble(offsets[14], object.processingProgress);
+  writer.writeDateTime(offsets[15], object.publicationDate);
+  writer.writeString(offsets[16], object.publisher);
+  writer.writeLong(offsets[17], object.retryCount);
+  writer.writeByte(offsets[18], object.status.index);
+  writer.writeString(offsets[19], object.title);
   writer.writeObjectList<TOCEntry>(
-    offsets[18],
+    offsets[20],
     allOffsets,
     TOCEntrySchema.serialize,
     object.toc,
   );
-  writer.writeLong(offsets[19], object.totalChapters);
+  writer.writeLong(offsets[21], object.totalChapters);
 }
 
 Book _bookDeserialize(
@@ -257,26 +275,28 @@ Book _bookDeserialize(
   object.failedPermanently = reader.readBool(offsets[5]);
   object.fileSizeInBytes = reader.readLongOrNull(offsets[6]);
   object.id = id;
-  object.language = reader.readStringOrNull(offsets[7]);
-  object.lastAccessedAt = reader.readDateTimeOrNull(offsets[8]);
-  object.lastReadPage = reader.readLong(offsets[9]);
-  object.lastReadTimestamp = reader.readDateTimeOrNull(offsets[10]);
-  object.processedChapters = reader.readLongList(offsets[11]) ?? [];
-  object.processingProgress = reader.readDouble(offsets[12]);
-  object.publicationDate = reader.readDateTimeOrNull(offsets[13]);
-  object.publisher = reader.readStringOrNull(offsets[14]);
-  object.retryCount = reader.readLong(offsets[15]);
-  object.status = _BookstatusValueEnumMap[reader.readByteOrNull(offsets[16])] ??
+  object.isNewFormat = reader.readBool(offsets[7]);
+  object.language = reader.readStringOrNull(offsets[8]);
+  object.lastAccessedAt = reader.readDateTimeOrNull(offsets[9]);
+  object.lastReadPage = reader.readLong(offsets[10]);
+  object.lastReadTimestamp = reader.readDateTimeOrNull(offsets[11]);
+  object.processedChapters = reader.readLongList(offsets[12]) ?? [];
+  object.processingMetadata = reader.readStringOrNull(offsets[13]);
+  object.processingProgress = reader.readDouble(offsets[14]);
+  object.publicationDate = reader.readDateTimeOrNull(offsets[15]);
+  object.publisher = reader.readStringOrNull(offsets[16]);
+  object.retryCount = reader.readLong(offsets[17]);
+  object.status = _BookstatusValueEnumMap[reader.readByteOrNull(offsets[18])] ??
       ProcessingStatus.queued;
-  object.title = reader.readStringOrNull(offsets[17]);
+  object.title = reader.readStringOrNull(offsets[19]);
   object.toc = reader.readObjectList<TOCEntry>(
-        offsets[18],
+        offsets[20],
         TOCEntrySchema.deserialize,
         allOffsets,
         TOCEntry(),
       ) ??
       [];
-  object.totalChapters = reader.readLong(offsets[19]);
+  object.totalChapters = reader.readLong(offsets[21]);
   return object;
 }
 
@@ -302,29 +322,33 @@ P _bookDeserializeProp<P>(
     case 6:
       return (reader.readLongOrNull(offset)) as P;
     case 7:
-      return (reader.readStringOrNull(offset)) as P;
+      return (reader.readBool(offset)) as P;
     case 8:
-      return (reader.readDateTimeOrNull(offset)) as P;
-    case 9:
-      return (reader.readLong(offset)) as P;
-    case 10:
-      return (reader.readDateTimeOrNull(offset)) as P;
-    case 11:
-      return (reader.readLongList(offset) ?? []) as P;
-    case 12:
-      return (reader.readDouble(offset)) as P;
-    case 13:
-      return (reader.readDateTimeOrNull(offset)) as P;
-    case 14:
       return (reader.readStringOrNull(offset)) as P;
-    case 15:
+    case 9:
+      return (reader.readDateTimeOrNull(offset)) as P;
+    case 10:
       return (reader.readLong(offset)) as P;
+    case 11:
+      return (reader.readDateTimeOrNull(offset)) as P;
+    case 12:
+      return (reader.readLongList(offset) ?? []) as P;
+    case 13:
+      return (reader.readStringOrNull(offset)) as P;
+    case 14:
+      return (reader.readDouble(offset)) as P;
+    case 15:
+      return (reader.readDateTimeOrNull(offset)) as P;
     case 16:
+      return (reader.readStringOrNull(offset)) as P;
+    case 17:
+      return (reader.readLong(offset)) as P;
+    case 18:
       return (_BookstatusValueEnumMap[reader.readByteOrNull(offset)] ??
           ProcessingStatus.queued) as P;
-    case 17:
+    case 19:
       return (reader.readStringOrNull(offset)) as P;
-    case 18:
+    case 20:
       return (reader.readObjectList<TOCEntry>(
             offset,
             TOCEntrySchema.deserialize,
@@ -332,7 +356,7 @@ P _bookDeserializeProp<P>(
             TOCEntry(),
           ) ??
           []) as P;
-    case 19:
+    case 21:
       return (reader.readLong(offset)) as P;
     default:
       throw IsarError('Unknown property with id $propertyId');
@@ -1395,6 +1419,16 @@ extension BookQueryFilter on QueryBuilder<Book, Book, QFilterCondition> {
     });
   }
 
+  QueryBuilder<Book, Book, QAfterFilterCondition> isNewFormatEqualTo(
+      bool value) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'isNewFormat',
+        value: value,
+      ));
+    });
+  }
+
   QueryBuilder<Book, Book, QAfterFilterCondition> languageIsNull() {
     return QueryBuilder.apply(this, (query) {
       return query.addFilterCondition(const FilterCondition.isNull(
@@ -1872,6 +1906,154 @@ extension BookQueryFilter on QueryBuilder<Book, Book, QFilterCondition> {
         upper,
         includeUpper,
       );
+    });
+  }
+
+  QueryBuilder<Book, Book, QAfterFilterCondition> processingMetadataIsNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(const FilterCondition.isNull(
+        property: r'processingMetadata',
+      ));
+    });
+  }
+
+  QueryBuilder<Book, Book, QAfterFilterCondition>
+      processingMetadataIsNotNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(const FilterCondition.isNotNull(
+        property: r'processingMetadata',
+      ));
+    });
+  }
+
+  QueryBuilder<Book, Book, QAfterFilterCondition> processingMetadataEqualTo(
+    String? value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'processingMetadata',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<Book, Book, QAfterFilterCondition> processingMetadataGreaterThan(
+    String? value, {
+    bool include = false,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        include: include,
+        property: r'processingMetadata',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<Book, Book, QAfterFilterCondition> processingMetadataLessThan(
+    String? value, {
+    bool include = false,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.lessThan(
+        include: include,
+        property: r'processingMetadata',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<Book, Book, QAfterFilterCondition> processingMetadataBetween(
+    String? lower,
+    String? upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.between(
+        property: r'processingMetadata',
+        lower: lower,
+        includeLower: includeLower,
+        upper: upper,
+        includeUpper: includeUpper,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<Book, Book, QAfterFilterCondition> processingMetadataStartsWith(
+    String value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.startsWith(
+        property: r'processingMetadata',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<Book, Book, QAfterFilterCondition> processingMetadataEndsWith(
+    String value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.endsWith(
+        property: r'processingMetadata',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<Book, Book, QAfterFilterCondition> processingMetadataContains(
+      String value,
+      {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.contains(
+        property: r'processingMetadata',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<Book, Book, QAfterFilterCondition> processingMetadataMatches(
+      String pattern,
+      {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.matches(
+        property: r'processingMetadata',
+        wildcard: pattern,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<Book, Book, QAfterFilterCondition> processingMetadataIsEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'processingMetadata',
+        value: '',
+      ));
+    });
+  }
+
+  QueryBuilder<Book, Book, QAfterFilterCondition>
+      processingMetadataIsNotEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        property: r'processingMetadata',
+        value: '',
+      ));
     });
   }
 
@@ -2622,6 +2804,18 @@ extension BookQuerySortBy on QueryBuilder<Book, Book, QSortBy> {
     });
   }
 
+  QueryBuilder<Book, Book, QAfterSortBy> sortByIsNewFormat() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'isNewFormat', Sort.asc);
+    });
+  }
+
+  QueryBuilder<Book, Book, QAfterSortBy> sortByIsNewFormatDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'isNewFormat', Sort.desc);
+    });
+  }
+
   QueryBuilder<Book, Book, QAfterSortBy> sortByLanguage() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'language', Sort.asc);
@@ -2667,6 +2861,18 @@ extension BookQuerySortBy on QueryBuilder<Book, Book, QSortBy> {
   QueryBuilder<Book, Book, QAfterSortBy> sortByLastReadTimestampDesc() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'lastReadTimestamp', Sort.desc);
+    });
+  }
+
+  QueryBuilder<Book, Book, QAfterSortBy> sortByProcessingMetadata() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'processingMetadata', Sort.asc);
+    });
+  }
+
+  QueryBuilder<Book, Book, QAfterSortBy> sortByProcessingMetadataDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'processingMetadata', Sort.desc);
     });
   }
 
@@ -2840,6 +3046,18 @@ extension BookQuerySortThenBy on QueryBuilder<Book, Book, QSortThenBy> {
     });
   }
 
+  QueryBuilder<Book, Book, QAfterSortBy> thenByIsNewFormat() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'isNewFormat', Sort.asc);
+    });
+  }
+
+  QueryBuilder<Book, Book, QAfterSortBy> thenByIsNewFormatDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'isNewFormat', Sort.desc);
+    });
+  }
+
   QueryBuilder<Book, Book, QAfterSortBy> thenByLanguage() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'language', Sort.asc);
@@ -2885,6 +3103,18 @@ extension BookQuerySortThenBy on QueryBuilder<Book, Book, QSortThenBy> {
   QueryBuilder<Book, Book, QAfterSortBy> thenByLastReadTimestampDesc() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'lastReadTimestamp', Sort.desc);
+    });
+  }
+
+  QueryBuilder<Book, Book, QAfterSortBy> thenByProcessingMetadata() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'processingMetadata', Sort.asc);
+    });
+  }
+
+  QueryBuilder<Book, Book, QAfterSortBy> thenByProcessingMetadataDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'processingMetadata', Sort.desc);
     });
   }
 
@@ -3021,6 +3251,12 @@ extension BookQueryWhereDistinct on QueryBuilder<Book, Book, QDistinct> {
     });
   }
 
+  QueryBuilder<Book, Book, QDistinct> distinctByIsNewFormat() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'isNewFormat');
+    });
+  }
+
   QueryBuilder<Book, Book, QDistinct> distinctByLanguage(
       {bool caseSensitive = true}) {
     return QueryBuilder.apply(this, (query) {
@@ -3049,6 +3285,14 @@ extension BookQueryWhereDistinct on QueryBuilder<Book, Book, QDistinct> {
   QueryBuilder<Book, Book, QDistinct> distinctByProcessedChapters() {
     return QueryBuilder.apply(this, (query) {
       return query.addDistinctBy(r'processedChapters');
+    });
+  }
+
+  QueryBuilder<Book, Book, QDistinct> distinctByProcessingMetadata(
+      {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'processingMetadata',
+          caseSensitive: caseSensitive);
     });
   }
 
@@ -3146,6 +3390,12 @@ extension BookQueryProperty on QueryBuilder<Book, Book, QQueryProperty> {
     });
   }
 
+  QueryBuilder<Book, bool, QQueryOperations> isNewFormatProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'isNewFormat');
+    });
+  }
+
   QueryBuilder<Book, String?, QQueryOperations> languageProperty() {
     return QueryBuilder.apply(this, (query) {
       return query.addPropertyName(r'language');
@@ -3173,6 +3423,12 @@ extension BookQueryProperty on QueryBuilder<Book, Book, QQueryProperty> {
   QueryBuilder<Book, List<int>, QQueryOperations> processedChaptersProperty() {
     return QueryBuilder.apply(this, (query) {
       return query.addPropertyName(r'processedChapters');
+    });
+  }
+
+  QueryBuilder<Book, String?, QQueryOperations> processingMetadataProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'processingMetadata');
     });
   }
 
@@ -3513,8 +3769,13 @@ const _ContentBlockblockTypeEnumValueMap = {
   'h4': 4,
   'h5': 5,
   'h6': 6,
-  'img': 7,
-  'unsupported': 8,
+  'blockquote': 7,
+  'li': 8,
+  'hr': 9,
+  'img': 10,
+  'pre': 11,
+  'div': 12,
+  'unsupported': 13,
 };
 const _ContentBlockblockTypeValueEnumMap = {
   0: BlockType.p,
@@ -3524,8 +3785,13 @@ const _ContentBlockblockTypeValueEnumMap = {
   4: BlockType.h4,
   5: BlockType.h5,
   6: BlockType.h6,
-  7: BlockType.img,
-  8: BlockType.unsupported,
+  7: BlockType.blockquote,
+  8: BlockType.li,
+  9: BlockType.hr,
+  10: BlockType.img,
+  11: BlockType.pre,
+  12: BlockType.div,
+  13: BlockType.unsupported,
 };
 
 Id _contentBlockGetId(ContentBlock object) {

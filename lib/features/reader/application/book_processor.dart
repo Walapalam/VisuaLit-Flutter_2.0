@@ -13,7 +13,22 @@ import 'package:visualit/features/reader/data/book_data.dart';
 class BookProcessor implements IBookProcessor {
   final ILoggerService _logger;
 
+  // Error notification callback
+  static void Function(String title, String message)? onError;
+
   BookProcessor(this._logger);
+
+  /// Notifies the user about an error
+  void _notifyUserAboutError(String bookTitle, String errorMessage) {
+    // Call the error callback if it's set
+    if (onError != null) {
+      onError!(bookTitle, errorMessage);
+    }
+
+    // Log the error
+    _logger.error('Book processing error: $bookTitle - $errorMessage', 
+        tag: 'BookProcessor');
+  }
 
   // This is the clean, static entry point for the Isolate.
   static Future<void> launchIsolate(String filePath) async {
@@ -31,6 +46,25 @@ class BookProcessor implements IBookProcessor {
     } catch (e, stackTrace) {
       debugPrint("Error processing book in isolate: $e");
       debugPrintStack(stackTrace: stackTrace);
+
+      // Update book status to error
+      try {
+        // Find the book by file path
+        final book = await isar.books.where().epubFilePathEqualTo(filePath).findFirst();
+        if (book != null) {
+          await isar.writeTxn(() async {
+            book.status = ProcessingStatus.error;
+            book.errorMessage = 'Error processing book: ${e.toString()}';
+            await isar.books.put(book);
+          });
+
+          // We can't directly notify the user from an isolate,
+          // but we've updated the book status so the UI can show the error
+          debugPrint("Updated book status to error: ${book.title}");
+        }
+      } catch (innerError) {
+        debugPrint("Failed to update book status after error: $innerError");
+      }
     } finally {
       // Ensure the Isar instance is closed, even if an error occurs.
       await isar.close();
@@ -41,9 +75,65 @@ class BookProcessor implements IBookProcessor {
   Future<void> processBook(Book book) async {
     _logger.info('Processing book: ${book.title}', tag: 'BookProcessor');
 
-    // This method would contain the synchronous version of the book processing logic
-    // For now, we'll just log that it was called
-    _logger.info('Book processing completed', tag: 'BookProcessor');
+    // Check if the book needs migration to the new format
+    if (!book.isNewFormat && book.status == ProcessingStatus.ready) {
+      _logger.info('Book needs migration to new format, triggering reprocessing', 
+          tag: 'BookProcessor');
+
+      // Queue the book for reprocessing in the background
+      await _migrateBookToNewFormat(book);
+    } else {
+      // Process the book normally
+      _logger.info('Book processing completed', tag: 'BookProcessor');
+    }
+  }
+
+  /// Migrates a book from the old format to the new block-based format
+  Future<void> _migrateBookToNewFormat(Book book) async {
+    _logger.info('Starting migration for book: ${book.title}', tag: 'BookProcessor');
+
+    try {
+      // Set the book status to queued to trigger reprocessing
+      book.status = ProcessingStatus.queued;
+
+      // Get the Isar instance
+      final isar = Isar.getInstance();
+      if (isar == null) {
+        _logger.error('Failed to get Isar instance for migration', tag: 'BookProcessor');
+        return;
+      }
+
+      // Update the book status
+      await isar.writeTxn(() async {
+        await isar.books.put(book);
+      });
+
+      // Launch the isolate to reprocess the book
+      _logger.info('Launching isolate for book migration: ${book.epubFilePath}', 
+          tag: 'BookProcessor');
+      await launchIsolate(book.epubFilePath);
+
+    } catch (e, stackTrace) {
+      _logger.error('Error migrating book to new format: $e', 
+          tag: 'BookProcessor', stackTrace: stackTrace);
+
+      // Update book status to error and store error message
+      if (isar != null) {
+        try {
+          await isar.writeTxn(() async {
+            book.status = ProcessingStatus.error;
+            book.errorMessage = 'Failed to migrate book: ${e.toString()}';
+            await isar.books.put(book);
+          });
+
+          // Notify user about the error
+          _notifyUserAboutError(book.title ?? 'Unknown book', e.toString());
+        } catch (innerError) {
+          _logger.error('Failed to update book status after error: $innerError', 
+              tag: 'BookProcessor');
+        }
+      }
+    }
   }
 
   // This private method contains the core book processing logic.
@@ -97,19 +187,48 @@ class BookProcessor implements IBookProcessor {
           final elements = document.body?.children ?? [];
           debugPrint("[BookProcessor] Chapter $i has ${elements.length} elements");
 
+          int blockIndex = 0;
           for (int j = 0; j < elements.length; j++) {
             final element = elements[j];
-            final textContent = element.text.trim();
-            if (textContent.isNotEmpty) {
-              final block = ContentBlock()
-                ..bookId = existingBook.id
-                ..chapterIndex = i
-                ..blockIndexInChapter = j
-                ..htmlContent = element.outerHtml
-                ..textContent = textContent
-                ..blockType = _getBlockType(element.localName);
-              newBlocks.add(block);
+
+            // Only create blocks for block-level elements
+            if (isBlockLevelTag(element.localName)) {
+              final textContent = element.text.trim();
+
+              // Skip empty blocks unless they're special elements like hr or img
+              if (textContent.isNotEmpty || 
+                  element.localName == 'hr' || 
+                  element.localName == 'img') {
+                final block = ContentBlock()
+                  ..bookId = existingBook.id
+                  ..chapterIndex = i
+                  ..blockIndexInChapter = blockIndex++
+                  ..htmlContent = element.outerHtml
+                  ..textContent = textContent
+                  ..blockType = _getBlockType(element.localName);
+                newBlocks.add(block);
+              }
+            } else if (element.localName == 'div') {
+              // Handle divs specially - they can be block or inline depending on content
+              // If a div contains block elements, skip it (those blocks will be processed separately)
+              // If a div only contains text or inline elements, treat it as a block
+              bool containsBlockElements = element.children.any((child) => isBlockLevelTag(child.localName));
+
+              if (!containsBlockElements) {
+                final textContent = element.text.trim();
+                if (textContent.isNotEmpty) {
+                  final block = ContentBlock()
+                    ..bookId = existingBook.id
+                    ..chapterIndex = i
+                    ..blockIndexInChapter = blockIndex++
+                    ..htmlContent = element.outerHtml
+                    ..textContent = textContent
+                    ..blockType = BlockType.div;
+                  newBlocks.add(block);
+                }
+              }
             }
+            // Skip inline elements at the top level - they should be inside blocks
           }
         }
       }
@@ -118,6 +237,7 @@ class BookProcessor implements IBookProcessor {
       await isar.writeTxn(() async {
         await isar.contentBlocks.putAll(newBlocks);
         existingBook.status = ProcessingStatus.ready;
+        existingBook.isNewFormat = true; // Mark as processed with new format
         await isar.books.put(existingBook);
       });
 
@@ -126,8 +246,26 @@ class BookProcessor implements IBookProcessor {
       debugPrint("[BookProcessor] Error processing book: $e");
       debugPrintStack(stackTrace: s);
 
+      // Store detailed error information
       existingBook.status = ProcessingStatus.error;
+      existingBook.errorMessage = "Error processing book: ${e.toString()}";
+
+      // Add error details to help with debugging
+      final errorDetails = {
+        'error': e.toString(),
+        'stackTrace': s.toString().split('\n').take(10).join('\n'),
+        'bookId': existingBook.id,
+        'bookTitle': existingBook.title,
+        'timestamp': DateTime.now().toIso8601String(),
+      };
+
+      existingBook.processingMetadata = errorDetails.toString();
+
+      // Save the updated book with error information
       await isar.writeTxn(() async => await isar.books.put(existingBook));
+
+      // Log detailed error for analytics
+      debugPrint("[BookProcessor] Detailed error info: $errorDetails");
     }
   }
 
@@ -147,10 +285,43 @@ class BookProcessor implements IBookProcessor {
         return BlockType.h5;
       case 'h6':
         return BlockType.h6;
+      case 'blockquote':
+        return BlockType.blockquote;
+      case 'li':
+        return BlockType.li;
+      case 'hr':
+        return BlockType.hr;
       case 'img':
         return BlockType.img;
+      case 'pre':
+        return BlockType.pre;
+      case 'div':
+        return BlockType.div;
       default:
         return BlockType.unsupported;
     }
+  }
+
+  /// Determines if a tag is a block-level tag that should create a new ContentBlock
+  static bool isBlockLevelTag(String? tagName) {
+    if (tagName == null) return false;
+
+    final blockLevelTags = [
+      'p', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 
+      'blockquote', 'li', 'hr', 'img', 'pre', 'div'
+    ];
+
+    return blockLevelTags.contains(tagName.toLowerCase());
+  }
+
+  /// Determines if a tag is an inline tag that should be preserved inside a ContentBlock
+  static bool isInlineTag(String? tagName) {
+    if (tagName == null) return false;
+
+    final inlineTags = [
+      'b', 'strong', 'i', 'em', 'a', 'span', 'code', 'br'
+    ];
+
+    return inlineTags.contains(tagName.toLowerCase());
   }
 }

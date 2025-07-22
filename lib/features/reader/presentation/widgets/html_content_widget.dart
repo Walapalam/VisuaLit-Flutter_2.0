@@ -24,7 +24,9 @@ class HtmlContentWidget extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final preferences = ref.watch(readingPreferencesProvider);
-    final highlightsAsync = ref.watch(highlightsProvider(block.bookId!));
+    final highlightsAsync = block.bookId != null 
+        ? ref.watch(highlightsProvider(block.bookId!))
+        : AsyncValue.data(<Highlight>[]);
 
     if (block.blockType == BlockType.img && block.imageBytes != null) {
       return Padding(
@@ -49,8 +51,67 @@ class HtmlContentWidget extends ConsumerWidget {
     blockHighlights.sort((a, b) => a.startOffset.compareTo(b.startOffset));
 
     return SelectionArea(
-      // The contextMenuBuilder has been removed entirely to eliminate the source of the error.
-      // This will cause the default OS text selection menu to appear (Copy, Select All, etc.).
+      contextMenuBuilder: (context, selectableRegionState) {
+        return AdaptiveTextSelectionToolbar.editableText(
+          editableTextState: selectableRegionState as EditableTextState,
+          // Add custom menu items for reader-specific actions
+          children: <Widget>[
+            // Copy action
+            TextSelectionToolbarTextButton(
+              padding: const EdgeInsets.symmetric(horizontal: 16.0),
+              onPressed: () {
+                selectableRegionState.copySelection();
+                selectableRegionState.hideToolbar();
+              },
+              child: const Text('Copy'),
+            ),
+            // Highlight action
+            TextSelectionToolbarTextButton(
+              padding: const EdgeInsets.symmetric(horizontal: 16.0),
+              onPressed: () {
+                final selectedText = selectableRegionState.getSelectedText();
+                if (selectedText != null && selectedText.text.isNotEmpty && block.bookId != null) {
+                  // Create a highlight with the selected text
+                  ref.read(highlightsProvider(block.bookId!).notifier).addHighlight(
+                    blockIndex: blockIndex,
+                    chapterIndex: block.chapterIndex ?? 0,
+                    startOffset: selectableRegionState.getSelectedText()?.start ?? 0,
+                    endOffset: selectableRegionState.getSelectedText()?.end ?? 0,
+                    color: Colors.yellow.value,
+                  );
+                }
+                selectableRegionState.hideToolbar();
+              },
+              child: const Text('Highlight'),
+            ),
+            // Look up action
+            TextSelectionToolbarTextButton(
+              padding: const EdgeInsets.symmetric(horizontal: 16.0),
+              onPressed: () {
+                final selectedText = selectableRegionState.getSelectedText();
+                if (selectedText != null && selectedText.text.isNotEmpty) {
+                  // Show a dictionary lookup or search dialog
+                  showDialog(
+                    context: context,
+                    builder: (context) => AlertDialog(
+                      title: const Text('Look Up'),
+                      content: Text('Looking up: "${selectedText.text}"'),
+                      actions: [
+                        TextButton(
+                          onPressed: () => Navigator.of(context).pop(),
+                          child: const Text('Close'),
+                        ),
+                      ],
+                    ),
+                  );
+                }
+                selectableRegionState.hideToolbar();
+              },
+              child: const Text('Look Up'),
+            ),
+          ],
+        );
+      },
       child: HtmlWidget(
         // The logic to render existing highlights remains.
         _injectHighlightTags(block.htmlContent!, blockHighlights),

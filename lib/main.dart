@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:visualit/core/providers/library_service_provider.dart';
 import 'package:visualit/core/router/app_router.dart';
 import 'package:visualit/core/services/sync_lifecycle_observer.dart';
 import 'package:visualit/core/services/sync_service.dart';
@@ -27,6 +28,14 @@ class MyApp extends ConsumerWidget {
     // Initialize sync lifecycle observer
     // This will trigger sync when app lifecycle changes
     ref.watch(syncLifecycleObserverProvider);
+
+    // Request all permissions when app starts
+    // Do this immediately to ensure permissions are granted as early as possible
+    ref.read(permissionsProvider.future).then((granted) {
+      debugPrint('All permissions request result: $granted');
+    }).catchError((e) {
+      debugPrint('Error requesting permissions: $e');
+    });
 
     // Trigger initial sync when app starts
     // Use a delayed future to ensure the app is fully initialized

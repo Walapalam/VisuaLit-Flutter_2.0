@@ -12,6 +12,8 @@ class MainShell extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final String? userAvatarUrl = 'https://example.com/avatar.png'; // Replace with actual user avatar URL or null
+
     return Scaffold(
       appBar: AppBar(
         title: Text(
@@ -27,23 +29,21 @@ class MainShell extends StatelessWidget {
         backgroundColor: Theme.of(context).colorScheme.primary,
         elevation: 0,
         actions: [
-          IconButton(
-            icon: Icon(
-              Icons.search,
-              color: Theme.of(context).colorScheme.onPrimary,
-            ),
-            onPressed: () {
-              showSearch(
-                context: context,
-                delegate: MySearchDelegate(),
-              );
-            },
-          ),
           Builder(
             builder: (context) => IconButton(
               icon: CircleAvatar(
                 backgroundColor: Theme.of(context).colorScheme.surface,
-                radius: 16,
+                radius: 28, // Adjusted size for better visibility
+                backgroundImage: userAvatarUrl != null
+                    ? NetworkImage(userAvatarUrl)
+                    : null, // Load avatar image if available
+                child: userAvatarUrl == null
+                    ? Icon(
+                  Icons.account_circle, // Placeholder icon
+                  size: 40, // Adjusted size for better visibility
+                  color: Theme.of(context).colorScheme.onSurface,
+                )
+                    : null, // Show placeholder icon if no avatar
               ),
               onPressed: () {
                 Scaffold.of(context).openEndDrawer();
@@ -98,39 +98,5 @@ class MainShell extends StatelessWidget {
         ],
       ),
     );
-  }
-}
-// Your MySearchDelegate code remains the same
-class MySearchDelegate extends SearchDelegate<String> {
-  @override
-  List<Widget>? buildActions(BuildContext context) {
-    return [
-      IconButton(
-        icon: const Icon(Icons.clear),
-        onPressed: () {
-          query = '';
-        },
-      ),
-    ];
-  }
-
-  @override
-  Widget? buildLeading(BuildContext context) {
-    return IconButton(
-      icon: const Icon(Icons.arrow_back),
-      onPressed: () {
-        close(context, '');
-      },
-    );
-  }
-
-  @override
-  Widget buildResults(BuildContext context) {
-    return Center(child: Text('You searched for: $query'));
-  }
-
-  @override
-  Widget buildSuggestions(BuildContext context) {
-    return Container();
   }
 }

@@ -31,6 +31,12 @@ class Book {
   int lastReadPage = 0;
   DateTime? lastReadTimestamp;
 
+  // Last update timestamp for sync conflict resolution
+  DateTime updatedAt = DateTime.now();
+
+  // ID of the corresponding document in Appwrite
+  String? serverId;
+
   List<TOCEntry> toc = [];
 }
 

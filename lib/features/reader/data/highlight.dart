@@ -29,7 +29,14 @@ class Highlight {
   /// The ARGB color value of the highlight.
   late int color;
 
+  // Creation timestamp
   DateTime timestamp = DateTime.now();
+
+  // Last update timestamp for sync conflict resolution
+  DateTime updatedAt = DateTime.now();
+
+  // ID of the corresponding document in Appwrite
+  String? serverId;
 
   String? note; // For future annotation features
 }

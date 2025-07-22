@@ -2,7 +2,10 @@ import 'package:isar/isar.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:visualit/features/reader/data/book_data.dart';
 import 'package:visualit/features/audiobook_player/data/audiobook.dart';
-import 'package:visualit/features/reader/data/highlight.dart'; // Import new schema
+import 'package:visualit/features/reader/data/highlight.dart'; // Import highlight schema
+import 'package:visualit/features/reader/data/bookmark.dart'; // Import bookmark schema
+import 'package:visualit/features/reader/data/layout_cache.dart'; // Import layout cache schema
+import 'package:visualit/features/settings/data/user_settings.dart'; // Import user settings schema
 
 class IsarService {
   late Future<Isar> db;
@@ -24,7 +27,10 @@ class IsarService {
           BookSchema,
           ContentBlockSchema,
           AudiobookSchema,
-          HighlightSchema // Add the new schema here
+          HighlightSchema,
+          BookmarkSchema,
+          UserSettingsSchema, // Add the user settings schema
+          LayoutCacheSchema
         ],
         directory: dir.path,
         inspector: true,

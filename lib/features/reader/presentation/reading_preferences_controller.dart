@@ -2,6 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:visualit/features/reader/data/book_data.dart';
 
+import '../../settings/data/settings_service.dart';
+import '../providers/layout_cache_provider.dart';
+
 // Enum for the new page turning style setting
 enum PageTurnStyle { paged, scroll }
 enum BackgroundDimming { none, low, medium, high }
@@ -104,17 +107,75 @@ class ReadingPreferences {
 }
 
 class ReadingPreferencesController extends StateNotifier<ReadingPreferences> {
-  ReadingPreferencesController() : super(ReadingPreferences.dark);
+  final Ref _ref;
 
-  void setFontSize(double size) => state = state.copyWith(fontSize: size);
-  void setFontFamily(String family) => state = state.copyWith(fontFamily: family);
-  void toggleLineGuide(bool enabled) => state = state.copyWith(isLineGuideEnabled: enabled);
+  ReadingPreferencesController(this._ref) : super(ReadingPreferences.dark) {
+    _loadSettings();
+  }
+
+  Future<void> _loadSettings() async {
+    try {
+      final settingsService = _ref.read(settingsServiceProvider);
+      final prefs = await settingsService.getReadingPreferences();
+      state = prefs;
+    } catch (e) {
+      print('Error loading settings: $e');
+    }
+  }
+
+  Future<void> _saveSettings() async {
+    try {
+      final settingsService = _ref.read(settingsServiceProvider);
+      await settingsService.updateFromReadingPreferences(state);
+
+      // Invalidate layout cache when settings change
+      final layoutCacheService = _ref.read(layoutCacheServiceProvider);
+      await layoutCacheService.clearAllLayouts();
+    } catch (e) {
+      print('Error saving settings: $e');
+    }
+  }
+
+  void setFontSize(double size) {
+    state = state.copyWith(fontSize: size);
+    _saveSettings();
+  }
+
+  void setFontFamily(String family) {
+    state = state.copyWith(fontFamily: family);
+    _saveSettings();
+  }
+
+  void toggleLineGuide(bool enabled) {
+    state = state.copyWith(isLineGuideEnabled: enabled);
+    _saveSettings();
+  }
+
+  void setLineSpacing(double spacing) {
+    state = state.copyWith(lineSpacing: spacing);
+    _saveSettings();
+  }
 
   // --- NEW METHODS ---
-  void setBrightness(double newBrightness) => state = state.copyWith(brightness: newBrightness.clamp(0.1, 1.0));
-  void setPageTurnStyle(PageTurnStyle style) => state = state.copyWith(pageTurnStyle: style);
-  void setMatchDeviceTheme(bool match) => state = state.copyWith(matchDeviceTheme: match, themeMode: match ? ThemeMode.system : state.themeMode);
-  void setThemeMode(ThemeMode mode) => state = state.copyWith(themeMode: mode, matchDeviceTheme: false);
+  void setBrightness(double newBrightness) {
+    state = state.copyWith(brightness: newBrightness.clamp(0.1, 1.0));
+    _saveSettings();
+  }
+
+  void setPageTurnStyle(PageTurnStyle style) {
+    state = state.copyWith(pageTurnStyle: style);
+    _saveSettings();
+  }
+
+  void setMatchDeviceTheme(bool match) {
+    state = state.copyWith(matchDeviceTheme: match, themeMode: match ? ThemeMode.system : state.themeMode);
+    _saveSettings();
+  }
+
+  void setThemeMode(ThemeMode mode) {
+    state = state.copyWith(themeMode: mode, matchDeviceTheme: false);
+    _saveSettings();
+  }
 
   void applyTheme(ReadingPreferences theme) {
     state = theme.copyWith(
@@ -125,9 +186,10 @@ class ReadingPreferencesController extends StateNotifier<ReadingPreferences> {
         isLineGuideEnabled: state.isLineGuideEnabled,
         matchDeviceTheme: state.matchDeviceTheme
     );
+    _saveSettings();
   }
 }
 
 final readingPreferencesProvider = StateNotifierProvider<ReadingPreferencesController, ReadingPreferences>(
-      (ref) => ReadingPreferencesController(),
+      (ref) => ReadingPreferencesController(ref),
 );

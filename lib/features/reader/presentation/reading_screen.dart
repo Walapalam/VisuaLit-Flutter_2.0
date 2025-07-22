@@ -157,6 +157,36 @@ class _ReadingScreenState extends ConsumerState<ReadingScreen> {
     if (!state.isBookLoaded) return const Center(child: CircularProgressIndicator());
     if (state.blocks.isEmpty) return const Center(child: Text('This book has no content.'));
 
+    // Show formatting indicator when the book is being formatted
+    if (state.isFormatting) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const CircularProgressIndicator(),
+            const SizedBox(height: 16),
+            Text(
+              'Formatting book...',
+              style: TextStyle(
+                color: prefs.textColor,
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'This will only happen once for this device and font settings.',
+              style: TextStyle(
+                color: prefs.textColor.withOpacity(0.7),
+                fontSize: 12,
+              ),
+              textAlign: TextAlign.center,
+            ),
+          ],
+        ),
+      );
+    }
+
     if (prefs.pageTurnStyle == PageTurnStyle.scroll) {
       return ListView.builder(
         controller: _scrollController,

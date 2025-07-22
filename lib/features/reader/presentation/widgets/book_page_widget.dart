@@ -44,6 +44,23 @@ class _BookPageWidgetState extends State<BookPageWidget> {
     int currentBlockIndex = widget.startingBlockIndex;
     final double availableHeight = widget.viewSize.height - 60;
 
+    // Show a temporary "Formatting..." indicator while building the page
+    setState(() {
+      _pageContent.clear();
+      _pageContent.add(
+        const Center(
+          child: Padding(
+            padding: EdgeInsets.all(16.0),
+            child: SizedBox(
+              width: 20,
+              height: 20,
+              child: CircularProgressIndicator(strokeWidth: 2),
+            ),
+          ),
+        ),
+      );
+    });
+
     while (currentBlockIndex < widget.allBlocks.length) {
       final block = widget.allBlocks[currentBlockIndex];
       // Pass the block's absolute index to the widget.

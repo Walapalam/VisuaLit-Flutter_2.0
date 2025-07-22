@@ -3,7 +3,7 @@
 #
 
 list(APPEND FLUTTER_PLUGIN_LIST
-  desktop_webview_window
+  flutter_tts
   isar_flutter_libs
   permission_handler_windows
   screen_brightness_windows

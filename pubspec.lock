@@ -29,10 +29,10 @@ packages:
     dependency: "direct main"
     description:
       name: appwrite
-      sha256: a602b80b0a079b545128fa34a8a8a92d6cbe37e366373602f3c21909aa6737a5
+      sha256: "335faac24642aaf66627c21ce26a5c64bcbc3911e624c61b9dfbe0eec7be1342"
       url: "https://pub.dev"
     source: hosted
-    version: "17.0.1"
+    version: "12.0.1"
   archive:
     dependency: "direct main"
     description:
@@ -169,6 +169,14 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "1.4.0"
+  charcode:
+    dependency: transitive
+    description:
+      name: charcode
+      sha256: fb0f1107cac15a5ea6ef0a6ef71a807b9e4267c713bb93e00e92d737cc8dbd8a
+      url: "https://pub.dev"
+    source: hosted
+    version: "1.4.0"
   checked_yaml:
     dependency: transitive
     description:
@@ -181,10 +189,10 @@ packages:
     dependency: transitive
     description:
       name: chewie
-      sha256: "19b93a1e60e4ba640a792208a6543f1c7d5b124d011ce0199e2f18802199d984"
+      sha256: "8bc4ac4cf3f316e50a25958c0f5eb9bb12cf7e8308bb1d74a43b230da2cfc144"
       url: "https://pub.dev"
     source: hosted
-    version: "1.12.1"
+    version: "1.7.5"
   clock:
     dependency: transitive
     description:
@@ -289,22 +297,14 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "0.7.11"
-  desktop_webview_window:
-    dependency: transitive
-    description:
-      name: desktop_webview_window
-      sha256: "57cf20d81689d5cbb1adfd0017e96b669398a669d927906073b0e42fc64111c0"
-      url: "https://pub.dev"
-    source: hosted
-    version: "0.2.3"
   device_info_plus:
-    dependency: transitive
+    dependency: "direct main"
     description:
       name: device_info_plus
-      sha256: a7fd703482b391a87d60b6061d04dfdeab07826b96f9abd8f5ed98068acc0074
+      sha256: "77f757b789ff68e4eaf9c56d1752309bd9f7ad557cb105b938a7f8eb89e59110"
       url: "https://pub.dev"
     source: hosted
-    version: "10.1.2"
+    version: "9.1.2"
   device_info_plus_platform_interface:
     dependency: transitive
     description:
@@ -398,30 +398,6 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "5.0.0"
-  flutter_local_notifications:
-    dependency: "direct main"
-    description:
-      name: flutter_local_notifications
-      sha256: "401643a6ea9d8451365f2ec11145335bf130560cfde367bdf8f0be6d60f89479"
-      url: "https://pub.dev"
-    source: hosted
-    version: "15.1.3"
-  flutter_local_notifications_linux:
-    dependency: transitive
-    description:
-      name: flutter_local_notifications_linux
-      sha256: c49bd06165cad9beeb79090b18cd1eb0296f4bf4b23b84426e37dd7c027fc3af
-      url: "https://pub.dev"
-    source: hosted
-    version: "4.0.1"
-  flutter_local_notifications_platform_interface:
-    dependency: transitive
-    description:
-      name: flutter_local_notifications_platform_interface
-      sha256: "85f8d07fe708c1bdcf45037f2c0109753b26ae077e9d9e899d55971711a4ea66"
-      url: "https://pub.dev"
-    source: hosted
-    version: "7.2.0"
   flutter_localizations:
     dependency: transitive
     description: flutter
@@ -464,22 +440,30 @@ packages:
     description: flutter
     source: sdk
     version: "0.0.0"
+  flutter_tts:
+    dependency: "direct main"
+    description:
+      name: flutter_tts
+      sha256: cbb3fd43b946e62398560235469e6113e4fe26c40eab1b7cb5e7c417503fb3a8
+      url: "https://pub.dev"
+    source: hosted
+    version: "3.8.5"
   flutter_web_auth_2:
     dependency: transitive
     description:
       name: flutter_web_auth_2
-      sha256: "3c14babeaa066c371f3a743f204dd0d348b7d42ffa6fae7a9847a521aff33696"
+      sha256: "4d3d2fd3d26bf1a26b3beafd4b4b899c0ffe10dc99af25abc58ffe24e991133c"
       url: "https://pub.dev"
     source: hosted
-    version: "4.1.0"
+    version: "3.1.2"
   flutter_web_auth_2_platform_interface:
     dependency: transitive
     description:
       name: flutter_web_auth_2_platform_interface
-      sha256: c63a472c8070998e4e422f6b34a17070e60782ac442107c70000dd1bed645f4d
+      sha256: e8669e262005a8354389ba2971f0fc1c36188481234ff50d013aaf993f30f739
       url: "https://pub.dev"
     source: hosted
-    version: "4.1.0"
+    version: "3.1.0"
   flutter_web_plugins:
     dependency: transitive
     description: flutter
@@ -857,18 +841,18 @@ packages:
     dependency: transitive
     description:
       name: package_info_plus
-      sha256: "7976bfe4c583170d6cdc7077e3237560b364149fcd268b5f53d95a991963b191"
+      sha256: "7e76fad405b3e4016cd39d08f455a4eb5199723cf594cd1b8916d47140d93017"
       url: "https://pub.dev"
     source: hosted
-    version: "8.3.0"
+    version: "4.2.0"
   package_info_plus_platform_interface:
     dependency: transitive
     description:
       name: package_info_plus_platform_interface
-      sha256: "6c935fb612dff8e3cc9632c2b301720c77450a126114126ffaafe28d2e87956c"
+      sha256: "9bc8ba46813a4cc42c66ab781470711781940780fd8beddd0c3da62506d3a6c6"
       url: "https://pub.dev"
     source: hosted
-    version: "3.2.0"
+    version: "2.0.1"
   path:
     dependency: "direct main"
     description:
@@ -1306,14 +1290,6 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "2.1.5"
-  timezone:
-    dependency: transitive
-    description:
-      name: timezone
-      sha256: "2236ec079a174ce07434e89fcd3fcda430025eb7692244139a9cf54fdcf1fc7d"
-      url: "https://pub.dev"
-    source: hosted
-    version: "0.9.4"
   timing:
     dependency: transitive
     description:
@@ -1330,6 +1306,14 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "1.4.0"
+  universal_html:
+    dependency: transitive
+    description:
+      name: universal_html
+      sha256: "56536254004e24d9d8cfdb7dbbf09b74cf8df96729f38a2f5c238163e3d58971"
+      url: "https://pub.dev"
+    source: hosted
+    version: "2.2.4"
   universal_io:
     dependency: transitive
     description:
@@ -1494,10 +1478,10 @@ packages:
     dependency: transitive
     description:
       name: wakelock_plus
-      sha256: a474e314c3e8fb5adef1f9ae2d247e57467ad557fa7483a2b895bc1b421c5678
+      sha256: f268ca2116db22e57577fb99d52515a24bdc1d570f12ac18bb762361d43b043d
       url: "https://pub.dev"
     source: hosted
-    version: "1.3.2"
+    version: "1.1.4"
   wakelock_plus_platform_interface:
     dependency: transitive
     description:
@@ -1522,22 +1506,14 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "1.1.1"
-  web_socket:
-    dependency: transitive
-    description:
-      name: web_socket
-      sha256: "34d64019aa8e36bf9842ac014bb5d2f5586ca73df5e4d9bf5c936975cae6982c"
-      url: "https://pub.dev"
-    source: hosted
-    version: "1.0.1"
   web_socket_channel:
     dependency: transitive
     description:
       name: web_socket_channel
-      sha256: d645757fb0f4773d602444000a8131ff5d48c9e47adfe9772652dd1a4f2d45c8
+      sha256: d88238e5eac9a42bb43ca4e721edba3c08c6354d4a53063afaa568516217621b
       url: "https://pub.dev"
     source: hosted
-    version: "3.0.3"
+    version: "2.4.0"
   webview_flutter:
     dependency: transitive
     description:

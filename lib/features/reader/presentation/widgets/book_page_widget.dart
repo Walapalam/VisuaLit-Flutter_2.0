@@ -1,22 +1,69 @@
 import 'package:flutter/material.dart';
-import 'package:visualit/features/reader/data/book_data.dart';
+import 'package:visualit/features/reader/data/book_data.dart' as isar_models;
+import 'package:visualit/features/reader/data/new_models.dart' as new_models;
 import 'package:visualit/features/reader/presentation/widgets/html_content_widget.dart';
 
 class BookPageWidget extends StatefulWidget {
-  final List<ContentBlock> allBlocks;
+  final dynamic _allBlocks;
   final int startingBlockIndex;
   final Size viewSize;
   final Function(int pageIndex, int startingBlock, int endingBlock) onPageBuilt;
   final int pageIndex;
 
-  const BookPageWidget({
+  // Internal flag to track the type of blocks
+  final bool _isIsarModel;
+
+  // Constructor for isar_models.ContentBlock list
+  const BookPageWidget.fromIsarModel({
     super.key,
-    required this.allBlocks,
+    required List<isar_models.ContentBlock> allBlocks,
     required this.startingBlockIndex,
     required this.viewSize,
     required this.onPageBuilt,
     required this.pageIndex,
-  });
+  }) : _allBlocks = allBlocks, _isIsarModel = true;
+
+  // Constructor for new_models.ContentBlock list
+  const BookPageWidget.fromNewModel({
+    super.key,
+    required List<new_models.ContentBlock> allBlocks,
+    required this.startingBlockIndex,
+    required this.viewSize,
+    required this.onPageBuilt,
+    required this.pageIndex,
+  }) : _allBlocks = allBlocks, _isIsarModel = false;
+
+  // Factory constructor to handle either type
+  factory BookPageWidget({
+    Key? key,
+    required dynamic allBlocks,
+    required int startingBlockIndex,
+    required Size viewSize,
+    required Function(int pageIndex, int startingBlock, int endingBlock) onPageBuilt,
+    required int pageIndex,
+  }) {
+    if (allBlocks is List<isar_models.ContentBlock>) {
+      return BookPageWidget.fromIsarModel(
+        key: key,
+        allBlocks: allBlocks,
+        startingBlockIndex: startingBlockIndex,
+        viewSize: viewSize,
+        onPageBuilt: onPageBuilt,
+        pageIndex: pageIndex,
+      );
+    } else if (allBlocks is List<new_models.ContentBlock>) {
+      return BookPageWidget.fromNewModel(
+        key: key,
+        allBlocks: allBlocks,
+        startingBlockIndex: startingBlockIndex,
+        viewSize: viewSize,
+        onPageBuilt: onPageBuilt,
+        pageIndex: pageIndex,
+      );
+    } else {
+      throw ArgumentError('allBlocks must be either List<isar_models.ContentBlock> or List<new_models.ContentBlock>');
+    }
+  }
 
   @override
   State<BookPageWidget> createState() => _BookPageWidgetState();
@@ -37,6 +84,24 @@ class _BookPageWidgetState extends State<BookPageWidget> {
     });
   }
 
+  // Helper method to get the length of the blocks list
+  int get _blocksLength {
+    if (widget._isIsarModel) {
+      return (widget._allBlocks as List<isar_models.ContentBlock>).length;
+    } else {
+      return (widget._allBlocks as List<new_models.ContentBlock>).length;
+    }
+  }
+
+  // Helper method to get a block at a specific index
+  dynamic _getBlockAt(int index) {
+    if (widget._isIsarModel) {
+      return (widget._allBlocks as List<isar_models.ContentBlock>)[index];
+    } else {
+      return (widget._allBlocks as List<new_models.ContentBlock>)[index];
+    }
+  }
+
   Future<void> _buildPageContent() async {
     if (!mounted) return;
 
@@ -44,12 +109,12 @@ class _BookPageWidgetState extends State<BookPageWidget> {
     int currentBlockIndex = widget.startingBlockIndex;
     final double availableHeight = widget.viewSize.height - 60;
 
-    while (currentBlockIndex < widget.allBlocks.length) {
-      final block = widget.allBlocks[currentBlockIndex];
+    while (currentBlockIndex < _blocksLength) {
+      final block = _getBlockAt(currentBlockIndex);
       // Pass the block's absolute index to the widget.
       currentWidgets.add(HtmlContentWidget(
           block: block,
-          blockIndex: currentBlockIndex, // <-- THE FIX
+          blockIndex: currentBlockIndex,
           viewSize: widget.viewSize
       ));
 

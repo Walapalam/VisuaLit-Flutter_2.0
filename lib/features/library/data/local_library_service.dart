@@ -1,5 +1,6 @@
 import 'dart:io';
-import 'dart:typed_data'; // Import this
+import 'dart:typed_data';
+import 'package:device_info_plus/device_info_plus.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:permission_handler/permission_handler.dart';
 
@@ -27,6 +28,39 @@ class LocalLibraryService {
 
     print('LocalLibraryService: Running on mobile platform (${Platform.operatingSystem}), requesting storage permission');
 
+    // Different permissions for different Android versions
+    if (Platform.isAndroid) {
+      // Get Android SDK version
+      final sdkVersion = await _getAndroidSdkVersion();
+      print('LocalLibraryService: Android SDK version: $sdkVersion');
+
+      if (sdkVersion >= 33) {
+        // Android 13+ (API 33+): Request granular media permissions
+        print('LocalLibraryService: Requesting granular media permissions for Android 13+');
+        final photos = await Permission.photos.request();
+        final audio = await Permission.audio.request();
+        final videos = await Permission.videos.request();
+
+        print('LocalLibraryService: Permission status - Photos: ${photos.toString()}, Audio: ${audio.toString()}, Videos: ${videos.toString()}');
+
+        // Return true if any of the permissions are granted
+        return photos.isGranted || audio.isGranted || videos.isGranted;
+      } 
+      else if (sdkVersion >= 30) {
+        // Android 11-12 (API 30-32): Request manage external storage
+        print('LocalLibraryService: Requesting manage external storage permission for Android 11-12');
+        final status = await Permission.manageExternalStorage.request();
+        print('LocalLibraryService: Permission status: ${status.toString()}');
+
+        if (status.isGranted) {
+          print('LocalLibraryService: Manage external storage permission granted');
+          return true;
+        }
+      }
+      // Fall back to storage permission for older versions
+    }
+
+    // Default approach for older Android versions and iOS
     final status = await Permission.storage.request();
     print('LocalLibraryService: Permission status: ${status.toString()}');
 
@@ -44,6 +78,20 @@ class LocalLibraryService {
     }
 
     return false;
+  }
+
+  /// Helper method to get Android SDK version
+  Future<int> _getAndroidSdkVersion() async {
+    if (Platform.isAndroid) {
+      try {
+        final deviceInfo = DeviceInfoPlugin();
+        final androidInfo = await deviceInfo.androidInfo;
+        return androidInfo.version.sdkInt;
+      } catch (e) {
+        print('LocalLibraryService: Error getting Android SDK version: $e');
+      }
+    }
+    return 0; // Default value for non-Android platforms
   }
 
   /// Opens the platform's file picker to select one or more EPUB files.

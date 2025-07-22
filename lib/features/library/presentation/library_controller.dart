@@ -1,6 +1,6 @@
+import 'dart:convert';
 import 'dart:typed_data';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:html/dom.dart' as dom;
 import 'package:isar/isar.dart';
 import 'package:visualit/core/providers/isar_provider.dart';
 import 'package:visualit/features/library/data/local_library_service.dart';
@@ -9,6 +9,7 @@ import 'package:visualit/features/reader/data/toc_entry.dart';
 import 'package:archive/archive.dart';
 import 'package:xml/xml.dart';
 import 'package:html/parser.dart' as html_parser;
+import 'package:html/dom.dart' as dom;
 import 'package:path/path.dart' as p;
 
 final localLibraryServiceProvider = Provider<LocalLibraryService>((ref) {
@@ -165,13 +166,13 @@ class LibraryController extends StateNotifier<AsyncValue<List<db.Book>>> {
 
         final containerFile = archive.findFile('META-INF/container.xml');
         if (containerFile == null) throw Exception('container.xml not found');
-        final containerXml = XmlDocument.parse(String.fromCharCodes(containerFile.content));
+        final containerXml = XmlDocument.parse(utf8.decode(containerFile.content));
         final opfPath = containerXml.findAllElements('rootfile').first.getAttribute('full-path');
         if (opfPath == null) throw Exception('OPF path not found in container.xml');
 
         final opfFile = archive.findFile(opfPath);
         if (opfFile == null) throw Exception('OPF file not found at path: $opfPath');
-        final opfXml = XmlDocument.parse(String.fromCharCodes(opfFile.content));
+        final opfXml = XmlDocument.parse(utf8.decode(opfFile.content));
         final opfDir = p.dirname(opfPath);
 
         final metadata = opfXml.findAllElements('metadata').first;
@@ -233,7 +234,7 @@ class LibraryController extends StateNotifier<AsyncValue<List<db.Book>>> {
           final chapterFile = archive.findFile(chapterPath);
           if (chapterFile == null) continue;
 
-          final chapterContent = String.fromCharCodes(chapterFile.content);
+          final chapterContent = utf8.decode(chapterFile.content);
           final document = html_parser.parse(chapterContent);
           final body = document.body;
           if (body == null) continue;
@@ -268,7 +269,7 @@ class LibraryController extends StateNotifier<AsyncValue<List<db.Book>>> {
           if (navPath != null) {
             final navFile = archive.findFile(navPath);
             if (navFile != null) {
-              final navContent = String.fromCharCodes(navFile.content);
+              final navContent = utf8.decode(navFile.content);
               final navBasePath = p.dirname(navPath);
               tocEntries = _parseNavXhtml(navContent, navBasePath);
             }
@@ -282,7 +283,7 @@ class LibraryController extends StateNotifier<AsyncValue<List<db.Book>>> {
             if (ncxPath != null) {
               final ncxFile = archive.findFile(ncxPath);
               if (ncxFile != null) {
-                final ncxContent = String.fromCharCodes(ncxFile.content);
+                final ncxContent = utf8.decode(ncxFile.content);
                 final ncxBasePath = p.dirname(ncxPath);
                 tocEntries = _parseNcx(ncxContent, ncxBasePath);
               }

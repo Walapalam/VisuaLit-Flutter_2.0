@@ -76,7 +76,6 @@ class LibraryScreen extends ConsumerWidget {
                           Uint8List.fromList(book.coverImageBytes!),
                           fit: BoxFit.cover,
                           width: double.infinity,
-                          // ADDED: This handles errors if the image data is invalid.
                           errorBuilder: (context, error, stackTrace) {
                             return Container(
                               color: Colors.grey[800],

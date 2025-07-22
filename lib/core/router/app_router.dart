@@ -14,6 +14,12 @@ import 'package:visualit/features/settings/presentation/settings_screen.dart';
 import 'package:visualit/features/audiobook_player/presentation/audiobooks_screen.dart';
 import 'package:visualit/features/reader/presentation/reading_screen.dart';
 import 'package:visualit/features/audiobook_player/presentation/audiobook_player_screen.dart';
+import 'package:visualit/main.dart';
+
+import '../../features/auth/presentation/splash_screen.dart';
+import '../../features/reader/presentation/reading_screen.dart';
+import 'package:visualit/features/marketplace/presentation/marketplace_screen.dart';
+import 'package:visualit/features/Cart/presentation/CartScreen.dart';
 
 final _rootNavigatorKey = GlobalKey<NavigatorState>();
 
@@ -61,45 +67,38 @@ final goRouterProvider = Provider<GoRouter>((ref) {
           return AudiobookPlayerScreen(audiobookId: audiobookId);
         },
       ),
+      GoRoute(
+        path: '/cart',
+        name: 'cart',
+        builder: (context, state) => const CartScreen(),
+      ),
+      // TODO: Add '/preferences' route here when built
+
+      // Main application shell route
       StatefulShellRoute.indexedStack(
         builder: (context, state, navigationShell) => MainShell(navigationShell: navigationShell),
         branches: [
+          StatefulShellBranch(routes: [
+            GoRoute(path: '/home', name: 'home', builder: (context, state) => const HomeScreen()),
+          ]),
+          StatefulShellBranch(routes: [
+            GoRoute(path: '/library', name: 'library', builder: (context, state) => const LibraryScreen()),
+          ]),
+          StatefulShellBranch(routes: [
+            GoRoute(path: '/audio', name: 'audio', builder: (context, state) => const AudiobooksScreen()),
+          ]),
           StatefulShellBranch(
             routes: [
               GoRoute(
-                path: '/home',
-                name: 'home',
-                builder: (context, state) => const HomeScreen(),
+                path: '/marketplace', name: 'marketplace',
+                builder: (context, state) => const MarketplaceScreen(),
               ),
             ],
           ),
-          StatefulShellBranch(
-            routes: [
-              GoRoute(
-                path: '/library',
-                name: 'library',
-                builder: (context, state) => const LibraryScreen(),
-              ),
-            ],
-          ),
-          StatefulShellBranch(
-            routes: [
-              GoRoute(
-                path: '/audio',
-                name: 'audio',
-                builder: (context, state) => const AudiobooksScreen(),
-              ),
-            ],
-          ),
-          StatefulShellBranch(
-            routes: [
-              GoRoute(
-                path: '/settings',
-                name: 'settings',
-                builder: (context, state) => const SettingsScreen(),
-              ),
-            ],
-          ),
+
+          StatefulShellBranch(routes: [
+            GoRoute(path: '/settings', name: 'settings', builder: (context, state) => const SettingsScreen()),
+          ]),
         ],
       ),
     ],

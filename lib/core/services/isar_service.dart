@@ -2,6 +2,7 @@ import 'package:isar/isar.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:visualit/features/reader/data/book_data.dart';
 import 'package:visualit/features/audiobook_player/data/audiobook.dart';
+import 'package:visualit/features/reader/data/highlight.dart'; // Import new schema
 
 class IsarService {
   late Future<Isar> db;
@@ -19,7 +20,12 @@ class IsarService {
     if (Isar.instanceNames.isEmpty) {
       final dir = await getApplicationDocumentsDirectory();
       return await Isar.open(
-        [BookSchema, ContentBlockSchema, AudiobookSchema],
+        [
+          BookSchema,
+          ContentBlockSchema,
+          AudiobookSchema,
+          HighlightSchema // Add the new schema here
+        ],
         directory: dir.path,
         inspector: true,
       );

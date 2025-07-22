@@ -1,5 +1,3 @@
-// lib/features/reader/presentation/widgets/reading_settings_panel.dart
-
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:visualit/features/reader/presentation/reading_preferences_controller.dart';
@@ -11,138 +9,133 @@ class ReadingSettingsPanel extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final prefs = ref.watch(readingPreferencesProvider);
     final prefsController = ref.read(readingPreferencesProvider.notifier);
-    final isDark = prefs.themeMode == ThemeMode.dark;
-    final primaryColor = Theme.of(context).colorScheme.primary;
-    final panelColor = isDark ? const Color(0xFF2C2C2E) : Colors.grey[200];
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final panelColor = isDark ? const Color(0xFF1E1E1E) : Colors.white;
     final textColor = isDark ? Colors.white70 : Colors.black87;
 
-    print("🔄 [SettingsPanel] Building settings panel.");
-
     return Container(
-      padding: const EdgeInsets.all(16.0),
+      padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
       decoration: BoxDecoration(
         color: panelColor,
-        borderRadius: const BorderRadius.only(
-          topLeft: Radius.circular(20),
-          topRight: Radius.circular(20),
-        ),
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
       ),
       child: SafeArea(
         top: false,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // --- FONT SIZE & THEME ROW ---
-            _buildSectionContainer(
-              isDark: isDark,
-              child: Column(
-                children: [
-                  Row(
-                    children: [
-                      const Text('a', style: TextStyle(fontSize: 16)),
-                      Expanded(
-                        child: Slider(
-                          value: prefs.fontSize,
-                          min: 12,
-                          max: 32,
-                          // Use onChangeEnd to avoid excessive logging while dragging
-                          onChangeEnd: (value) {
-                            print("  [SettingsPanel] Changing font size to ${value.toStringAsFixed(1)}");
-                            prefsController.state = prefs.copyWith(fontSize: value);
-                          },
-                          onChanged: (value) => prefsController.state = prefs.copyWith(fontSize: value),
-                          activeColor: primaryColor,
-                        ),
-                      ),
-                      const Text('A', style: TextStyle(fontSize: 24)),
-                    ],
-                  ),
-                  const Divider(),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceAround,
-                    children: [
-                      _ThemeChip(theme: ReadingPreferences.light),
-                      _ThemeChip(theme: ReadingPreferences.sepia),
-                      _ThemeChip(theme: ReadingPreferences.dark),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 16),
-
-            // --- FONT FAMILY SELECTION ---
-            _buildSectionContainer(
-              isDark: isDark,
-              child: SingleChildScrollView(
-                scrollDirection: Axis.horizontal,
-                child: Row(
-                  children: availableFonts.map((font) {
-                    return _FontButton(fontFamily: font);
-                  }).toList(),
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Brightness Slider
+              _SettingsRow(
+                icon: Icons.brightness_6_outlined,
+                child: Slider(
+                  value: prefs.brightness,
+                  min: 0.1,
+                  max: 1.0,
+                  onChanged: prefsController.setBrightness,
                 ),
               ),
-            ),
-            const SizedBox(height: 16),
-
-            // --- ACCESSIBILITY OPTIONS ---
-            _buildSectionContainer(
-              isDark: isDark,
-              child: Column(
-                children: [
-                  SwitchListTile(
-                    title: Text('Line Guide', style: TextStyle(color: textColor)),
-                    value: prefs.isLineGuideEnabled,
-                    onChanged: (value) {
-                      print("  [SettingsPanel] Toggling Line Guide to: $value");
-                      prefsController.toggleLineGuide(value);
-                    },
-                    activeColor: primaryColor,
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 8),
-                  ),
-                  if (prefs.isLineGuideEnabled) ...[
-                    const Divider(height: 1),
-                    Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 8.0),
-                      child: SegmentedButton<BackgroundDimming>(
-                        segments: const [
-                          ButtonSegment(value: BackgroundDimming.none, label: Text('None')),
-                          ButtonSegment(value: BackgroundDimming.low, label: Text('Low')),
-                          ButtonSegment(value: BackgroundDimming.medium, label: Text('Med')),
-                          ButtonSegment(value: BackgroundDimming.high, label: Text('High')),
-                        ],
-                        selected: {prefs.backgroundDimming},
-                        onSelectionChanged: (s) {
-                          print("  [SettingsPanel] Changing background dimming to: ${s.first.name}");
-                          prefsController.setBackgroundDimming(s.first);
-                        },
-                        style: SegmentedButton.styleFrom(
-                          backgroundColor: isDark ? Colors.grey[800] : Colors.grey[300],
-                          foregroundColor: textColor,
-                          selectedForegroundColor: panelColor,
-                          selectedBackgroundColor: primaryColor,
-                        ),
+              const Divider(),
+              // Font Size Slider
+              _SettingsRow(
+                icon: Icons.format_size,
+                child: Row(
+                  children: [
+                    const Text('a', style: TextStyle(fontSize: 14)),
+                    Expanded(
+                      child: Slider(
+                        value: prefs.fontSize,
+                        min: 12,
+                        max: 32,
+                        divisions: 20,
+                        onChanged: prefsController.setFontSize,
                       ),
                     ),
+                    const Text('A', style: TextStyle(fontSize: 22)),
                   ],
-                ],
+                ),
               ),
-            ),
-          ],
+              const Divider(),
+              // Font Family
+              SizedBox(
+                height: 50,
+                child: _SettingsRow(
+                  icon: Icons.font_download_outlined,
+                  child: ListView(
+                    scrollDirection: Axis.horizontal,
+                    children: availableFonts.map((font) => _FontButton(fontFamily: font)).toList(),
+                  ),
+                ),
+              ),
+              const Divider(),
+              // Page Turn Style
+              _SettingsRow(
+                icon: Icons.swipe_outlined,
+                child: SegmentedButton<PageTurnStyle>(
+                  segments: const [
+                    ButtonSegment(value: PageTurnStyle.paged, label: Text('Page')),
+                    ButtonSegment(value: PageTurnStyle.scroll, label: Text('Scroll')),
+                  ],
+                  selected: {prefs.pageTurnStyle},
+                  onSelectionChanged: (s) => prefsController.setPageTurnStyle(s.first),
+                ),
+              ),
+              const Divider(),
+              // Color Themes
+              _SettingsRow(
+                icon: Icons.color_lens_outlined,
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceAround,
+                  children: [
+                    _ThemeChip(theme: ReadingPreferences.light),
+                    _ThemeChip(theme: ReadingPreferences.sepia),
+                    _ThemeChip(theme: ReadingPreferences.dark),
+                  ],
+                ),
+              ),
+              const Divider(),
+              // Light/Dark/System Mode
+              SwitchListTile(
+                title: Text('Match Device Theme', style: TextStyle(color: textColor)),
+                value: prefs.matchDeviceTheme,
+                onChanged: prefsController.setMatchDeviceTheme,
+                secondary: const Icon(Icons.brightness_auto_outlined),
+                contentPadding: EdgeInsets.zero,
+              ),
+              if (!prefs.matchDeviceTheme)
+                SwitchListTile(
+                  title: Text('Dark Mode', style: TextStyle(color: textColor)),
+                  value: prefs.themeMode == ThemeMode.dark,
+                  onChanged: (isDark) => prefsController.setThemeMode(isDark ? ThemeMode.dark : ThemeMode.light),
+                  secondary: const Icon(Icons.dark_mode_outlined),
+                  contentPadding: EdgeInsets.zero,
+                ),
+            ],
+          ),
         ),
       ),
     );
   }
+}
 
-  Widget _buildSectionContainer({required Widget child, required bool isDark}) {
-    return Container(
-      padding: const EdgeInsets.all(8),
-      decoration: BoxDecoration(
-        color: isDark ? Colors.black.withOpacity(0.2) : Colors.white.withOpacity(0.5),
-        borderRadius: BorderRadius.circular(12),
+// Helper widgets for consistent layout
+class _SettingsRow extends StatelessWidget {
+  final IconData icon;
+  final Widget child;
+  const _SettingsRow({required this.icon, required this.child});
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8.0),
+      child: Row(
+        children: [
+          Icon(icon, color: Colors.grey[600]),
+          const SizedBox(width: 16),
+          Expanded(child: child),
+        ],
       ),
-      child: child,
     );
   }
 }
@@ -157,13 +150,10 @@ class _ThemeChip extends ConsumerWidget {
     final bool isSelected = selectedTheme.pageColor == theme.pageColor;
 
     return GestureDetector(
-      onTap: () {
-        print("  [SettingsPanel] Changing theme to one with page color: ${theme.pageColor}");
-        ref.read(readingPreferencesProvider.notifier).setTheme(theme);
-      },
+      onTap: () => ref.read(readingPreferencesProvider.notifier).applyTheme(theme),
       child: Container(
-        width: 50,
-        height: 50,
+        width: 40,
+        height: 40,
         decoration: BoxDecoration(
           color: theme.pageColor,
           shape: BoxShape.circle,
@@ -189,17 +179,11 @@ class _FontButton extends ConsumerWidget {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 4.0),
       child: OutlinedButton(
-        onPressed: () {
-          print("  [SettingsPanel] Setting font family to: $fontFamily");
-          ref.read(readingPreferencesProvider.notifier).setFontFamily(fontFamily);
-        },
+        onPressed: () => ref.read(readingPreferencesProvider.notifier).setFontFamily(fontFamily),
         style: OutlinedButton.styleFrom(
-          backgroundColor: isSelected ? Theme.of(context).colorScheme.primary.withOpacity(0.2) : null,
-          foregroundColor: prefs.themeMode == ThemeMode.dark ? Colors.white70 : Colors.black87,
-          side: BorderSide(
-            color: isSelected ? Theme.of(context).colorScheme.primary : Colors.grey,
-            width: isSelected ? 2 : 1,
-          ),
+          backgroundColor: isSelected ? Theme.of(context).colorScheme.primary.withAlpha(51) : null,
+          foregroundColor: prefs.textColor,
+          side: BorderSide(color: isSelected ? Theme.of(context).colorScheme.primary : Colors.grey),
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
         ),
         child: Text(fontFamily, style: TextStyle(fontFamily: fontFamily)),

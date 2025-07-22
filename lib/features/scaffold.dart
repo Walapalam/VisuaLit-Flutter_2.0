@@ -63,6 +63,7 @@ class MainShell extends StatelessWidget {
         showSelectedLabels: true,
         currentIndex: navigationShell.currentIndex,
         onTap: (index) {
+          debugPrint('Navigating to index: $index');
           navigationShell.goBranch(
             index,
             initialLocation: index == navigationShell.currentIndex,
@@ -83,6 +84,11 @@ class MainShell extends StatelessWidget {
             icon: Icon(Icons.headphones_outlined),
             activeIcon: Icon(Icons.headphones),
             label: 'Audio',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.store_outlined),
+            activeIcon: Icon(Icons.store),
+            label: 'Marketplace',
           ),
           BottomNavigationBarItem(
             icon: Icon(Icons.settings_outlined),

@@ -31,17 +31,24 @@ class BookCard extends StatelessWidget {
                 borderRadius: BorderRadius.circular(12.0),
                 child: Container(
                   width: double.infinity,
-                  color: AppTheme.darkGrey,
+                  color: Theme.of(context).colorScheme.surface,
                   child: imageBytes != null
                       ? Image.memory(
                     imageBytes!,
                     fit: BoxFit.cover,
-                    // This correctly handles any image decoding errors.
                     errorBuilder: (context, error, stackTrace) {
-                      return const Icon(Icons.book, color: AppTheme.grey, size: 50);
+                      return Icon(
+                        Icons.book,
+                        color: Theme.of(context).colorScheme.onSurface.withOpacity(0.5),
+                        size: 50,
+                      );
                     },
                   )
-                      : const Icon(Icons.book, color: AppTheme.grey, size: 50),
+                      : Icon(
+                    Icons.book,
+                    color: Theme.of(context).colorScheme.onSurface.withOpacity(0.5),
+                    size: 50,
+                  ),
                 ),
               ),
             ),
@@ -50,8 +57,8 @@ class BookCard extends StatelessWidget {
               title,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
-                color: AppTheme.white,
+              style: TextStyle(
+                color: Theme.of(context).colorScheme.onBackground,
                 fontWeight: FontWeight.bold,
                 fontSize: 16,
               ),
@@ -61,8 +68,8 @@ class BookCard extends StatelessWidget {
               author,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
-                color: AppTheme.grey,
+              style: TextStyle(
+                color: Theme.of(context).colorScheme.onBackground.withOpacity(0.7),
                 fontSize: 14,
               ),
             ),

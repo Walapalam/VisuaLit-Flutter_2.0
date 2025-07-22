@@ -39,8 +39,6 @@ class SettingsScreen extends ConsumerWidget {
     final authState = ref.watch(authControllerProvider);
     final user = authState.user;
     final themeMode = ref.watch(themeControllerProvider);
-    final fontSize = ref.watch(fontSizeProvider);
-    final fontStyle = ref.watch(fontStyleProvider);
     final isDarkMode = themeMode == ThemeMode.dark;
 
     return Scaffold(

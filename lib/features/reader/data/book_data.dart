@@ -20,6 +20,11 @@ class Book {
   String? author;
   List<byte>? coverImageBytes;
 
+  // New metadata fields
+  String? publisher;
+  String? language;
+  DateTime? publicationDate;
+
   @enumerated
   ProcessingStatus status = ProcessingStatus.queued;
 
@@ -42,11 +47,17 @@ class ContentBlock {
   int? blockIndexInChapter;
 
   @Index()
-  String? src;
+  String? src; // The source XHTML file of this block
 
   @enumerated
   late BlockType blockType;
 
+  // Now the primary source for rendering
   String? htmlContent;
+
+  // Keep plain text for searching, indexing, or simple displays
   String? textContent;
+
+  // Store image data directly if the block is an image
+  List<byte>? imageBytes;
 }

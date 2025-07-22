@@ -1,7 +1,6 @@
-import 'dart:io';
+import 'dart:convert';
 import 'dart:typed_data';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:html/dom.dart' as dom;
 import 'package:isar/isar.dart';
 import 'package:visualit/core/providers/isar_provider.dart';
 import 'package:visualit/features/library/data/local_library_service.dart';
@@ -10,7 +9,10 @@ import 'package:visualit/features/reader/data/toc_entry.dart';
 import 'package:archive/archive.dart';
 import 'package:xml/xml.dart';
 import 'package:html/parser.dart' as html_parser;
+import 'package:html/dom.dart' as dom;
 import 'package:path/path.dart' as p;
+import 'package:visualit/core/models/book.dart';
+
 
 final localLibraryServiceProvider = Provider<LocalLibraryService>((ref) {
   return LocalLibraryService();
@@ -58,9 +60,84 @@ class LibraryController extends StateNotifier<AsyncValue<List<db.Book>>> {
     await _processFiles(files);
   }
 
+  /// Recursively traverses the HTML DOM to flatten it into a list of ContentBlocks.
+  /// This is the robust way to handle any chapter structure.
+  void _flattenAndParseElements({
+    required List<dom.Element> elements,
+    required List<db.ContentBlock> targetBlockList, // The list to add blocks to
+    required int bookId,
+    required int chapterIndex,
+    required String chapterPath,
+    required Archive archive,
+    required int Function() getNextBlockIndex, // Function to get and increment the index
+  }) {
+    for (final element in elements) {
+      final tagName = element.localName;
+      final blockType = _getBlockType(tagName);
+
+      // If it's a container tag, we don't create a block for it.
+      // Instead, we recurse into its children to find content.
+      if (tagName == 'div' || tagName == 'section' || tagName == 'article' || tagName == 'main') {
+        _flattenAndParseElements(
+          elements: element.children,
+          targetBlockList: targetBlockList,
+          bookId: bookId,
+          chapterIndex: chapterIndex,
+          chapterPath: chapterPath,
+          archive: archive,
+          getNextBlockIndex: getNextBlockIndex,
+        );
+        continue;
+      }
+
+      // If it's a content block we care about, we process it.
+      if (blockType != db.BlockType.unsupported) {
+        final textContent = element.text.replaceAll('\u00A0', ' ').trim();
+
+        // We skip blocks that are just empty text, but we must allow image blocks
+        // as they have no text content but are still valid.
+        if (textContent.isEmpty && blockType != db.BlockType.img) {
+          continue;
+        }
+
+        final block = db.ContentBlock()
+          ..bookId = bookId
+          ..chapterIndex = chapterIndex
+          ..blockIndexInChapter = getNextBlockIndex() // Use the closure to get a unique index
+          ..src = chapterPath
+          ..blockType = blockType
+          ..htmlContent = element.outerHtml // Store the raw HTML for the rendering engine
+          ..textContent = textContent;
+
+        // Specifically handle image data extraction
+        if (blockType == db.BlockType.img) {
+          // An image can be a direct <img> tag, an <image> tag (used in SVG), or an <svg> tag wrapping an <image>.
+          // We need to find the actual image reference.
+          final imgTag = (tagName == 'img' || tagName == 'image')
+              ? element
+              : element.querySelector('img, image');
+
+          // EPUBs can use 'src', 'href', or 'xlink:href' for image paths. Check all.
+          final hrefAttr = imgTag?.attributes['src'] ?? imgTag?.attributes['href'] ?? imgTag?.attributes['xlink:href'];
+
+          if (hrefAttr != null) {
+            // Resolve the relative image path against the chapter's path.
+            final imagePath = p.normalize(p.join(p.dirname(chapterPath), hrefAttr));
+            final imageFile = archive.findFile(imagePath);
+            if (imageFile != null) {
+              block.imageBytes = imageFile.content as Uint8List;
+            } else {
+              print("    ❌ [LibraryController] Image file not found at path: '$imagePath'");
+            }
+          }
+        }
+        targetBlockList.add(block);
+      }
+    }
+  }
+
   Future<void> _processFiles(List<PickedFileData> files) async {
     if (files.isEmpty) {
-      print("ℹ️ [LibraryController] No new files to process.");
       await loadBooksFromDb();
       return;
     }
@@ -87,29 +164,29 @@ class LibraryController extends StateNotifier<AsyncValue<List<db.Book>>> {
 
       try {
         final bytes = fileData.bytes;
-        print("  [LibraryController] Unzipping ${bytes.lengthInBytes} bytes...");
         final archive = ZipDecoder().decodeBytes(bytes);
 
         final containerFile = archive.findFile('META-INF/container.xml');
         if (containerFile == null) throw Exception('container.xml not found');
-        final containerXml = XmlDocument.parse(String.fromCharCodes(containerFile.content));
+        final containerXml = XmlDocument.parse(utf8.decode(containerFile.content));
         final opfPath = containerXml.findAllElements('rootfile').first.getAttribute('full-path');
         if (opfPath == null) throw Exception('OPF path not found in container.xml');
-        print("  [LibraryController] Found OPF path: '$opfPath'");
 
         final opfFile = archive.findFile(opfPath);
         if (opfFile == null) throw Exception('OPF file not found at path: $opfPath');
-        final opfXml = XmlDocument.parse(String.fromCharCodes(opfFile.content));
+        final opfXml = XmlDocument.parse(utf8.decode(opfFile.content));
         final opfDir = p.dirname(opfPath);
-        print("  [LibraryController] OPF directory is: '$opfDir'");
 
         final metadata = opfXml.findAllElements('metadata').first;
         final title = metadata.findAllElements('dc:title').firstOrNull?.innerText ?? p.basenameWithoutExtension(filePath);
         final author = metadata.findAllElements('dc:creator').firstOrNull?.innerText ?? 'Unknown Author';
-        print("  [LibraryController] Parsed Metadata -> Title: '$title', Author: '$author'");
+        final publisher = metadata.findAllElements('dc:publisher').firstOrNull?.innerText;
+        final language = metadata.findAllElements('dc:language').firstOrNull?.innerText;
+        final pubDateStr = metadata.findAllElements('dc:date').firstOrNull?.innerText;
+        final publicationDate = pubDateStr != null ? DateTime.tryParse(pubDateStr) : null;
+        print("  [LibraryController] Parsed Metadata -> Title: '$title', Author: '$author', Publisher: '$publisher'");
 
         final manifest = <String, String>{};
-        print("  [LibraryController] Building manifest map...");
         final manifestItems = opfXml.findAllElements('item');
         for (final item in manifestItems) {
           final id = item.getAttribute('id');
@@ -121,123 +198,86 @@ class LibraryController extends StateNotifier<AsyncValue<List<db.Book>>> {
         }
 
         Uint8List? coverImageBytes;
+        // Cover logic remains the same and is robust.
         String? coverId;
-
-        print("  [LibraryController] Searching for cover via EPUB 3 method (properties='cover-image')...");
         for (final item in manifestItems) {
           if (item.getAttribute('properties')?.contains('cover-image') ?? false) {
             coverId = item.getAttribute('id');
-            print("    ✅ Found cover ID: '$coverId'");
             break;
           }
         }
-
         if (coverId == null) {
-          print("  [LibraryController] EPUB 3 cover not found. Searching for cover via EPUB 2 method (meta name='cover')...");
           for (final meta in metadata.findAllElements('meta')) {
             if (meta.getAttribute('name') == 'cover') {
               coverId = meta.getAttribute('content');
-              print("    ✅ Found cover ID: '$coverId'");
               break;
             }
           }
         }
-
         if (coverId != null) {
           final coverPath = manifest[coverId];
           if(coverPath != null) {
             final coverFile = archive.findFile(coverPath);
             if (coverFile != null) {
               coverImageBytes = coverFile.content as Uint8List;
-              print("  [LibraryController] Successfully loaded cover image from '$coverPath' (${coverImageBytes.lengthInBytes} bytes).");
-            } else {
-              print("  ❌ [LibraryController] Cover ID was found, but the file at path '$coverPath' is missing from the archive.");
             }
-          } else {
-            print("  ❌ [LibraryController] Cover ID '$coverId' was found in metadata, but it's missing from the manifest.");
           }
-        } else {
-          print("  ⚠️ [LibraryController] Could not find a cover image reference in this EPUB.");
         }
 
         final spineItems = opfXml.findAllElements('itemref');
         final spine = spineItems.map((item) => item.getAttribute('idref')).whereType<String>().toList();
-        print("  [LibraryController] Found ${spine.length} items in spine.");
 
         final List<db.ContentBlock> allBlocks = [];
         for (int i = 0; i < spine.length; i++) {
           final idref = spine[i];
           final chapterPath = manifest[idref];
-
-          if (chapterPath == null) {
-            print("    ⚠️ [LibraryController] Spine item '$idref' has no path in manifest. Skipping.");
-            continue;
-          }
+          if (chapterPath == null) continue;
 
           final chapterFile = archive.findFile(chapterPath);
-          if (chapterFile == null) {
-            print("    ❌ [LibraryController] Chapter file NOT FOUND in archive: '${chapterPath}'. Skipping.");
-            continue;
-          }
+          if (chapterFile == null) continue;
 
-          final chapterContent = String.fromCharCodes(chapterFile.content);
+          final chapterContent = utf8.decode(chapterFile.content);
           final document = html_parser.parse(chapterContent);
           final body = document.body;
-          if (body == null) {
-            print("    ⚠️ [LibraryController] Chapter '$chapterPath' has no <body> tag. Skipping.");
-            continue;
-          }
+          if (body == null) continue;
 
-          final elements = body.querySelectorAll('p, h1, h2, h3, h4, h5, h6');
+          int blockCounter = 0;
 
-          for (int j = 0; j < elements.length; j++) {
-            final element = elements[j];
-            final textContent = element.text.replaceAll('\u00A0', ' ').trim();
-            if (textContent.isNotEmpty) {
-              final block = db.ContentBlock()
-                ..bookId = bookId
-                ..chapterIndex = i
-                ..blockIndexInChapter = j
-                ..src = chapterPath
-                ..blockType = _getBlockType(element.localName)
-                ..htmlContent = element.outerHtml
-                ..textContent = textContent;
-              allBlocks.add(block);
-            }
-          }
+          // Use the robust recursive function to process the entire chapter body
+          _flattenAndParseElements(
+            elements: body.children,
+            targetBlockList: allBlocks, // Add directly to the main list
+            bookId: bookId,
+            chapterIndex: i,
+            chapterPath: chapterPath,
+            archive: archive,
+            getNextBlockIndex: () => blockCounter++, // Pass a closure to manage the index
+          );
         }
 
-        print("  ✅ [LibraryController] FINAL RESULT: Extracted a total of ${allBlocks.length} content blocks from all chapters.");
+        print("  ✅ [LibraryController] FINAL RESULT: Extracted a total of ${allBlocks.length} content blocks from the entire book.");
         if (allBlocks.isEmpty) {
-          print("  ❌ [LibraryController] CRITICAL FAILURE: No content blocks were extracted from the entire book.");
+          print("  ❌ [LibraryController] CRITICAL FAILURE: No content blocks were extracted from the book.");
         }
 
-        // ======================= TOC PARSING LOGIC - START =======================
-        print("\n  [LibraryController] Starting TOC Parsing...");
+        // TOC Parsing remains the same and is robust.
         List<TOCEntry> tocEntries = [];
-
-        // Method 1: Look for EPUB 3 Navigation Document (nav.xhtml)
         final navItem = manifestItems.firstWhere(
               (item) => item.getAttribute('properties')?.contains('nav') ?? false,
-          orElse: () => XmlElement(XmlName('')), // Return a dummy element if not found
+          orElse: () => XmlElement(XmlName('')),
         );
-
         if (navItem.name.local.isNotEmpty) {
           final navPath = manifest[navItem.getAttribute('id')];
           if (navPath != null) {
             final navFile = archive.findFile(navPath);
             if (navFile != null) {
-              print("    ✅ Found EPUB 3 nav file at '$navPath'. Parsing...");
-              final navContent = String.fromCharCodes(navFile.content);
+              final navContent = utf8.decode(navFile.content);
               final navBasePath = p.dirname(navPath);
               tocEntries = _parseNavXhtml(navContent, navBasePath);
             }
           }
         }
-
-        // Method 2: Fallback to EPUB 2 NCX file if no nav file was found
         if (tocEntries.isEmpty) {
-          print("  [LibraryController] EPUB 3 nav not found. Looking for EPUB 2 NCX file...");
           final spineElement = opfXml.findAllElements('spine').firstOrNull;
           final ncxId = spineElement?.getAttribute('toc');
           if (ncxId != null) {
@@ -245,21 +285,13 @@ class LibraryController extends StateNotifier<AsyncValue<List<db.Book>>> {
             if (ncxPath != null) {
               final ncxFile = archive.findFile(ncxPath);
               if (ncxFile != null) {
-                print("    ✅ Found EPUB 2 NCX file at '$ncxPath'. Parsing...");
-                final ncxContent = String.fromCharCodes(ncxFile.content);
+                final ncxContent = utf8.decode(ncxFile.content);
                 final ncxBasePath = p.dirname(ncxPath);
                 tocEntries = _parseNcx(ncxContent, ncxBasePath);
               }
             }
           }
         }
-
-        if (tocEntries.isNotEmpty) {
-          print("  ✅ [LibraryController] Successfully parsed ${tocEntries.length} top-level TOC entries.");
-        } else {
-          print("  ⚠️ [LibraryController] Could not find or parse a TOC for this book.");
-        }
-        // ======================= TOC PARSING LOGIC - END =========================
 
         await _isar.writeTxn(() async {
           final bookToUpdate = await _isar.books.get(bookId);
@@ -268,7 +300,10 @@ class LibraryController extends StateNotifier<AsyncValue<List<db.Book>>> {
             bookToUpdate.author = author;
             bookToUpdate.coverImageBytes = coverImageBytes;
             bookToUpdate.status = db.ProcessingStatus.ready;
-            bookToUpdate.toc = tocEntries; // Save the parsed TOC
+            bookToUpdate.toc = tocEntries;
+            bookToUpdate.publisher = publisher;
+            bookToUpdate.language = language;
+            bookToUpdate.publicationDate = publicationDate;
             await _isar.books.put(bookToUpdate);
           }
           await _isar.contentBlocks.putAll(allBlocks);
@@ -282,7 +317,6 @@ class LibraryController extends StateNotifier<AsyncValue<List<db.Book>>> {
           if (bookToUpdate != null) {
             bookToUpdate.status = db.ProcessingStatus.error;
             await _isar.books.put(bookToUpdate);
-            print("  [LibraryController] Updated book status to: error.");
           }
         });
       }
@@ -290,7 +324,6 @@ class LibraryController extends StateNotifier<AsyncValue<List<db.Book>>> {
     await loadBooksFromDb();
   }
 
-  // Helper methods (_parseNavXhtml, _parseNcx, _getBlockType) remain the same
   List<TOCEntry> _parseNavXhtml(String content, String basePath) {
     final document = html_parser.parse(content);
     final nav = document.querySelector('nav[epub\\:type="toc"]');
@@ -348,6 +381,23 @@ class LibraryController extends StateNotifier<AsyncValue<List<db.Book>>> {
     }
     return entries;
   }
+  Future<void> addBookFromCart(Map<String, dynamic> bookData) async {
+    final currentBooks = state.value ?? [];
+
+    // Create an instance of db.Book
+    final book = db.Book()
+      ..id = int.parse(bookData['id'].toString())
+      ..title = bookData['title'] ?? 'Untitled'
+      ..author = bookData['authors'] != null && bookData['authors'].isNotEmpty
+          ? bookData['authors'][0]['name']
+          : null
+      ..epubFilePath = ''
+      ..status = db.ProcessingStatus.ready;
+
+    // Update the state with the new book
+    state = AsyncValue.data([...currentBooks, book]);
+  }
+
 
   db.BlockType _getBlockType(String? tagName) {
     switch (tagName?.toLowerCase()) {
@@ -359,6 +409,8 @@ class LibraryController extends StateNotifier<AsyncValue<List<db.Book>>> {
       case 'h5': return db.BlockType.h5;
       case 'h6': return db.BlockType.h6;
       case 'img': return db.BlockType.img;
+      case 'image': return db.BlockType.img;
+      case 'svg': return db.BlockType.img;
       default: return db.BlockType.unsupported;
     }
   }

@@ -1,22 +1,24 @@
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:visualit/features/audiobook_player/presentation/audiobook_player_screen.dart';
-import 'package:visualit/features/audiobook_player/presentation/audiobooks_screen.dart';
 import 'package:visualit/features/auth/presentation/auth_controller.dart';
 import 'package:visualit/features/auth/presentation/login_screen.dart';
-import 'package:visualit/features/auth/presentation/signup_screen.dart';
 import 'package:visualit/features/auth/presentation/onboarding_screen.dart';
+import 'package:visualit/features/auth/presentation/signup_screen.dart';
+import 'package:visualit/features/auth/presentation/splash_screen.dart';
 import 'package:visualit/features/home/presentation/home_screen.dart';
 import 'package:visualit/features/library/presentation/library_screen.dart';
 import 'package:visualit/features/scaffold.dart';
 import 'package:visualit/features/settings/presentation/settings_screen.dart';
+import 'package:visualit/features/audiobook_player/presentation/audiobooks_screen.dart';
+import 'package:visualit/features/reader/presentation/reading_screen.dart';
+import 'package:visualit/features/audiobook_player/presentation/audiobook_player_screen.dart';
 import 'package:visualit/main.dart';
 
 import '../../features/auth/presentation/splash_screen.dart';
 import '../../features/reader/presentation/reading_screen.dart';
 import 'package:visualit/features/marketplace/presentation/marketplace_screen.dart';
-
 import 'package:visualit/features/Cart/presentation/CartScreen.dart';
 
 final _rootNavigatorKey = GlobalKey<NavigatorState>();
@@ -26,18 +28,36 @@ final goRouterProvider = Provider<GoRouter>((ref) {
 
   return GoRouter(
     navigatorKey: _rootNavigatorKey,
-    initialLocation: '/home',
+    initialLocation: '/splash',
     debugLogDiagnostics: true,
     routes: [
-      // Standalone routes (outside the shell)
-      GoRoute(path: '/splash', name: 'splash', builder: (context, state) => const SplashScreen()),
-      GoRoute(path: '/login', name: 'login', builder: (context, state) => const LoginScreen()),
-      GoRoute(path: '/signup', name: 'signup', builder: (context, state) => const SignUpScreen()),
-      GoRoute(path: '/onboarding', name: 'onboarding', builder: (context, state) => const OnboardingScreen()),
-      GoRoute(path: '/book/:bookId', name: 'bookReader', builder: (context, state) {
-        final bookId = int.tryParse(state.pathParameters['bookId'] ?? '0') ?? 0;
-        return ReadingScreen(bookId: bookId);
-      },
+      GoRoute(
+        path: '/splash',
+        name: 'splash',
+        builder: (context, state) => const SplashScreen(),
+      ),
+      GoRoute(
+        path: '/onboarding',
+        name: 'onboarding',
+        builder: (context, state) => const OnboardingScreen(),
+      ),
+      GoRoute(
+        path: '/login',
+        name: 'login',
+        builder: (context, state) => const LoginScreen(),
+      ),
+      GoRoute(
+        path: '/signup',
+        name: 'signup',
+        builder: (context, state) => const SignUpScreen(),
+      ),
+      GoRoute(
+        path: '/book/:bookId',
+        name: 'bookReader',
+        builder: (context, state) {
+          final bookId = int.tryParse(state.pathParameters['bookId'] ?? '0') ?? 0;
+          return ReadingScreen(bookId: bookId);
+        },
       ),
       GoRoute(
         path: '/audiobook/:audiobookId',
@@ -56,9 +76,7 @@ final goRouterProvider = Provider<GoRouter>((ref) {
 
       // Main application shell route
       StatefulShellRoute.indexedStack(
-        builder: (context, state, navigationShell) {
-          return MainShell(navigationShell: navigationShell);
-        },
+        builder: (context, state, navigationShell) => MainShell(navigationShell: navigationShell),
         branches: [
           StatefulShellBranch(routes: [
             GoRoute(path: '/home', name: 'home', builder: (context, state) => const HomeScreen()),
@@ -84,24 +102,30 @@ final goRouterProvider = Provider<GoRouter>((ref) {
         ],
       ),
     ],
-    redirect: (context, state) {
+    redirect: (context, state) async {
+      final status = authState.status;
       final location = state.matchedLocation;
       final publicRoutes = ['/splash', '/onboarding', '/login', '/signup'];
 
-      if (authState.status == AuthStatus.initial) {
+      // Stay on splash until initialization is complete (including loading state)
+      if ((status == AuthStatus.initial || status == AuthStatus.loading) && location != '/splash') {
         return '/splash';
       }
 
-      if (authState.status == AuthStatus.authenticated) {
-        if (publicRoutes.contains(location)) {
-          return '/home';
-        }
+      // If authenticated or guest, redirect to home from public routes
+      if ((status == AuthStatus.authenticated || status == AuthStatus.guest) &&
+          publicRoutes.contains(location)) {
+        return '/home';
       }
 
-      if (authState.status == AuthStatus.unauthenticated) {
-        if (!publicRoutes.contains(location)) {
-          return '/onboarding';
-        }
+      // If unauthenticated and not on a public route, redirect to onboarding
+      if (status == AuthStatus.unauthenticated && !publicRoutes.contains(location)) {
+        return '/onboarding';
+      }
+
+      // If on splash and initialization is complete, redirect based on status
+      if (location == '/splash' && status != AuthStatus.initial && status != AuthStatus.loading) {
+        return status == AuthStatus.unauthenticated ? '/onboarding' : '/home';
       }
 
       return null;

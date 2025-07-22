@@ -1,4 +1,4 @@
-// GENERATED CODE - DO NOT MODIFY BY HAND
+  // GENERATED CODE - DO NOT MODIFY BY HAND
 
 part of 'toc_entry.dart';
 
@@ -13,24 +13,29 @@ const TOCEntrySchema = Schema(
   name: r'TOCEntry',
   id: 4752988535337494951,
   properties: {
-    r'children': PropertySchema(
+    r'blockIndexStart': PropertySchema(
       id: 0,
+      name: r'blockIndexStart',
+      type: IsarType.long,
+    ),
+    r'children': PropertySchema(
+      id: 1,
       name: r'children',
       type: IsarType.objectList,
       target: r'TOCEntry',
     ),
     r'fragment': PropertySchema(
-      id: 1,
+      id: 2,
       name: r'fragment',
       type: IsarType.string,
     ),
     r'src': PropertySchema(
-      id: 2,
+      id: 3,
       name: r'src',
       type: IsarType.string,
     ),
     r'title': PropertySchema(
-      id: 3,
+      id: 4,
       name: r'title',
       type: IsarType.string,
     )
@@ -82,15 +87,16 @@ void _tOCEntrySerialize(
   List<int> offsets,
   Map<Type, List<int>> allOffsets,
 ) {
+  writer.writeLong(offsets[0], object.blockIndexStart);
   writer.writeObjectList<TOCEntry>(
-    offsets[0],
+    offsets[1],
     allOffsets,
     TOCEntrySchema.serialize,
     object.children,
   );
-  writer.writeString(offsets[1], object.fragment);
-  writer.writeString(offsets[2], object.src);
-  writer.writeString(offsets[3], object.title);
+  writer.writeString(offsets[2], object.fragment);
+  writer.writeString(offsets[3], object.src);
+  writer.writeString(offsets[4], object.title);
 }
 
 TOCEntry _tOCEntryDeserialize(
@@ -100,16 +106,17 @@ TOCEntry _tOCEntryDeserialize(
   Map<Type, List<int>> allOffsets,
 ) {
   final object = TOCEntry();
+  object.blockIndexStart = reader.readLongOrNull(offsets[0]);
   object.children = reader.readObjectList<TOCEntry>(
-        offsets[0],
+        offsets[1],
         TOCEntrySchema.deserialize,
         allOffsets,
         TOCEntry(),
       ) ??
       [];
-  object.fragment = reader.readStringOrNull(offsets[1]);
-  object.src = reader.readStringOrNull(offsets[2]);
-  object.title = reader.readStringOrNull(offsets[3]);
+  object.fragment = reader.readStringOrNull(offsets[2]);
+  object.src = reader.readStringOrNull(offsets[3]);
+  object.title = reader.readStringOrNull(offsets[4]);
   return object;
 }
 
@@ -121,6 +128,8 @@ P _tOCEntryDeserializeProp<P>(
 ) {
   switch (propertyId) {
     case 0:
+      return (reader.readLongOrNull(offset)) as P;
+    case 1:
       return (reader.readObjectList<TOCEntry>(
             offset,
             TOCEntrySchema.deserialize,
@@ -128,11 +137,11 @@ P _tOCEntryDeserializeProp<P>(
             TOCEntry(),
           ) ??
           []) as P;
-    case 1:
-      return (reader.readStringOrNull(offset)) as P;
     case 2:
       return (reader.readStringOrNull(offset)) as P;
     case 3:
+      return (reader.readStringOrNull(offset)) as P;
+    case 4:
       return (reader.readStringOrNull(offset)) as P;
     default:
       throw IsarError('Unknown property with id $propertyId');
@@ -141,6 +150,80 @@ P _tOCEntryDeserializeProp<P>(
 
 extension TOCEntryQueryFilter
     on QueryBuilder<TOCEntry, TOCEntry, QFilterCondition> {
+  QueryBuilder<TOCEntry, TOCEntry, QAfterFilterCondition>
+      blockIndexStartIsNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(const FilterCondition.isNull(
+        property: r'blockIndexStart',
+      ));
+    });
+  }
+
+  QueryBuilder<TOCEntry, TOCEntry, QAfterFilterCondition>
+      blockIndexStartIsNotNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(const FilterCondition.isNotNull(
+        property: r'blockIndexStart',
+      ));
+    });
+  }
+
+  QueryBuilder<TOCEntry, TOCEntry, QAfterFilterCondition>
+      blockIndexStartEqualTo(int? value) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'blockIndexStart',
+        value: value,
+      ));
+    });
+  }
+
+  QueryBuilder<TOCEntry, TOCEntry, QAfterFilterCondition>
+      blockIndexStartGreaterThan(
+    int? value, {
+    bool include = false,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        include: include,
+        property: r'blockIndexStart',
+        value: value,
+      ));
+    });
+  }
+
+  QueryBuilder<TOCEntry, TOCEntry, QAfterFilterCondition>
+      blockIndexStartLessThan(
+    int? value, {
+    bool include = false,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.lessThan(
+        include: include,
+        property: r'blockIndexStart',
+        value: value,
+      ));
+    });
+  }
+
+  QueryBuilder<TOCEntry, TOCEntry, QAfterFilterCondition>
+      blockIndexStartBetween(
+    int? lower,
+    int? upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.between(
+        property: r'blockIndexStart',
+        lower: lower,
+        includeLower: includeLower,
+        upper: upper,
+        includeUpper: includeUpper,
+      ));
+    });
+  }
+
   QueryBuilder<TOCEntry, TOCEntry, QAfterFilterCondition> childrenLengthEqualTo(
       int length) {
     return QueryBuilder.apply(this, (query) {

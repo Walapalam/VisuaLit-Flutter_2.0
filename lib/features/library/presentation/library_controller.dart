@@ -1,8 +1,11 @@
 import 'dart:convert';
 import 'dart:typed_data';
+import 'dart:math' as math;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:isar/isar.dart';
 import 'package:visualit/core/providers/isar_provider.dart';
+import 'package:visualit/features/library/data/background_task_queue.dart';
+import 'package:visualit/features/library/data/book_processing_task.dart';
 import 'package:visualit/features/library/data/local_library_service.dart';
 import 'package:visualit/features/reader/data/book_data.dart' as db;
 import 'package:visualit/features/reader/data/toc_entry.dart';
@@ -22,17 +25,24 @@ final libraryControllerProvider = StateNotifierProvider.autoDispose<LibraryContr
         (ref) {
       final isar = ref.watch(isarDBProvider).requireValue;
       final localLibraryService = ref.watch(localLibraryServiceProvider);
-      return LibraryController(localLibraryService, isar);
+      final backgroundTaskQueue = ref.watch(backgroundTaskQueueProvider);
+      return LibraryController(localLibraryService, isar, backgroundTaskQueue);
     }
 );
 
 class LibraryController extends StateNotifier<AsyncValue<List<db.Book>>> {
   final LocalLibraryService _localLibraryService;
   final Isar _isar;
+  final BackgroundTaskQueue _backgroundTaskQueue;
 
-  LibraryController(this._localLibraryService, this._isar) : super(const AsyncValue.loading()) {
+  LibraryController(this._localLibraryService, this._isar, this._backgroundTaskQueue) : super(const AsyncValue.loading()) {
     print("✅ [LibraryController] Initialized.");
     loadBooksFromDb();
+
+    // Listen to task status changes
+    _backgroundTaskQueue.taskStream.listen((_) {
+      loadBooksFromDb(); // Reload books when tasks change status
+    });
   }
 
   Future<void> loadBooksFromDb() async {
@@ -58,6 +68,70 @@ class LibraryController extends StateNotifier<AsyncValue<List<db.Book>>> {
     print("ℹ️ [LibraryController] User initiated 'scanAndProcessBooks'.");
     final files = await _localLibraryService.scanAndLoadBooks();
     await _processFiles(files);
+  }
+
+  Future<void> retryProcessingBook(int bookId) async {
+    print("ℹ️ [LibraryController] User initiated retry for book ID: $bookId");
+
+    // Get the book from the database
+    final book = await _isar.books.get(bookId);
+    if (book == null) {
+      print("❌ [LibraryController] Book not found with ID: $bookId");
+      return;
+    }
+
+    if (book.status != db.ProcessingStatus.error) {
+      print("⚠️ [LibraryController] Book is not in error state. Current status: ${book.status}");
+      return;
+    }
+
+    try {
+      // Load the file data
+      final filePath = book.epubFilePath;
+      final fileData = await _localLibraryService.loadFileFromPath(filePath);
+
+      if (fileData == null) {
+        throw Exception("Could not load file from path: $filePath");
+      }
+
+      // Reset the book status to queued
+      await _isar.writeTxn(() async {
+        book.status = db.ProcessingStatus.queued;
+        book.errorMessage = null;
+        book.errorStackTrace = null;
+        await _isar.books.put(book);
+      });
+
+      // Reload the book list to show the updated status
+      await loadBooksFromDb();
+
+      // Create and enqueue a new task
+      final task = BookProcessingTask(
+        id: bookId,
+        filePath: filePath,
+        fileBytes: fileData.bytes,
+      );
+
+      _backgroundTaskQueue.enqueueTask(task);
+      print("✅ [LibraryController] Enqueued retry task for book ID: $bookId");
+
+    } catch (e, s) {
+      print("❌ [LibraryController] Error preparing book for retry: $e\n$s");
+
+      // Update the book status back to error with the new error message
+      await _isar.writeTxn(() async {
+        final bookToUpdate = await _isar.books.get(bookId);
+        if (bookToUpdate != null) {
+          bookToUpdate.status = db.ProcessingStatus.error;
+          bookToUpdate.errorMessage = e.toString();
+          bookToUpdate.errorStackTrace = s.toString();
+          await _isar.books.put(bookToUpdate);
+        }
+      });
+
+      // Reload the book list to show the updated status
+      await loadBooksFromDb();
+    }
   }
 
   /// Recursively traverses the HTML DOM to flatten it into a list of ContentBlocks.
@@ -142,11 +216,11 @@ class LibraryController extends StateNotifier<AsyncValue<List<db.Book>>> {
       return;
     }
 
-    print("⏳ [LibraryController] Starting to process ${files.length} file(s).");
+    print("⏳ [LibraryController] Starting to process ${files.length} file(s) using BackgroundTaskQueue.");
 
     for (final fileData in files) {
       final filePath = fileData.path;
-      print("\n--- 📖 Processing Book: $filePath ---");
+      print("\n--- 📖 Preparing Book for Queue: $filePath ---");
 
       final existingBook = await _isar.books.where().epubFilePathEqualTo(filePath).findFirst();
       if (existingBook != null) {
@@ -154,14 +228,25 @@ class LibraryController extends StateNotifier<AsyncValue<List<db.Book>>> {
         continue;
       }
 
+      // Create initial book entry with queued status
       final newBook = db.Book()
         ..epubFilePath = filePath
-        ..status = db.ProcessingStatus.processing;
+        ..status = db.ProcessingStatus.queued;
 
       final bookId = await _isar.writeTxn(() async => await _isar.books.put(newBook));
-      print("  ✅ [LibraryController] Created initial book entry with ID: $bookId, status: processing");
-      await loadBooksFromDb();
+      print("  ✅ [LibraryController] Created initial book entry with ID: $bookId, status: queued");
 
+      // remove if doesnt work start
+      // Create and enqueue task
+      final task = BookProcessingTask(
+        id: bookId,
+        filePath: filePath,
+        fileBytes: fileData.bytes,
+      );
+
+      _backgroundTaskQueue.enqueueTask(task);
+      print("  ✅ [LibraryController] Enqueued book processing task for ID: $bookId");
+      // remove if doesnt work end
       try {
         final bytes = fileData.bytes;
         final archive = ZipDecoder().decodeBytes(bytes);
@@ -321,6 +406,8 @@ class LibraryController extends StateNotifier<AsyncValue<List<db.Book>>> {
         });
       }
     }
+
+    // Reload books to show queued status
     await loadBooksFromDb();
   }
 
@@ -398,6 +485,43 @@ class LibraryController extends StateNotifier<AsyncValue<List<db.Book>>> {
     state = AsyncValue.data([...currentBooks, book]);
   }
 
+
+  /// Process a single chapter and extract its content blocks
+  Future<void> _processChapter({
+    required List<String> spine,
+    required int i,
+    required Map<String, String> manifest,
+    required Archive archive,
+    required int bookId,
+    required List<db.ContentBlock> allBlocks,
+  }) async {
+    final idref = spine[i];
+    final chapterPath = manifest[idref];
+    if (chapterPath == null) return;
+
+    final chapterFile = archive.findFile(chapterPath);
+    if (chapterFile == null) return;
+
+    final chapterContent = String.fromCharCodes(chapterFile.content);
+    final document = html_parser.parse(chapterContent);
+    final body = document.body;
+    if (body == null) return;
+
+    int blockCounter = 0;
+
+    // Use the robust recursive function to process the chapter body
+    _flattenAndParseElements(
+      elements: body.children,
+      targetBlockList: allBlocks,
+      bookId: bookId,
+      chapterIndex: i,
+      chapterPath: chapterPath,
+      archive: archive,
+      getNextBlockIndex: () => blockCounter++,
+    );
+
+    print("  ✅ [LibraryController] Processed chapter $i with ${blockCounter} blocks");
+  }
 
   db.BlockType _getBlockType(String? tagName) {
     switch (tagName?.toLowerCase()) {

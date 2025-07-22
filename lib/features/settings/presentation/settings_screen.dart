@@ -4,7 +4,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:visualit/features/auth/presentation/auth_controller.dart';
 import 'package:visualit/core/providers/font_providers.dart';
+import 'package:visualit/core/services/sync_service.dart';
 import 'package:visualit/core/theme/theme_controller.dart';
+import 'package:visualit/shared_widgets/sync_status_indicator.dart';
 
 class SettingsScreen extends ConsumerWidget {
   const SettingsScreen({super.key});
@@ -138,6 +140,25 @@ class SettingsScreen extends ConsumerWidget {
                   'Help & Support',
                   Icons.help_outline,
                       () => Navigator.pushNamed(context, '/help-support'),
+                ),
+                const Divider(height: 1),
+                _buildNavigationItem(
+                  context,
+                  'Storage & Cache',
+                      () => context.pushNamed('storageSettings'),
+                ),
+                const Divider(height: 1),
+                _buildSettingItem(
+                  context,
+                  'Sync Data',
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const SyncStatusIndicator(showText: false),
+                      const SizedBox(width: 8),
+                      SyncButton(),
+                    ],
+                  ),
                 ),
               ],
             ),

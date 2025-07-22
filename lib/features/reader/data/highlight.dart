@@ -1,9 +1,10 @@
 import 'package:isar/isar.dart';
+import 'package:visualit/core/models/syncable_entity.dart';
 
 part 'highlight.g.dart';
 
 @collection
-class Highlight {
+class Highlight implements SyncableEntity {
   Id id = Isar.autoIncrement;
 
   @Index()
@@ -32,4 +33,25 @@ class Highlight {
   DateTime timestamp = DateTime.now();
 
   String? note; // For future annotation features
+
+  /// Unique identifier for synchronization across devices.
+  @override
+  String? syncId;
+
+  /// Timestamp of when this entity was last modified.
+  @override
+  DateTime lastModified = DateTime.now();
+
+  /// Flag indicating whether this entity has local changes
+  /// that need to be synchronized to the server.
+  @override
+  bool isDirty = true;
+
+  /// Updates the lastModified timestamp to the current time
+  /// and marks the entity as dirty.
+  @override
+  void markDirty() {
+    lastModified = DateTime.now();
+    isDirty = true;
+  }
 }

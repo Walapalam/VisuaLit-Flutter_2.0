@@ -4,7 +4,7 @@ import 'package:visualit/features/reader/data/toc_entry.dart';
 part 'book_data.g.dart';
 
 // ---- Enums ----
-enum ProcessingStatus { queued, processing, ready, error }
+enum ProcessingStatus { queued, processing, ready, error, partiallyReady }
 
 enum BlockType { p, h1, h2, h3, h4, h5, h6, img, unsupported }
 
@@ -28,8 +28,24 @@ class Book {
   @enumerated
   ProcessingStatus status = ProcessingStatus.queued;
 
+  // Error tracking
+  String? errorMessage;
+  String? errorStackTrace;
+  bool failedPermanently = false;
+  int retryCount = 0;
+
+  // Reading progress
   int lastReadPage = 0;
   DateTime? lastReadTimestamp;
+
+  // File size tracking for cache management
+  int? fileSizeInBytes;
+  DateTime? lastAccessedAt;
+
+  // Progressive loading tracking
+  List<int> processedChapters = [];
+  int totalChapters = 0;
+  double processingProgress = 0.0; // 0.0 to 1.0
 
   List<TOCEntry> toc = [];
 }
@@ -41,6 +57,10 @@ class ContentBlock {
   @Index()
   int? bookId;
 
+  @Index()
+  int? chapterId; // Reference to Chapter model
+
+  // Keep for backward compatibility
   @Index()
   int? chapterIndex;
 
@@ -58,6 +78,13 @@ class ContentBlock {
   // Keep plain text for searching, indexing, or simple displays
   String? textContent;
 
+  // Search index fields
+  List<String>? tokenizedText; // Words split and normalized for search
+  List<String>? stemmedText;   // Stemmed words for better search matching
+
   // Store image data directly if the block is an image
   List<byte>? imageBytes;
+
+  // Size tracking for cache management
+  int? sizeInBytes;
 }

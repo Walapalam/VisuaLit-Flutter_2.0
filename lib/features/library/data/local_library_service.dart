@@ -172,4 +172,26 @@ class LocalLibraryService {
       return [];
     }
   }
+
+  /// Loads a file from the given path and returns a PickedFileData object.
+  ///
+  /// This is useful for retrying processing of a book that previously failed.
+  Future<PickedFileData?> loadFileFromPath(String filePath) async {
+    print('LocalLibraryService: Loading file from path: $filePath');
+
+    try {
+      final file = File(filePath);
+      if (!await file.exists()) {
+        print('LocalLibraryService: File does not exist at path: $filePath');
+        return null;
+      }
+
+      final bytes = await file.readAsBytes();
+      print('LocalLibraryService: Successfully read ${bytes.lengthInBytes} bytes from $filePath');
+      return PickedFileData(path: filePath, bytes: bytes);
+    } catch (e) {
+      print('LocalLibraryService: Error loading file from path: $e');
+      return null;
+    }
+  }
 }

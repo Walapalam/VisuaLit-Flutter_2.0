@@ -152,11 +152,8 @@ class _MarketplaceScreenState extends ConsumerState<MarketplaceScreen> {
                                         ),
                                       ),
                                       onPressed: () {
-                                        ref.read(cartProvider.notifier).addBook(book);
+                                        ref.read(cartProvider.notifier).addBook(book, context);
                                         Navigator.of(context).pop();
-                                        ScaffoldMessenger.of(context).showSnackBar(
-                                          SnackBar(content: Text('${book['title']} added to cart')),
-                                        );
                                       },
                                       child: const Text('Add to Cart'),
                                     ),

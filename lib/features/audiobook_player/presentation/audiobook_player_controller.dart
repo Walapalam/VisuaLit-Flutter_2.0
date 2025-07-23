@@ -18,24 +18,17 @@ class _Debouncer {
     _timer?.cancel();
     _timer = Timer(Duration(milliseconds: milliseconds), action);
   }
+  void cancel() {
+    _timer?.cancel();
+  }
 }
+
+
 
 final audiobookPlayerControllerProvider = StateNotifierProvider.family
     .autoDispose<AudiobookPlayerController, AudiobookPlayerState, int>(
         (ref, audiobookId) {
       final isar = ref.watch(isarDBProvider).requireValue;
-      // Keep the provider alive even when not watched, so music doesn't stop
-      // when the user navigates away temporarily (e.g., to the home screen).
-      // The autoDispose will still clean it up when the player screen is popped.
-      final link = ref.keepAlive();
-      final timer = Timer(const Duration(seconds: 30), () {
-        link.close(); // Close the link after 30s of inactivity.
-      });
-
-      ref.onDispose(() {
-        timer.cancel();
-      });
-
       return AudiobookPlayerController(isar, audiobookId);
     });
 
@@ -47,6 +40,8 @@ class AudiobookPlayerState {
   final Duration currentPosition;
   final Duration totalDuration;
   final int currentChapterIndex;
+  final double playbackSpeed;
+  final bool isScreenLocked;
 
   const AudiobookPlayerState({
     this.audiobook,
@@ -55,6 +50,8 @@ class AudiobookPlayerState {
     this.currentPosition = Duration.zero,
     this.totalDuration = Duration.zero,
     this.currentChapterIndex = 0,
+    this.playbackSpeed = 1.0, // Default speed
+    this.isScreenLocked = false,
   });
 
   AudiobookPlayerState copyWith({
@@ -64,7 +61,10 @@ class AudiobookPlayerState {
     Duration? currentPosition,
     Duration? totalDuration,
     int? currentChapterIndex,
+    double? playbackSpeed,
+    bool? isScreenLocked,
   }) {
+
     return AudiobookPlayerState(
       audiobook: audiobook ?? this.audiobook,
       isLoading: isLoading ?? this.isLoading,
@@ -72,6 +72,8 @@ class AudiobookPlayerState {
       currentPosition: currentPosition ?? this.currentPosition,
       totalDuration: totalDuration ?? this.totalDuration,
       currentChapterIndex: currentChapterIndex ?? this.currentChapterIndex,
+      playbackSpeed: playbackSpeed ?? this.playbackSpeed,
+      isScreenLocked: isScreenLocked ?? this.isScreenLocked,
     );
   }
 }
@@ -93,26 +95,59 @@ class AudiobookPlayerController extends StateNotifier<AudiobookPlayerState> {
   }
 
   Future<void> _initialize() async {
+    // This method was already corrected in the previous step and is fine.
+    // It loads the book, sets the state, and calls _loadChapter.
     print("DEBUG: [PlayerController] Initializing for audiobookId: $_audiobookId");
     final book = await _isar.audiobooks.get(_audiobookId);
     if (book == null || book.chapters.isEmpty) {
       print("❌ DEBUG: [PlayerController] Audiobook with ID $_audiobookId not found or has no chapters!");
-      state = state.copyWith(isLoading: false, audiobook: null); // Explicitly set book to null
+      if (mounted) {
+        state = state.copyWith(isLoading: false, audiobook: null);
+      }
       return;
     }
 
-    // *** FIX: Update state with the loaded book and initial chapter index ***
-    state = state.copyWith(
-      audiobook: book,
-      currentChapterIndex: book.lastReadChapterIndex,
-    );
+    if (mounted) {
+      state = state.copyWith(
+        audiobook: book,
+        currentChapterIndex: book.lastReadChapterIndex,
+      );
+    } else {
+      return; // Abort if disposed during async gap
+    }
 
     _listenToPlayerState();
+
+    await _audioPlayer.setSpeed(state.playbackSpeed);
 
     // Load the initial chapter
     await _loadChapter(book.lastReadChapterIndex, seekToInitialPosition: true);
 
     print("DEBUG: [PlayerController] Initialization complete for title: '${book.displayTitle}'");
+  }
+
+  void toggleScreenLock() {
+    if (!mounted) return;
+    state = state.copyWith(isScreenLocked: !state.isScreenLocked);
+  }
+
+  /// Cycles through the available playback speeds.
+  Future<void> cyclePlaybackSpeed() async {
+    if (!mounted) return;
+
+    // Define the cycle of speeds
+    const List<double> speedCycle = [1.0, 1.25, 1.5, 1.75, 2.0, 0.5, 0.75];
+
+    final currentSpeed = state.playbackSpeed;
+    final currentIndex = speedCycle.indexOf(currentSpeed);
+
+    // If current speed is not in the list (e.g., from a previous session),
+    // default to the next speed after 1.0. Otherwise, cycle to the next one.
+    final nextIndex = (currentIndex == -1) ? 1 : (currentIndex + 1) % speedCycle.length;
+    final nextSpeed = speedCycle[nextIndex];
+
+    await _audioPlayer.setSpeed(nextSpeed);
+    state = state.copyWith(playbackSpeed: nextSpeed);
   }
 
   Future<void> _loadChapter(int chapterIndex, {bool seekToInitialPosition = false}) async {
@@ -227,27 +262,33 @@ class AudiobookPlayerController extends StateNotifier<AudiobookPlayerState> {
   }
 
   Future<void> _saveProgress() async {
+    // *** FIX 3: Add a `mounted` guard as the first line. ***
+    // This is the safety net that prevents the crash.
+    if (!mounted) {
+      print("DEBUG: [PlayerController] Aborting save, controller is disposed.");
+      return;
+    }
+
     final book = state.audiobook;
-    if (book == null || !mounted) return;
+    if (book == null) return;
 
-    // Use a temporary variable to avoid race conditions with the state
-    final currentPosition = state.currentPosition;
-    final currentChapter = state.currentChapterIndex;
-
-    // Update the book object in memory
-    book.lastReadChapterIndex = currentChapter;
-    book.lastReadPositionInSeconds = currentPosition.inSeconds;
+    book.lastReadChapterIndex = state.currentChapterIndex;
+    book.lastReadPositionInSeconds = state.currentPosition.inSeconds;
 
     await _isar.writeTxn(() async {
       await _isar.audiobooks.put(book);
     });
-    print("DEBUG: [PlayerController] Progress saved. Chapter: $currentChapter, Position: ${currentPosition.inSeconds}s");
+    print("DEBUG: [PlayerController] Progress saved. Chapter: ${book.lastReadChapterIndex}, Position: ${book.lastReadPositionInSeconds}s");
   }
 
   @override
   void dispose() {
-    print("DEBUG: [PlayerController] Disposing controller. Performing final save and releasing player.");
-    _saveProgress(); // ** FIX: Perform a final save **
+    print("DEBUG: [PlayerController] Disposing controller.");
+    // *** FIX 4: Cancel the debouncer and perform a final save. ***
+    _debouncer.cancel();
+    _saveProgress(); // Perform one last synchronous save before disposing.
+
+    // Clean up all resources
     _playerStateSubscription?.cancel();
     _positionSubscription?.cancel();
     _durationSubscription?.cancel();

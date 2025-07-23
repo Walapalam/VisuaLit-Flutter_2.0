@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:visualit/features/audiobook_player/presentation/audiobook_player_screen.dart';
 import 'package:visualit/features/audiobook_player/presentation/audiobooks_screen.dart';
 import 'package:visualit/features/auth/presentation/auth_controller.dart';
 import 'package:visualit/features/auth/presentation/login_screen.dart';
@@ -13,6 +12,7 @@ import 'package:visualit/features/scaffold.dart';
 import 'package:visualit/features/settings/presentation/settings_screen.dart';
 import 'package:visualit/main.dart';
 
+import '../../features/audiobook_player/presentation/audiobook_player_screen.dart';
 import '../../features/auth/presentation/splash_screen.dart';
 import '../../features/reader/presentation/reading_screen.dart';
 
@@ -37,13 +37,15 @@ final goRouterProvider = Provider<GoRouter>((ref) {
       },
       ),
       GoRoute(
-        path: '/audiobook/:audiobookId',
-        name: 'audiobookPlayer',
-        builder: (context, state) {
-          final audiobookId = int.tryParse(state.pathParameters['audiobookId'] ?? '0') ?? 0;
-          return AudiobookPlayerScreen(audiobookId: audiobookId);
-        },
-      ),
+              path: '/audiobook/:audiobookId', // A simpler path for the player
+              name: 'audiobookPlayer',
+              builder: (context, state) {
+                final audiobookId = int.tryParse(state.pathParameters['audiobookId'] ?? '0') ?? 0;
+                return AudiobookPlayerScreen(
+                  audiobookId: audiobookId,
+                );
+              },
+            ),
       // TODO: Add '/preferences' route here when built
 
       // Main application shell route

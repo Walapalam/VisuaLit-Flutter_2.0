@@ -4,11 +4,12 @@ import 'package:isar/isar.dart';
 import 'package:path/path.dart' as p;
 import 'package:visualit/core/providers/isar_provider.dart';
 import 'package:visualit/features/audiobook_player/data/audiobook.dart';
-import 'package:visualit/features/library/data/local_library_service.dart';
-import 'package:visualit/features/library/presentation/library_controller.dart';
+import 'package:visualit/features/audiobook_player/data/local_library_service.dart';
 
-import '../../library/data/local_library_service.dart'; // To reuse the provider
 
+
+
+/// This provider creates the controller and makes it available to the UI.
 final audiobooksControllerProvider = StateNotifierProvider.autoDispose<
     AudiobooksController, AsyncValue<List<Audiobook>>>((ref) {
   final isar = ref.watch(isarDBProvider).requireValue;
@@ -28,33 +29,63 @@ class AudiobooksController extends StateNotifier<AsyncValue<List<Audiobook>>> {
   Future<void> loadAudiobooks() async {
     state = const AsyncValue.loading();
     try {
-      final audiobooks = await _isar.audiobooks.where().findAll();
+      final audiobooks = await _isar.audiobooks.where().sortByTitle().findAll();
       state = AsyncValue.data(audiobooks);
     } catch (e, st) {
       state = AsyncValue.error(e, st);
     }
   }
 
-  Future<void> addAudiobook() async {
-    final files = await _localLibraryService.pickAudiobooks();
-    if (files.isEmpty) return;
+  /// Asks the service for a folder path and processes it.
+  Future<void> addAudiobookFromFolder() async {
+    final directoryPath = await _localLibraryService.pickDirectory();
+    if (directoryPath == null) return;
 
-    for (final file in files) {
-      final existing = await _isar.audiobooks
-          .where()
-          .filePathEqualTo(file.path)
-          .findFirst();
+    final directory = Directory(directoryPath);
+    final mp3Files = directory.listSync()
+        .where((e) => e is File && e.path.toLowerCase().endsWith('.mp3'))
+        .map((e) => e.path).toList();
 
-      if (existing != null) continue; // Skip if already exists
+    if (mp3Files.isEmpty) return;
+    mp3Files.sort();
 
-      final newAudiobook = Audiobook()
-        ..filePath = file.path
-      // Use the file name as the initial title, without the extension
-        ..title = p.basenameWithoutExtension(file.path);
+    final bookTitle = p.basename(directoryPath);
+    if (await _isar.audiobooks.where().titleEqualTo(bookTitle).findFirst() != null) return;
 
-      await _isar.writeTxn(() => _isar.audiobooks.put(newAudiobook));
+    final newBook = Audiobook()
+      ..title = bookTitle
+      ..isSingleFile = false; // Set the flag
+
+    int order = 0;
+    for (final filePath in mp3Files) {
+      newBook.chapters.add(Chapter()
+        ..filePath = filePath
+        ..title = p.basenameWithoutExtension(filePath)
+        ..sortOrder = order++);
     }
-    // Reload the list from the database to update the UI
-    loadAudiobooks();
+
+    await _isar.writeTxn(() => _isar.audiobooks.put(newBook));
+    await loadAudiobooks();
+  }
+
+  /// Asks the service for a single file path and processes it.
+  Future<void> addAudiobookFromFile() async {
+    final filePath = await _localLibraryService.pickSingleMp3File();
+    if (filePath == null) return;
+
+    final bookTitle = p.basenameWithoutExtension(filePath);
+    if (await _isar.audiobooks.where().titleEqualTo(bookTitle).findFirst() != null) return;
+
+    final newBook = Audiobook()
+      ..title = bookTitle
+      ..isSingleFile = true; // Set the flag
+
+    newBook.chapters.add(Chapter()
+      ..filePath = filePath
+      ..title = "Full Audiobook"
+      ..sortOrder = 0);
+
+    await _isar.writeTxn(() => _isar.audiobooks.put(newBook));
+    await loadAudiobooks();
   }
 }

@@ -1,188 +1,185 @@
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:isar/isar.dart';
-import 'package:just_audio/just_audio.dart';
-import 'package:visualit/core/providers/isar_provider.dart';
-import 'package:visualit/features/audiobook_player/data/audiobook.dart';
+import 'package:visualit/features/audiobook_player/presentation/audiobook_player_controller.dart';
 
-// Helper class to bundle player streams
-class _PlayerData {
-  final Duration position;
-  final Duration bufferedPosition;
-  final Duration duration;
-  final PlayerState playerState;
-
-  _PlayerData({
-    required this.position,
-    required this.bufferedPosition,
-    required this.duration,
-    required this.playerState,
-  });
-}
-
-class AudiobookPlayerScreen extends ConsumerStatefulWidget {
+class AudiobookPlayerScreen extends ConsumerWidget {
   final int audiobookId;
+
   const AudiobookPlayerScreen({super.key, required this.audiobookId});
 
-  @override
-  ConsumerState<AudiobookPlayerScreen> createState() => _AudiobookPlayerScreenState();
-}
-
-class _AudiobookPlayerScreenState extends ConsumerState<AudiobookPlayerScreen> {
-  final AudioPlayer _player = AudioPlayer();
-  late Future<Audiobook?> _audiobookFuture;
-
-  @override
-  void initState() {
-    super.initState();
-    _audiobookFuture = _loadAudiobookAndSetupPlayer();
+  // Helper to format duration to mm:ss
+  String _formatDuration(Duration d) {
+    final minutes = d.inMinutes.remainder(60).toString().padLeft(2, '0');
+    final seconds = d.inSeconds.remainder(60).toString().padLeft(2, '0');
+    return "$minutes:$seconds";
   }
 
-  Future<Audiobook?> _loadAudiobookAndSetupPlayer() async {
-    final isar = await ref.read(isarDBProvider.future);
-    final audiobook = await isar.audiobooks.get(widget.audiobookId);
-    if (audiobook != null && audiobook.filePath != null) {
-      try {
-        await _player.setFilePath(audiobook.filePath!);
-      } catch (e) {
-        print("Error setting audio source: $e");
-        return null;
-      }
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final playerState = ref.watch(audiobookPlayerControllerProvider(audiobookId));
+    final playerController = ref.read(audiobookPlayerControllerProvider(audiobookId).notifier);
+    final textTheme = Theme.of(context).textTheme;
+    final colorScheme = Theme.of(context).colorScheme;
+
+    if (playerState.isLoading) {
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
-    return audiobook;
-  }
 
-  @override
-  void dispose() {
-    _player.dispose();
-    super.dispose();
-  }
+    if (playerState.audiobook == null) {
+      return const Scaffold(body: Center(child: Text("Audiobook not found.")));
+    }
 
-  // Combine multiple streams for the UI
-  Stream<_PlayerData> get _playerDataStream =>
-      Stream.periodic(const Duration(milliseconds: 200)).asyncMap((_) {
-        return _PlayerData(
-            position: _player.position,
-            bufferedPosition: _player.bufferedPosition,
-            duration: _player.duration ?? Duration.zero,
-            playerState: _player.playerState
-        );
-      });
+    final book = playerState.audiobook!;
 
-  @override
-  Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: const Color(0xFF1F2E2E), // Dark cyan background
       appBar: AppBar(
-        title: const Text('Now Playing'),
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        leading: IconButton(
+          icon: const Icon(Icons.expand_more),
+          onPressed: () => Navigator.of(context).pop(),
+        ),
+        title: const Text("Now Playing"),
+        centerTitle: true,
+        actions: [
+          IconButton(icon: const Icon(Icons.more_vert), onPressed: () {}),
+        ],
       ),
-      body: FutureBuilder<Audiobook?>(
-        future: _audiobookFuture,
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
-          }
-          if (snapshot.hasError || snapshot.data == null) {
-            return const Center(child: Text('Error: Could not load audiobook.'));
-          }
+      body: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 24.0),
+        child: Column(
+          children: [
+            const SizedBox(height: 20),
+            // Album Art
+            Container(
+              height: MediaQuery.of(context).size.width * 0.8,
+              width: MediaQuery.of(context).size.width * 0.8,
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(12),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.5),
+                    blurRadius: 20,
+                    offset: const Offset(0, 10),
+                  )
+                ],
+              ),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(12.0),
+                child: book.coverImageBytes != null
+                    ? Image.memory(
+                  Uint8List.fromList(book.coverImageBytes!),
+                  fit: BoxFit.cover,
+                )
+                    : Container(
+                  color: Colors.grey.shade800,
+                  child: const Icon(Icons.music_note, size: 100, color: Colors.white54),
+                ),
+              ),
+            ),
+            const SizedBox(height: 40),
+            // Title and Artist
+            Text(
+              book.displayTitle,
+              style: textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold, color: Colors.white),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 8),
+            Text(
+              book.author ?? "Unknown Artist",
+              style: textTheme.bodyLarge?.copyWith(color: Colors.grey[400]),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 20),
+            // Action Buttons (Like, Save, etc)
 
-          final audiobook = snapshot.data!;
-
-          return Padding(
-            padding: const EdgeInsets.all(20.0),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
+            const SizedBox(height: 20),
+            // Seek Bar
+            Column(
               children: [
-                const Icon(Icons.album, size: 200), // Placeholder for cover art
-                const SizedBox(height: 32),
-                Text(
-                  audiobook.title ?? 'Unknown Title',
-                  style: Theme.of(context).textTheme.headlineSmall,
-                  textAlign: TextAlign.center,
+                SliderTheme(
+                  data: SliderTheme.of(context).copyWith(
+                    trackHeight: 2.0,
+                    thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 6.0),
+                    overlayShape: const RoundSliderOverlayShape(overlayRadius: 12.0),
+                  ),
+                  child: Slider(
+                    value: playerState.currentPosition.inSeconds.toDouble(),
+                    max: playerState.totalDuration.inSeconds.toDouble(),
+                    min: 0,
+                    activeColor: Colors.white,
+                    inactiveColor: Colors.grey.shade700,
+                    onChanged: (value) {
+                      playerController.seek(Duration(seconds: value.round()));
+                    },
+                  ),
                 ),
-                const SizedBox(height: 8),
-                Text(
-                  audiobook.author ?? 'Unknown Author',
-                  style: Theme.of(context).textTheme.titleMedium,
-                ),
-                const SizedBox(height: 32),
-
-                StreamBuilder<_PlayerData>(
-                  stream: _playerDataStream,
-                  builder: (context, snapshot) {
-                    final data = snapshot.data;
-                    final position = data?.position ?? Duration.zero;
-                    final duration = data?.duration ?? Duration.zero;
-
-                    return Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Slider(
-                          min: 0.0,
-                          max: duration.inSeconds.toDouble(),
-                          value: position.inSeconds.toDouble().clamp(0.0, duration.inSeconds.toDouble()),
-                          onChanged: (value) {
-                            _player.seek(Duration(seconds: value.toInt()));
-                          },
-                        ),
-                        Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 16.0),
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              Text(_formatDuration(position)),
-                              Text(_formatDuration(duration)),
-                            ],
-                          ),
-                        ),
-                      ],
-                    );
-                  },
-                ),
-
-                const SizedBox(height: 20),
-
-                StreamBuilder<PlayerState>(
-                  stream: _player.playerStateStream,
-                  builder: (context, snapshot) {
-                    final playerState = snapshot.data;
-                    final processingState = playerState?.processingState;
-                    final playing = playerState?.playing;
-
-                    if (processingState == ProcessingState.loading ||
-                        processingState == ProcessingState.buffering) {
-                      return const CircularProgressIndicator();
-                    } else if (playing != true) {
-                      return IconButton(
-                        icon: const Icon(Icons.play_arrow),
-                        iconSize: 64.0,
-                        onPressed: _player.play,
-                      );
-                    } else if (processingState != ProcessingState.completed) {
-                      return IconButton(
-                        icon: const Icon(Icons.pause),
-                        iconSize: 64.0,
-                        onPressed: _player.pause,
-                      );
-                    } else {
-                      return IconButton(
-                        icon: const Icon(Icons.replay),
-                        iconSize: 64.0,
-                        onPressed: () => _player.seek(Duration.zero),
-                      );
-                    }
-                  },
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(_formatDuration(playerState.currentPosition), style: TextStyle(color: Colors.grey[400])),
+                      Text(_formatDuration(playerState.totalDuration), style: TextStyle(color: Colors.grey[400])),
+                    ],
+                  ),
                 ),
               ],
             ),
-          );
-        },
+            const SizedBox(height: 10),
+            // Player Controls
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                IconButton(icon: const Icon(Icons.shuffle, size: 28), color: Colors.white, onPressed: () {}),
+                IconButton(icon: const Icon(Icons.skip_previous, size: 40), color: Colors.white, onPressed: playerController.skipToPrevious),
+                IconButton(
+                  iconSize: 70,
+                  icon: Icon(playerState.isPlaying ? Icons.pause_circle_filled : Icons.play_circle_filled),
+                  color: Colors.white,
+                  onPressed: () => playerState.isPlaying ? playerController.pause() : playerController.play(),
+                ),
+                IconButton(icon: const Icon(Icons.skip_next, size: 40), color: Colors.white, onPressed: playerController.skipToNext),
+                IconButton(icon: const Icon(Icons.repeat, size: 28), color: Colors.white, onPressed: () {}),
+              ],
+            ),
+            const Spacer(),
+            // Up Next, Lyrics, etc.
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceAround,
+              children: [
+                _bottomTabText("CHAPTER"),
+                _bottomTabText("", isSelected: true),
+                _bottomTabText("RELATED"),
+              ],
+            ),
+            const SizedBox(height: 20),
+          ],
+        ),
       ),
     );
   }
 
-  String _formatDuration(Duration d) {
-    final minutes = d.inMinutes.remainder(60).toString().padLeft(2, '0');
-    final seconds = d.inSeconds.remainder(60).toString().padLeft(2, '0');
-    return "${d.inHours > 0 ? '${d.inHours}:' : ''}$minutes:$seconds";
+  Widget _iconButtonWithText(IconData icon, String label, VoidCallback onPressed) {
+    return Column(
+      children: [
+        IconButton(icon: Icon(icon, color: Colors.grey[400]), onPressed: onPressed),
+        if (label.isNotEmpty) Text(label, style: TextStyle(color: Colors.grey[400], fontSize: 12)),
+      ],
+    );
+  }
+
+  Widget _bottomTabText(String text, {bool isSelected = false}) {
+    return Text(
+      text,
+      style: TextStyle(
+        color: isSelected ? Colors.white : Colors.grey[600],
+        fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+        fontSize: 14,
+      ),
+    );
   }
 }

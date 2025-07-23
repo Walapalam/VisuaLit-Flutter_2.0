@@ -5,6 +5,7 @@ import 'package:visualit/core/router/app_router.dart';
 import 'package:visualit/core/theme/app_theme.dart';
 import 'package:visualit/core/theme/theme_controller.dart';
 
+
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await dotenv.load(fileName: ".env");
@@ -12,6 +13,7 @@ Future<void> main() async {
   runApp(const ProviderScope(
     child: MyApp(),
   ));
+
 }
 
 class MyApp extends ConsumerWidget {

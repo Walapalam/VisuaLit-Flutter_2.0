@@ -20,6 +20,9 @@ class Book {
   String? author;
   List<byte>? coverImageBytes;
 
+  // NEW ATTRIBUTE: Add the isbn field for local storage
+  String? isbn;
+
   // New metadata fields
   String? publisher;
   String? language;

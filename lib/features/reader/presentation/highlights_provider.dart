@@ -4,7 +4,6 @@ import 'package:visualit/core/providers/isar_provider.dart';
 import 'package:visualit/features/reader/data/highlight.dart';
 
 // This provider returns a stream of all highlights for a specific bookId.
-// The UI can subscribe to this to get real-time updates.
 final highlightsProvider = StreamProvider.family.autoDispose<List<Highlight>, int>((ref, bookId) {
   final isar = ref.watch(isarDBProvider).value;
   if (isar == null) {
@@ -13,5 +12,9 @@ final highlightsProvider = StreamProvider.family.autoDispose<List<Highlight>, in
 
   print("  [highlightsProvider] Creating stream for bookId: $bookId");
 
-  return isar.highlights.where().bookIdEqualTo(bookId).watch(fireImmediately: true);
+  // Use query to watch changes, then filter by bookId in Dart
+  return isar.collection<Highlight>()
+      .where()
+      .watch()
+      .map((highlights) => highlights.where((h) => h.bookId == bookId).toList());
 });

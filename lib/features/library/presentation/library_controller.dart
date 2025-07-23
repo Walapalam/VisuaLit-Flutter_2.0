@@ -1,11 +1,11 @@
 import 'dart:convert';
 import 'dart:typed_data';
-import 'dart:math' as math;
+import 'dart:math' as math; // Not used in this specific feature, but present in original file
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:isar/isar.dart';
 import 'package:visualit/core/providers/isar_provider.dart';
-import 'package:visualit/features/library/data/background_task_queue.dart';
-import 'package:visualit/features/library/data/book_processing_task.dart';
+import 'package:visualit/features/library/data/background_task_queue.dart'; // Not directly used in this feature, but present in original file
+import 'package:visualit/features/library/data/book_processing_task.dart'; // Not directly used in this feature, but present in original file
 import 'package:visualit/features/library/data/local_library_service.dart';
 import 'package:visualit/features/reader/data/book_data.dart' as db;
 import 'package:visualit/features/reader/data/toc_entry.dart';
@@ -25,6 +25,7 @@ final libraryControllerProvider = StateNotifierProvider.autoDispose<LibraryContr
         (ref) {
       final isar = ref.watch(isarDBProvider).requireValue;
       final localLibraryService = ref.watch(localLibraryServiceProvider);
+      // Ensure backgroundTaskQueue is provided if used in your actual app setup
       final backgroundTaskQueue = ref.watch(backgroundTaskQueueProvider);
       return LibraryController(localLibraryService, isar, backgroundTaskQueue);
     }
@@ -33,7 +34,7 @@ final libraryControllerProvider = StateNotifierProvider.autoDispose<LibraryContr
 class LibraryController extends StateNotifier<AsyncValue<List<db.Book>>> {
   final LocalLibraryService _localLibraryService;
   final Isar _isar;
-  final BackgroundTaskQueue _backgroundTaskQueue;
+  final BackgroundTaskQueue _backgroundTaskQueue; // Retained as per your original file
 
   LibraryController(this._localLibraryService, this._isar, this._backgroundTaskQueue) : super(const AsyncValue.loading()) {
     print("✅ [LibraryController] Initialized.");
@@ -97,7 +98,7 @@ class LibraryController extends StateNotifier<AsyncValue<List<db.Book>>> {
       // Reset the book status to queued
       await _isar.writeTxn(() async {
         book.status = db.ProcessingStatus.queued;
-        book.errorMessage = null;
+        book.errorMessage = null; // Assuming errorMessage and errorStackTrace were added for background task queue
         book.errorStackTrace = null;
         await _isar.books.put(book);
       });
@@ -233,6 +234,7 @@ class LibraryController extends StateNotifier<AsyncValue<List<db.Book>>> {
         ..epubFilePath = filePath
         ..status = db.ProcessingStatus.queued;
 
+      // Temporary bookId generation to enqueue task without waiting for full metadata parsing
       final bookId = await _isar.writeTxn(() async => await _isar.books.put(newBook));
       print("  ✅ [LibraryController] Created initial book entry with ID: $bookId, status: queued");
 
@@ -411,6 +413,48 @@ class LibraryController extends StateNotifier<AsyncValue<List<db.Book>>> {
     await loadBooksFromDb();
   }
 
+
+  // NOTE: The actual EPUB parsing logic for populating full book metadata
+  // is usually done in a background task (like `BookProcessor.launchIsolate`).
+  // The `_processFiles` above only puts it in a queue.
+  // The code for `BookProcessor` (which you provided earlier) needs to handle
+  // parsing and saving ISBN to the `db.Book` model after it's been processed
+  // from the queue.
+
+  // For reference, here's how `BookProcessor` (if you were modifying it directly)
+  // would parse the ISBN and save it. You should apply this logic in your
+  // `BookProcessor._processBook` method after parsing other metadata.
+
+  /*
+  // Example of how to add ISBN parsing within your BookProcessor's _processBook method:
+  // (This is NOT in LibraryController, but where the actual EPUB processing happens)
+
+  // Assuming you have 'metadata' XML element available in BookProcessor:
+  String? isbn;
+  final isbnIdentifier = metadata.findAllElements('dc:identifier').firstWhereOrNull(
+    (element) => element.attributes.any(
+      (attr) => attr.name.local == 'scheme' && attr.value.toLowerCase() == 'isbn'
+    ) || element.innerText.replaceAll(RegExp(r'[^0-9X]'), '').length == 10 ||
+       element.innerText.replaceAll(RegExp(r'[^0-9]'), '').length == 13,
+  );
+
+  isbn = isbnIdentifier?.innerText.trim();
+  if (isbn != null) {
+    isbn = isbn!.replaceAll(RegExp(r'[- ]'), '');
+  }
+
+  // Then, when updating the book in Isar within BookProcessor:
+  await isar.writeTxn(() async {
+    final bookToUpdate = await isar.books.get(existingBook.id);
+    if (bookToUpdate != null) {
+      // ... existing updates like title, author, etc.
+      bookToUpdate.isbn = isbn; // <--- ADD THIS LINE IN BOOKPROCESSOR
+      await isar.books.put(bookToUpdate);
+    }
+  });
+  */
+
+
   List<TOCEntry> _parseNavXhtml(String content, String basePath) {
     final document = html_parser.parse(content);
     final nav = document.querySelector('nav[epub\\:type="toc"]');
@@ -537,5 +581,17 @@ class LibraryController extends StateNotifier<AsyncValue<List<db.Book>>> {
       case 'svg': return db.BlockType.img;
       default: return db.BlockType.unsupported;
     }
+  }
+}
+
+// Extension to help with finding first element or null
+extension IterableExtension<T> on Iterable<T> {
+  T? firstWhereOrNull(bool Function(T element) test) {
+    for (var element in this) {
+      if (test(element)) {
+        return element;
+      }
+    }
+    return null;
   }
 }

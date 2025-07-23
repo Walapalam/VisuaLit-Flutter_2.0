@@ -58,11 +58,8 @@ class LibraryScreen extends ConsumerWidget {
               return GestureDetector(
                 onTap: () {
                   if (book.status == ProcessingStatus.ready || book.status == ProcessingStatus.partiallyReady) {
-                    // Allow reading for both ready and partially ready books
                     context.goNamed('bookReader',
                         pathParameters: {'bookId': book.id.toString()});
-
-                    // If partially ready, show a snackbar to inform the user
                     if (book.status == ProcessingStatus.partiallyReady) {
                       ScaffoldMessenger.of(context).showSnackBar(SnackBar(
                         content: Text('${book.title ?? 'Book'} is still being processed. Some chapters may not be available yet.'),
@@ -70,7 +67,6 @@ class LibraryScreen extends ConsumerWidget {
                       ));
                     }
                   } else if (book.status == ProcessingStatus.error) {
-                    // Show error details in a dialog
                     showDialog(
                       context: context,
                       builder: (context) => AlertDialog(
@@ -80,7 +76,6 @@ class LibraryScreen extends ConsumerWidget {
                             mainAxisSize: MainAxisSize.min,
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              // Status indicator
                               Row(
                                 children: [
                                   Container(
@@ -90,8 +85,8 @@ class LibraryScreen extends ConsumerWidget {
                                       borderRadius: BorderRadius.circular(4),
                                     ),
                                     child: Text(
-                                      book.failedPermanently 
-                                          ? 'PERMANENTLY FAILED' 
+                                      book.failedPermanently
+                                          ? 'PERMANENTLY FAILED'
                                           : 'ERROR',
                                       style: const TextStyle(
                                         color: Colors.white,
@@ -170,7 +165,6 @@ class LibraryScreen extends ConsumerWidget {
                               Uint8List.fromList(book.coverImageBytes!),
                               fit: BoxFit.cover,
                               width: double.infinity,
-                              // ADDED: This handles errors if the image data is invalid.
                               errorBuilder: (context, error, stackTrace) {
                                 return Container(
                                   color: Colors.grey[800],
@@ -178,9 +172,13 @@ class LibraryScreen extends ConsumerWidget {
                                       child: Icon(Icons.book, size: 40)),
                                 );
                               },
+                            )
+                                : Container(
+                              color: Colors.grey[800],
+                              child: const Center(
+                                  child: Icon(Icons.book, size: 40)),
                             ),
                           ),
-                          // Error badge
                           if (book.status == ProcessingStatus.error)
                             Positioned(
                               top: 0,

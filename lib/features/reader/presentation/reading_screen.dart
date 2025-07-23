@@ -9,9 +9,14 @@ import 'package:visualit/features/reader/presentation/reading_preferences_contro
 import 'package:visualit/features/reader/presentation/widgets/book_page_widget.dart';
 import 'package:visualit/features/reader/presentation/widgets/html_content_widget.dart';
 import 'package:visualit/features/reader/presentation/widgets/reading_settings_panel.dart';
+// Import the BookOverviewDialog (and remove AllBooksOverviewDialog import if it was there)
+import 'package:visualit/features/reader/presentation/widgets/book_overview_dialog.dart';
+// Also need to import your local Book data models from Isar
+import 'package:visualit/features/reader/data/book_data.dart' as local_book_data; // Alias to avoid conflict
+
 
 class ReadingScreen extends ConsumerStatefulWidget {
-  final int bookId;
+  final int bookId; // This is the Isar book ID
   const ReadingScreen({super.key, required this.bookId});
 
   @override
@@ -71,6 +76,66 @@ class _ReadingScreenState extends ConsumerState<ReadingScreen> {
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (context) => const ReadingSettingsPanel(),
+    );
+  }
+
+  // UPDATED METHOD: Now gathers local book/chapter data and passes to BookOverviewDialog
+  void _showBookOverviewDialog() async {
+    // Access the current local book's data and reading state from Riverpod
+    final readingState = ref.read(readingControllerProvider(widget.bookId));
+    final localBook = readingState.book; // This is your local Isar Book object
+
+    if (localBook == null || localBook.title == null || localBook.title!.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Book data (title) not available for visualization lookup.')),
+      );
+      return;
+    }
+
+    // Get current chapter index from the reading state
+    final currentChapterIndex = readingState.blocks[readingState.pageToBlockIndexMap[readingState.currentPage]!].chapterIndex;
+
+    if (currentChapterIndex == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Chapter information not available for visualization.')),
+      );
+      return;
+    }
+
+    // Extract all content blocks for the current chapter
+    final chapterBlocks = readingState.blocks
+        .where((block) => block.chapterIndex == currentChapterIndex)
+        .toList();
+
+    // Combine HTML content of blocks to form chapter_content
+    // This assumes your backend can process concatenated HTML.
+    // If your backend needs plain text, you'd combine block.textContent.
+    final currentChapterContent = chapterBlocks
+        .map((block) => block.htmlContent ?? '')
+        .join('\n'); // Join with newline for readability for parser
+
+    // Get ISBN from local book data. Your local Book model (lib/features/reader/data/book_data.dart)
+    // currently does NOT have an ISBN field. If your backend needs ISBN for lookup,
+    // you MUST add `String? isbn;` to your local `Book` model and populate it during import.
+    final String? localBookISBN = localBook.isbn; // Assuming you might add an 'isbn' field to local_book_data.Book later.
+
+    showGeneralDialog(
+      context: context,
+      barrierColor: Colors.transparent, // Make barrier transparent
+      barrierDismissible: true, // Allow dismissing by tapping outside
+      barrierLabel: 'Book Visualizations',
+      transitionDuration: const Duration(milliseconds: 300),
+      pageBuilder: (context, animation, secondaryAnimation) {
+        return FadeTransition( // Smooth fade transition for dialog
+          opacity: animation,
+          child: BookOverviewDialog(
+            bookTitleForLookup: localBook.title!,
+            localBookISBN: localBookISBN, // Pass local book's ISBN
+            localChapterNumber: currentChapterIndex, // Pass current chapter number
+            localChapterContent: currentChapterContent, // Pass current chapter content
+          ),
+        );
+      },
     );
   }
 
@@ -241,7 +306,7 @@ class _ReadingScreenState extends ConsumerState<ReadingScreen> {
             child: const Icon(Icons.visibility),
             label: 'Toggle Visualization',
             onTap: () {
-              // TODO: integrate visualization toggle
+              _showBookOverviewDialog(); // Calls the updated method
             }),
         SpeedDialChild(
             child: const Icon(Icons.tune),

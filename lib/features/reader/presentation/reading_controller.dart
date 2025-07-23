@@ -522,7 +522,7 @@ class ReadingController extends StateNotifier<ReadingState> {
       ..endOffset = selection.end
       ..color = color.value;
     await _isar.writeTxn(() async {
-      await _isar.highlights.put(newHighlight);
+      await _isar.collection<Highlight>().put(newHighlight);
     });
   }
 }

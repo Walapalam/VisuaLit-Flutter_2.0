@@ -1,7 +1,7 @@
+import 'dart:convert';
 import 'dart:typed_data';
 import 'dart:math' as math; // Not used in this specific feature, but present in original file
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:html/dom.dart' as dom;
 import 'package:isar/isar.dart';
 import 'package:visualit/core/providers/isar_provider.dart';
 import 'package:visualit/features/library/data/background_task_queue.dart'; // Not directly used in this feature, but present in original file
@@ -12,7 +12,10 @@ import 'package:visualit/features/reader/data/toc_entry.dart';
 import 'package:archive/archive.dart';
 import 'package:xml/xml.dart';
 import 'package:html/parser.dart' as html_parser;
+import 'package:html/dom.dart' as dom;
 import 'package:path/path.dart' as p;
+import 'package:visualit/core/models/book.dart';
+
 
 final localLibraryServiceProvider = Provider<LocalLibraryService>((ref) {
   return LocalLibraryService();
@@ -235,6 +238,7 @@ class LibraryController extends StateNotifier<AsyncValue<List<db.Book>>> {
       final bookId = await _isar.writeTxn(() async => await _isar.books.put(newBook));
       print("  ✅ [LibraryController] Created initial book entry with ID: $bookId, status: queued");
 
+      // remove if doesnt work start
       // Create and enqueue task
       final task = BookProcessingTask(
         id: bookId,
@@ -244,6 +248,165 @@ class LibraryController extends StateNotifier<AsyncValue<List<db.Book>>> {
 
       _backgroundTaskQueue.enqueueTask(task);
       print("  ✅ [LibraryController] Enqueued book processing task for ID: $bookId");
+      // remove if doesnt work end
+      try {
+        final bytes = fileData.bytes;
+        final archive = ZipDecoder().decodeBytes(bytes);
+
+        final containerFile = archive.findFile('META-INF/container.xml');
+        if (containerFile == null) throw Exception('container.xml not found');
+        final containerXml = XmlDocument.parse(utf8.decode(containerFile.content));
+        final opfPath = containerXml.findAllElements('rootfile').first.getAttribute('full-path');
+        if (opfPath == null) throw Exception('OPF path not found in container.xml');
+
+        final opfFile = archive.findFile(opfPath);
+        if (opfFile == null) throw Exception('OPF file not found at path: $opfPath');
+        final opfXml = XmlDocument.parse(utf8.decode(opfFile.content));
+        final opfDir = p.dirname(opfPath);
+
+        final metadata = opfXml.findAllElements('metadata').first;
+        final title = metadata.findAllElements('dc:title').firstOrNull?.innerText ?? p.basenameWithoutExtension(filePath);
+        final author = metadata.findAllElements('dc:creator').firstOrNull?.innerText ?? 'Unknown Author';
+        final publisher = metadata.findAllElements('dc:publisher').firstOrNull?.innerText;
+        final language = metadata.findAllElements('dc:language').firstOrNull?.innerText;
+        final pubDateStr = metadata.findAllElements('dc:date').firstOrNull?.innerText;
+        final publicationDate = pubDateStr != null ? DateTime.tryParse(pubDateStr) : null;
+        print("  [LibraryController] Parsed Metadata -> Title: '$title', Author: '$author', Publisher: '$publisher'");
+
+        final manifest = <String, String>{};
+        final manifestItems = opfXml.findAllElements('item');
+        for (final item in manifestItems) {
+          final id = item.getAttribute('id');
+          final href = item.getAttribute('href');
+          if (id != null && href != null) {
+            final finalPath = p.url.normalize(p.url.join(opfDir, href));
+            manifest[id] = finalPath;
+          }
+        }
+
+        Uint8List? coverImageBytes;
+        // Cover logic remains the same and is robust.
+        String? coverId;
+        for (final item in manifestItems) {
+          if (item.getAttribute('properties')?.contains('cover-image') ?? false) {
+            coverId = item.getAttribute('id');
+            break;
+          }
+        }
+        if (coverId == null) {
+          for (final meta in metadata.findAllElements('meta')) {
+            if (meta.getAttribute('name') == 'cover') {
+              coverId = meta.getAttribute('content');
+              break;
+            }
+          }
+        }
+        if (coverId != null) {
+          final coverPath = manifest[coverId];
+          if(coverPath != null) {
+            final coverFile = archive.findFile(coverPath);
+            if (coverFile != null) {
+              coverImageBytes = coverFile.content as Uint8List;
+            }
+          }
+        }
+
+        final spineItems = opfXml.findAllElements('itemref');
+        final spine = spineItems.map((item) => item.getAttribute('idref')).whereType<String>().toList();
+
+        final List<db.ContentBlock> allBlocks = [];
+        for (int i = 0; i < spine.length; i++) {
+          final idref = spine[i];
+          final chapterPath = manifest[idref];
+          if (chapterPath == null) continue;
+
+          final chapterFile = archive.findFile(chapterPath);
+          if (chapterFile == null) continue;
+
+          final chapterContent = utf8.decode(chapterFile.content);
+          final document = html_parser.parse(chapterContent);
+          final body = document.body;
+          if (body == null) continue;
+
+          int blockCounter = 0;
+
+          // Use the robust recursive function to process the entire chapter body
+          _flattenAndParseElements(
+            elements: body.children,
+            targetBlockList: allBlocks, // Add directly to the main list
+            bookId: bookId,
+            chapterIndex: i,
+            chapterPath: chapterPath,
+            archive: archive,
+            getNextBlockIndex: () => blockCounter++, // Pass a closure to manage the index
+          );
+        }
+
+        print("  ✅ [LibraryController] FINAL RESULT: Extracted a total of ${allBlocks.length} content blocks from the entire book.");
+        if (allBlocks.isEmpty) {
+          print("  ❌ [LibraryController] CRITICAL FAILURE: No content blocks were extracted from the book.");
+        }
+
+        // TOC Parsing remains the same and is robust.
+        List<TOCEntry> tocEntries = [];
+        final navItem = manifestItems.firstWhere(
+              (item) => item.getAttribute('properties')?.contains('nav') ?? false,
+          orElse: () => XmlElement(XmlName('')),
+        );
+        if (navItem.name.local.isNotEmpty) {
+          final navPath = manifest[navItem.getAttribute('id')];
+          if (navPath != null) {
+            final navFile = archive.findFile(navPath);
+            if (navFile != null) {
+              final navContent = utf8.decode(navFile.content);
+              final navBasePath = p.dirname(navPath);
+              tocEntries = _parseNavXhtml(navContent, navBasePath);
+            }
+          }
+        }
+        if (tocEntries.isEmpty) {
+          final spineElement = opfXml.findAllElements('spine').firstOrNull;
+          final ncxId = spineElement?.getAttribute('toc');
+          if (ncxId != null) {
+            final ncxPath = manifest[ncxId];
+            if (ncxPath != null) {
+              final ncxFile = archive.findFile(ncxPath);
+              if (ncxFile != null) {
+                final ncxContent = utf8.decode(ncxFile.content);
+                final ncxBasePath = p.dirname(ncxPath);
+                tocEntries = _parseNcx(ncxContent, ncxBasePath);
+              }
+            }
+          }
+        }
+
+        await _isar.writeTxn(() async {
+          final bookToUpdate = await _isar.books.get(bookId);
+          if (bookToUpdate != null) {
+            bookToUpdate.title = title;
+            bookToUpdate.author = author;
+            bookToUpdate.coverImageBytes = coverImageBytes;
+            bookToUpdate.status = db.ProcessingStatus.ready;
+            bookToUpdate.toc = tocEntries;
+            bookToUpdate.publisher = publisher;
+            bookToUpdate.language = language;
+            bookToUpdate.publicationDate = publicationDate;
+            await _isar.books.put(bookToUpdate);
+          }
+          await _isar.contentBlocks.putAll(allBlocks);
+        });
+        print("  ✅ [LibraryController] Successfully saved book metadata and ${allBlocks.length} blocks. Status: ready.");
+
+      } catch (e, s) {
+        print("  ❌ [LibraryController] FATAL ERROR during processing for book ID $bookId: $e\n$s");
+        await _isar.writeTxn(() async {
+          final bookToUpdate = await _isar.books.get(bookId);
+          if (bookToUpdate != null) {
+            bookToUpdate.status = db.ProcessingStatus.error;
+            await _isar.books.put(bookToUpdate);
+          }
+        });
+      }
     }
 
     // Reload books to show queued status
@@ -349,6 +512,23 @@ class LibraryController extends StateNotifier<AsyncValue<List<db.Book>>> {
     }
     return entries;
   }
+  Future<void> addBookFromCart(Map<String, dynamic> bookData) async {
+    final currentBooks = state.value ?? [];
+
+    // Create an instance of db.Book
+    final book = db.Book()
+      ..id = int.parse(bookData['id'].toString())
+      ..title = bookData['title'] ?? 'Untitled'
+      ..author = bookData['authors'] != null && bookData['authors'].isNotEmpty
+          ? bookData['authors'][0]['name']
+          : null
+      ..epubFilePath = ''
+      ..status = db.ProcessingStatus.ready;
+
+    // Update the state with the new book
+    state = AsyncValue.data([...currentBooks, book]);
+  }
+
 
   /// Process a single chapter and extract its content blocks
   Future<void> _processChapter({

@@ -1,20 +1,16 @@
+import 'package:appwrite/appwrite.dart';
 import 'package:appwrite/models.dart' as models;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:visualit/core/utils/error_parser.dart';
 import 'package:visualit/features/auth/data/auth_repository.dart';
 
-// This StateNotifierProvider will be what our UI interacts with.
-// It exposes the AuthController and its state (AuthState).
-final authControllerProvider =
-StateNotifierProvider<AuthController, AuthState>((ref) {
-  // The controller depends on the repository to perform actions.
+final authControllerProvider = StateNotifierProvider<AuthController, AuthState>((ref) {
   final authRepository = ref.watch(authRepositoryProvider);
   return AuthController(authRepository: authRepository);
 });
 
-// An enum to represent the different states of our authentication process.
-enum AuthStatus { initial, loading, authenticated, guest, unauthenticated, error }
+enum AuthStatus { initial, loading, authenticated, guest, unauthenticated }
 
-// A state class to hold our authentication status, user data, and any error messages.
 class AuthState {
   final AuthStatus status;
   final models.User? user;
@@ -26,123 +22,114 @@ class AuthState {
     this.errorMessage,
   });
 
-  // A helper method to create a copy of the state with updated values.
   AuthState copyWith({
     AuthStatus? status,
     models.User? user,
+    bool clearUser = false,
     String? errorMessage,
+    bool clearError = false,
   }) {
     return AuthState(
       status: status ?? this.status,
-      user: user ?? this.user,
-      errorMessage: errorMessage ?? this.errorMessage,
+      user: clearUser ? null : user ?? this.user,
+      errorMessage: clearError ? null : errorMessage ?? this.errorMessage,
     );
   }
 }
 
-/// AuthController manages the business logic for authentication.
-/// It extends StateNotifier, which is a Riverpod class for managing state.
 class AuthController extends StateNotifier<AuthState> {
   final AuthRepository _authRepository;
 
   AuthController({required AuthRepository authRepository})
       : _authRepository = authRepository,
-        super(AuthState()) {
-    // When the controller is created, immediately check the user's auth status.
-    _initializeAuthState();
-  }
+        super(AuthState());
 
-  /// Checks if a user is already logged in when the app starts.
-  Future<void> checkCurrentUser() async {
+  Future<void> initialize() async {
     state = state.copyWith(status: AuthStatus.loading);
     try {
       final user = await _authRepository.getCurrentUser();
       if (user != null) {
-        state = state.copyWith(status: AuthStatus.authenticated, user: user);
+        final status = user.email.isEmpty ? AuthStatus.guest : AuthStatus.authenticated;
+        state = state.copyWith(status: status, user: user);
       } else {
-        state = state.copyWith(status: AuthStatus.unauthenticated);
+        state = state.copyWith(status: AuthStatus.unauthenticated, clearUser: true);
       }
     } catch (e) {
-      state = state.copyWith(status: AuthStatus.unauthenticated);
+      state = state.copyWith(
+        status: AuthStatus.unauthenticated,
+        clearUser: true,
+        errorMessage: 'Failed to initialize session',
+      );
     }
   }
 
-  Future<void> _initializeAuthState() async {
-    try {
-      final user = await _authRepository.getCurrentUser();
-      if (user != null) {
-        state = state.copyWith(status: AuthStatus.authenticated, user: user);
-      } else {
-        state = state.copyWith(status: AuthStatus.unauthenticated);
-      }
-    } catch (e) {
-      state = state.copyWith(status: AuthStatus.unauthenticated);
-    }
+  void _startLoading() {
+    state = state.copyWith(status: AuthStatus.loading, clearError: true);
   }
 
-  /// Attempts to log the user in.
   Future<void> login(String email, String password) async {
-    state = state.copyWith(status: AuthStatus.loading);
+    _startLoading();
     try {
       await _authRepository.login(email: email, password: password);
-      final user = await _authRepository.getCurrentUser();
-      state = state.copyWith(status: AuthStatus.authenticated, user: user);
-    } catch (e) {
-      state = state.copyWith(status: AuthStatus.error, errorMessage: e.toString());
+      await initialize();
+    } on AppwriteException catch (e) {
+      state = state.copyWith(
+        status: AuthStatus.unauthenticated,
+        errorMessage: parseAppwriteException(e),
+      );
     }
   }
 
-  /// Attempts to sign the user up.
   Future<void> signUp(String name, String email, String password) async {
-    state = state.copyWith(status: AuthStatus.loading);
+    _startLoading();
     try {
       await _authRepository.signUp(name: name, email: email, password: password);
-      // After signing up, log the user in to create a session.
       await login(email, password);
-    } catch (e) {
-      state = state.copyWith(status: AuthStatus.error, errorMessage: e.toString());
+    } on AppwriteException catch (e) {
+      state = state.copyWith(
+        status: AuthStatus.unauthenticated,
+        errorMessage: parseAppwriteException(e),
+      );
     }
   }
 
-  /// Logs the user out.
   Future<void> logout() async {
-    state = state.copyWith(status: AuthStatus.loading);
+    _startLoading();
     try {
       await _authRepository.logout();
-      state = state.copyWith(status: AuthStatus.unauthenticated, user: null);
-    } catch (e) {
-      state = state.copyWith(status: AuthStatus.error, errorMessage: e.toString());
+      state = state.copyWith(status: AuthStatus.unauthenticated, clearUser: true);
+    } on AppwriteException catch (e) {
+      state = state.copyWith(
+        status: AuthStatus.authenticated,
+        errorMessage: parseAppwriteException(e),
+      );
     }
   }
 
   Future<void> signInAsGuest() async {
-    // Save guest info locally if needed
-    state = state.copyWith(status: AuthStatus.guest, user: null);
-  }
-
-  Future<void> signInWithGoogle() async {
-    // TODO: Implement Google OAuth2 logic
-    state = state.copyWith(status: AuthStatus.loading);
+    _startLoading();
     try {
-      // await _authRepository.signInWithGoogle();
-      // final user = await _authRepository.getCurrentUser();
-      // state = state.copyWith(status: AuthStatus.authenticated, user: user);
-      throw UnimplementedError('Google sign-in not implemented yet.');
-    } catch (e) {
-      state = state.copyWith(status: AuthStatus.error, errorMessage: e.toString());
+      await _authRepository.createAnonymousSession();
+      await initialize();
+    } on AppwriteException catch (e) {
+      state = state.copyWith(
+        status: AuthStatus.unauthenticated,
+        errorMessage: parseAppwriteException(e),
+      );
     }
   }
 
-  Future<void> signInWithApple() async {
-    // TODO: Implement Apple OAuth2 logic
-    state = state.copyWith(status: AuthStatus.loading);
+  Future<void> signInWithGoogle() async {
+    _startLoading();
     try {
-      // await _authRepository.signInWithApple();
-      // final user = await _authRepository.getCurrentUser();
-      // state = state.copyWith(status: AuthStatus.authenticated, user: user);
-      throw UnimplementedError('Apple sign-in not implemented yet.');
-    } catch (e) {
-      state = state.copyWith(status: AuthStatus.error, errorMessage: e.toString());
+      await _authRepository.signInWithGoogle();
+      await Future.delayed(const Duration(seconds: 1));
+      await initialize();
+    } on AppwriteException catch (e) {
+      state = state.copyWith(
+        status: AuthStatus.unauthenticated,
+        errorMessage: parseAppwriteException(e),
+      );
     }
   }
 }

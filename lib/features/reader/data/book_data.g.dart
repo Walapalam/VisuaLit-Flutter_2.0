@@ -52,67 +52,66 @@ const BookSchema = CollectionSchema(
       name: r'fileSizeInBytes',
       type: IsarType.long,
     ),
-    r'language': PropertySchema(
+    r'isbn': PropertySchema(
       id: 7,
+      name: r'isbn',
+      type: IsarType.string,
+    ),
+    r'language': PropertySchema(
+      id: 8,
       name: r'language',
       type: IsarType.string,
     ),
     r'lastAccessedAt': PropertySchema(
-      id: 8,
+      id: 9,
       name: r'lastAccessedAt',
       type: IsarType.dateTime,
     ),
     r'lastReadPage': PropertySchema(
-      id: 9,
+      id: 10,
       name: r'lastReadPage',
       type: IsarType.long,
     ),
     r'lastReadTimestamp': PropertySchema(
-      id: 10,
+      id: 11,
       name: r'lastReadTimestamp',
       type: IsarType.dateTime,
     ),
     r'processedChapters': PropertySchema(
-      id: 11,
+      id: 12,
       name: r'processedChapters',
       type: IsarType.longList,
     ),
     r'processingProgress': PropertySchema(
-      id: 12,
+      id: 13,
       name: r'processingProgress',
       type: IsarType.double,
     ),
     r'publicationDate': PropertySchema(
-      id: 13,
+      id: 14,
       name: r'publicationDate',
       type: IsarType.dateTime,
     ),
     r'publisher': PropertySchema(
-      id: 14,
+      id: 15,
       name: r'publisher',
       type: IsarType.string,
     ),
     r'retryCount': PropertySchema(
-      id: 15,
+      id: 16,
       name: r'retryCount',
       type: IsarType.long,
     ),
     r'status': PropertySchema(
-      id: 16,
+      id: 17,
       name: r'status',
       type: IsarType.byte,
       enumMap: _BookstatusEnumValueMap,
     ),
     r'title': PropertySchema(
-      id: 17,
+      id: 18,
       name: r'title',
       type: IsarType.string,
-    ),
-    r'toc': PropertySchema(
-      id: 18,
-      name: r'toc',
-      type: IsarType.objectList,
-      target: r'TOCEntry',
     ),
     r'totalChapters': PropertySchema(
       id: 19,
@@ -141,7 +140,7 @@ const BookSchema = CollectionSchema(
     )
   },
   links: {},
-  embeddedSchemas: {r'TOCEntry': TOCEntrySchema},
+  embeddedSchemas: {},
   getId: _bookGetId,
   getLinks: _bookGetLinks,
   attach: _bookAttach,
@@ -180,6 +179,12 @@ int _bookEstimateSize(
     }
   }
   {
+    final value = object.isbn;
+    if (value != null) {
+      bytesCount += 3 + value.length * 3;
+    }
+  }
+  {
     final value = object.language;
     if (value != null) {
       bytesCount += 3 + value.length * 3;
@@ -198,14 +203,6 @@ int _bookEstimateSize(
       bytesCount += 3 + value.length * 3;
     }
   }
-  bytesCount += 3 + object.toc.length * 3;
-  {
-    final offsets = allOffsets[TOCEntry]!;
-    for (var i = 0; i < object.toc.length; i++) {
-      final value = object.toc[i];
-      bytesCount += TOCEntrySchema.estimateSize(value, offsets, allOffsets);
-    }
-  }
   return bytesCount;
 }
 
@@ -222,23 +219,18 @@ void _bookSerialize(
   writer.writeString(offsets[4], object.errorStackTrace);
   writer.writeBool(offsets[5], object.failedPermanently);
   writer.writeLong(offsets[6], object.fileSizeInBytes);
-  writer.writeString(offsets[7], object.language);
-  writer.writeDateTime(offsets[8], object.lastAccessedAt);
-  writer.writeLong(offsets[9], object.lastReadPage);
-  writer.writeDateTime(offsets[10], object.lastReadTimestamp);
-  writer.writeLongList(offsets[11], object.processedChapters);
-  writer.writeDouble(offsets[12], object.processingProgress);
-  writer.writeDateTime(offsets[13], object.publicationDate);
-  writer.writeString(offsets[14], object.publisher);
-  writer.writeLong(offsets[15], object.retryCount);
-  writer.writeByte(offsets[16], object.status.index);
-  writer.writeString(offsets[17], object.title);
-  writer.writeObjectList<TOCEntry>(
-    offsets[18],
-    allOffsets,
-    TOCEntrySchema.serialize,
-    object.toc,
-  );
+  writer.writeString(offsets[7], object.isbn);
+  writer.writeString(offsets[8], object.language);
+  writer.writeDateTime(offsets[9], object.lastAccessedAt);
+  writer.writeLong(offsets[10], object.lastReadPage);
+  writer.writeDateTime(offsets[11], object.lastReadTimestamp);
+  writer.writeLongList(offsets[12], object.processedChapters);
+  writer.writeDouble(offsets[13], object.processingProgress);
+  writer.writeDateTime(offsets[14], object.publicationDate);
+  writer.writeString(offsets[15], object.publisher);
+  writer.writeLong(offsets[16], object.retryCount);
+  writer.writeByte(offsets[17], object.status.index);
+  writer.writeString(offsets[18], object.title);
   writer.writeLong(offsets[19], object.totalChapters);
 }
 
@@ -257,25 +249,19 @@ Book _bookDeserialize(
   object.failedPermanently = reader.readBool(offsets[5]);
   object.fileSizeInBytes = reader.readLongOrNull(offsets[6]);
   object.id = id;
-  object.language = reader.readStringOrNull(offsets[7]);
-  object.lastAccessedAt = reader.readDateTimeOrNull(offsets[8]);
-  object.lastReadPage = reader.readLong(offsets[9]);
-  object.lastReadTimestamp = reader.readDateTimeOrNull(offsets[10]);
-  object.processedChapters = reader.readLongList(offsets[11]) ?? [];
-  object.processingProgress = reader.readDouble(offsets[12]);
-  object.publicationDate = reader.readDateTimeOrNull(offsets[13]);
-  object.publisher = reader.readStringOrNull(offsets[14]);
-  object.retryCount = reader.readLong(offsets[15]);
-  object.status = _BookstatusValueEnumMap[reader.readByteOrNull(offsets[16])] ??
+  object.isbn = reader.readStringOrNull(offsets[7]);
+  object.language = reader.readStringOrNull(offsets[8]);
+  object.lastAccessedAt = reader.readDateTimeOrNull(offsets[9]);
+  object.lastReadPage = reader.readLong(offsets[10]);
+  object.lastReadTimestamp = reader.readDateTimeOrNull(offsets[11]);
+  object.processedChapters = reader.readLongList(offsets[12]) ?? [];
+  object.processingProgress = reader.readDouble(offsets[13]);
+  object.publicationDate = reader.readDateTimeOrNull(offsets[14]);
+  object.publisher = reader.readStringOrNull(offsets[15]);
+  object.retryCount = reader.readLong(offsets[16]);
+  object.status = _BookstatusValueEnumMap[reader.readByteOrNull(offsets[17])] ??
       ProcessingStatus.queued;
-  object.title = reader.readStringOrNull(offsets[17]);
-  object.toc = reader.readObjectList<TOCEntry>(
-        offsets[18],
-        TOCEntrySchema.deserialize,
-        allOffsets,
-        TOCEntry(),
-      ) ??
-      [];
+  object.title = reader.readStringOrNull(offsets[18]);
   object.totalChapters = reader.readLong(offsets[19]);
   return object;
 }
@@ -304,34 +290,28 @@ P _bookDeserializeProp<P>(
     case 7:
       return (reader.readStringOrNull(offset)) as P;
     case 8:
-      return (reader.readDateTimeOrNull(offset)) as P;
-    case 9:
-      return (reader.readLong(offset)) as P;
-    case 10:
-      return (reader.readDateTimeOrNull(offset)) as P;
-    case 11:
-      return (reader.readLongList(offset) ?? []) as P;
-    case 12:
-      return (reader.readDouble(offset)) as P;
-    case 13:
-      return (reader.readDateTimeOrNull(offset)) as P;
-    case 14:
       return (reader.readStringOrNull(offset)) as P;
-    case 15:
+    case 9:
+      return (reader.readDateTimeOrNull(offset)) as P;
+    case 10:
       return (reader.readLong(offset)) as P;
+    case 11:
+      return (reader.readDateTimeOrNull(offset)) as P;
+    case 12:
+      return (reader.readLongList(offset) ?? []) as P;
+    case 13:
+      return (reader.readDouble(offset)) as P;
+    case 14:
+      return (reader.readDateTimeOrNull(offset)) as P;
+    case 15:
+      return (reader.readStringOrNull(offset)) as P;
     case 16:
+      return (reader.readLong(offset)) as P;
+    case 17:
       return (_BookstatusValueEnumMap[reader.readByteOrNull(offset)] ??
           ProcessingStatus.queued) as P;
-    case 17:
-      return (reader.readStringOrNull(offset)) as P;
     case 18:
-      return (reader.readObjectList<TOCEntry>(
-            offset,
-            TOCEntrySchema.deserialize,
-            allOffsets,
-            TOCEntry(),
-          ) ??
-          []) as P;
+      return (reader.readStringOrNull(offset)) as P;
     case 19:
       return (reader.readLong(offset)) as P;
     default:
@@ -1395,6 +1375,150 @@ extension BookQueryFilter on QueryBuilder<Book, Book, QFilterCondition> {
     });
   }
 
+  QueryBuilder<Book, Book, QAfterFilterCondition> isbnIsNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(const FilterCondition.isNull(
+        property: r'isbn',
+      ));
+    });
+  }
+
+  QueryBuilder<Book, Book, QAfterFilterCondition> isbnIsNotNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(const FilterCondition.isNotNull(
+        property: r'isbn',
+      ));
+    });
+  }
+
+  QueryBuilder<Book, Book, QAfterFilterCondition> isbnEqualTo(
+    String? value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'isbn',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<Book, Book, QAfterFilterCondition> isbnGreaterThan(
+    String? value, {
+    bool include = false,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        include: include,
+        property: r'isbn',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<Book, Book, QAfterFilterCondition> isbnLessThan(
+    String? value, {
+    bool include = false,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.lessThan(
+        include: include,
+        property: r'isbn',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<Book, Book, QAfterFilterCondition> isbnBetween(
+    String? lower,
+    String? upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.between(
+        property: r'isbn',
+        lower: lower,
+        includeLower: includeLower,
+        upper: upper,
+        includeUpper: includeUpper,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<Book, Book, QAfterFilterCondition> isbnStartsWith(
+    String value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.startsWith(
+        property: r'isbn',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<Book, Book, QAfterFilterCondition> isbnEndsWith(
+    String value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.endsWith(
+        property: r'isbn',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<Book, Book, QAfterFilterCondition> isbnContains(String value,
+      {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.contains(
+        property: r'isbn',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<Book, Book, QAfterFilterCondition> isbnMatches(String pattern,
+      {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.matches(
+        property: r'isbn',
+        wildcard: pattern,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<Book, Book, QAfterFilterCondition> isbnIsEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'isbn',
+        value: '',
+      ));
+    });
+  }
+
+  QueryBuilder<Book, Book, QAfterFilterCondition> isbnIsNotEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        property: r'isbn',
+        value: '',
+      ));
+    });
+  }
+
   QueryBuilder<Book, Book, QAfterFilterCondition> languageIsNull() {
     return QueryBuilder.apply(this, (query) {
       return query.addFilterCondition(const FilterCondition.isNull(
@@ -2401,89 +2525,6 @@ extension BookQueryFilter on QueryBuilder<Book, Book, QFilterCondition> {
     });
   }
 
-  QueryBuilder<Book, Book, QAfterFilterCondition> tocLengthEqualTo(int length) {
-    return QueryBuilder.apply(this, (query) {
-      return query.listLength(
-        r'toc',
-        length,
-        true,
-        length,
-        true,
-      );
-    });
-  }
-
-  QueryBuilder<Book, Book, QAfterFilterCondition> tocIsEmpty() {
-    return QueryBuilder.apply(this, (query) {
-      return query.listLength(
-        r'toc',
-        0,
-        true,
-        0,
-        true,
-      );
-    });
-  }
-
-  QueryBuilder<Book, Book, QAfterFilterCondition> tocIsNotEmpty() {
-    return QueryBuilder.apply(this, (query) {
-      return query.listLength(
-        r'toc',
-        0,
-        false,
-        999999,
-        true,
-      );
-    });
-  }
-
-  QueryBuilder<Book, Book, QAfterFilterCondition> tocLengthLessThan(
-    int length, {
-    bool include = false,
-  }) {
-    return QueryBuilder.apply(this, (query) {
-      return query.listLength(
-        r'toc',
-        0,
-        true,
-        length,
-        include,
-      );
-    });
-  }
-
-  QueryBuilder<Book, Book, QAfterFilterCondition> tocLengthGreaterThan(
-    int length, {
-    bool include = false,
-  }) {
-    return QueryBuilder.apply(this, (query) {
-      return query.listLength(
-        r'toc',
-        length,
-        include,
-        999999,
-        true,
-      );
-    });
-  }
-
-  QueryBuilder<Book, Book, QAfterFilterCondition> tocLengthBetween(
-    int lower,
-    int upper, {
-    bool includeLower = true,
-    bool includeUpper = true,
-  }) {
-    return QueryBuilder.apply(this, (query) {
-      return query.listLength(
-        r'toc',
-        lower,
-        includeLower,
-        upper,
-        includeUpper,
-      );
-    });
-  }
-
   QueryBuilder<Book, Book, QAfterFilterCondition> totalChaptersEqualTo(
       int value) {
     return QueryBuilder.apply(this, (query) {
@@ -2538,14 +2579,7 @@ extension BookQueryFilter on QueryBuilder<Book, Book, QFilterCondition> {
   }
 }
 
-extension BookQueryObject on QueryBuilder<Book, Book, QFilterCondition> {
-  QueryBuilder<Book, Book, QAfterFilterCondition> tocElement(
-      FilterQuery<TOCEntry> q) {
-    return QueryBuilder.apply(this, (query) {
-      return query.object(q, r'toc');
-    });
-  }
-}
+extension BookQueryObject on QueryBuilder<Book, Book, QFilterCondition> {}
 
 extension BookQueryLinks on QueryBuilder<Book, Book, QFilterCondition> {}
 
@@ -2619,6 +2653,18 @@ extension BookQuerySortBy on QueryBuilder<Book, Book, QSortBy> {
   QueryBuilder<Book, Book, QAfterSortBy> sortByFileSizeInBytesDesc() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'fileSizeInBytes', Sort.desc);
+    });
+  }
+
+  QueryBuilder<Book, Book, QAfterSortBy> sortByIsbn() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'isbn', Sort.asc);
+    });
+  }
+
+  QueryBuilder<Book, Book, QAfterSortBy> sortByIsbnDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'isbn', Sort.desc);
     });
   }
 
@@ -2840,6 +2886,18 @@ extension BookQuerySortThenBy on QueryBuilder<Book, Book, QSortThenBy> {
     });
   }
 
+  QueryBuilder<Book, Book, QAfterSortBy> thenByIsbn() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'isbn', Sort.asc);
+    });
+  }
+
+  QueryBuilder<Book, Book, QAfterSortBy> thenByIsbnDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'isbn', Sort.desc);
+    });
+  }
+
   QueryBuilder<Book, Book, QAfterSortBy> thenByLanguage() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'language', Sort.asc);
@@ -3021,6 +3079,13 @@ extension BookQueryWhereDistinct on QueryBuilder<Book, Book, QDistinct> {
     });
   }
 
+  QueryBuilder<Book, Book, QDistinct> distinctByIsbn(
+      {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'isbn', caseSensitive: caseSensitive);
+    });
+  }
+
   QueryBuilder<Book, Book, QDistinct> distinctByLanguage(
       {bool caseSensitive = true}) {
     return QueryBuilder.apply(this, (query) {
@@ -3146,6 +3211,12 @@ extension BookQueryProperty on QueryBuilder<Book, Book, QQueryProperty> {
     });
   }
 
+  QueryBuilder<Book, String?, QQueryOperations> isbnProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'isbn');
+    });
+  }
+
   QueryBuilder<Book, String?, QQueryOperations> languageProperty() {
     return QueryBuilder.apply(this, (query) {
       return query.addPropertyName(r'language');
@@ -3209,12 +3280,6 @@ extension BookQueryProperty on QueryBuilder<Book, Book, QQueryProperty> {
   QueryBuilder<Book, String?, QQueryOperations> titleProperty() {
     return QueryBuilder.apply(this, (query) {
       return query.addPropertyName(r'title');
-    });
-  }
-
-  QueryBuilder<Book, List<TOCEntry>, QQueryOperations> tocProperty() {
-    return QueryBuilder.apply(this, (query) {
-      return query.addPropertyName(r'toc');
     });
   }
 

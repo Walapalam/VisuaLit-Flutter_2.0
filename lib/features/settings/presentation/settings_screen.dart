@@ -145,6 +145,7 @@ class SettingsScreen extends ConsumerWidget {
                 _buildNavigationItem(
                   context,
                   'Storage & Cache',
+                  Icons.storage_outlined, // Added missing icon parameter
                       () => context.pushNamed('storageSettings'),
                 ),
                 const Divider(height: 1),

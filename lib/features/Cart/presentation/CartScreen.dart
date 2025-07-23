@@ -85,6 +85,8 @@ class _CartScreenState extends ConsumerState<CartScreen> {
                           'authors': book['authors'],
                           'fileBytes': response.bodyBytes,
                         };
+
+
                         await libraryController.addBookFromCart(bookData);
 
                         // Show success message

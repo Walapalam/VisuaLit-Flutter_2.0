@@ -1,98 +1,123 @@
 import 'package:flutter/material.dart';
 import 'package:visualit/features/reader/data/book_data.dart';
 import 'package:visualit/features/reader/presentation/widgets/html_content_widget.dart';
+import 'package:visualit/features/reader/presentation/reading_screen.dart'; // Contains the TextHighlight model.
 
-class BookPageWidget extends StatefulWidget {
-  final List<ContentBlock> allBlocks;
-  final int startingBlockIndex;
-  final Size viewSize;
-  final Function(int pageIndex, int startingBlock, int endingBlock) onPageBuilt;
-  final int pageIndex;
+        // If TextHighlight is not imported, define a minimal version for compilation:
+        class TextHighlight {
+          final int blockIndex;
+          final int startOffset;
+          final int endOffset;
+          final Color color;
+          TextHighlight({required this.blockIndex, required this.startOffset, required this.endOffset, required this.color});
+        }
 
-  const BookPageWidget({
-    super.key,
-    required this.allBlocks,
-    required this.startingBlockIndex,
-    required this.viewSize,
-    required this.onPageBuilt,
-    required this.pageIndex,
-  });
+        /// A widget that represents a single, paginated "page" of a book.
+        class BookPageWidget extends StatefulWidget {
+          final List<ContentBlock> allBlocks;
+          final int startingBlockIndex;
+          final Size viewSize;
+          final Function(int pageIndex, int startingBlock, int endingBlock) onPageBuilt;
+          final int pageIndex;
+          final List<TextHighlight> highlights;
+          final void Function(TextSelection?, RenderObject?, int, String?)? onSelectionChanged;
 
-  @override
-  State<BookPageWidget> createState() => _BookPageWidgetState();
-}
+          const BookPageWidget({
+            super.key,
+            required this.allBlocks,
+            required this.startingBlockIndex,
+            required this.viewSize,
+            required this.onPageBuilt,
+            required this.pageIndex,
+            this.highlights = const [],
+            this.onSelectionChanged,
+          });
 
-class _BookPageWidgetState extends State<BookPageWidget> {
-  final List<Widget> _pageContent = [];
-  final GlobalKey _columnKey = GlobalKey();
-  int _endingBlockIndex = 0;
-  bool _isLayoutDone = false;
+          @override
+          State<BookPageWidget> createState() => _BookPageWidgetState();
+        }
 
-  @override
-  void initState() {
-    super.initState();
-    _endingBlockIndex = widget.startingBlockIndex;
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _buildPageContent();
-    });
-  }
+        class _BookPageWidgetState extends State<BookPageWidget> {
+          final List<Widget> _pageContent = [];
+          final GlobalKey _columnKey = GlobalKey();
+          int _endingBlockIndex = 0;
+          bool _isLayoutDone = false;
 
-  Future<void> _buildPageContent() async {
-    if (!mounted) return;
+          @override
+          void initState() {
+            super.initState();
+            _endingBlockIndex = widget.startingBlockIndex;
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              _buildPageContent();
+            });
+          }
 
-    final List<Widget> currentWidgets = [];
-    int currentBlockIndex = widget.startingBlockIndex;
-    final double availableHeight = widget.viewSize.height - 60;
+          Future<void> _buildPageContent() async {
+            if (!mounted) return;
 
-    while (currentBlockIndex < widget.allBlocks.length) {
-      final block = widget.allBlocks[currentBlockIndex];
-      // Pass the block's absolute index to the widget.
-      currentWidgets.add(HtmlContentWidget(
-          block: block,
-          blockIndex: currentBlockIndex, // <-- THE FIX
-          viewSize: widget.viewSize
-      ));
+            final List<Widget> currentWidgets = [];
+            int currentBlockIndex = widget.startingBlockIndex;
+            final double availableHeight = widget.viewSize.height - 60;
 
-      setState(() {
-        _pageContent.clear();
-        _pageContent.addAll(currentWidgets);
-      });
+            while (currentBlockIndex < widget.allBlocks.length) {
+              final block = widget.allBlocks[currentBlockIndex];
 
-      await Future.delayed(Duration.zero);
-      if (!mounted) return;
+              // Null-safe access to blockIndex
+              final blockHighlights = widget.highlights.where((h) => h.blockIndex == currentBlockIndex).toList();
 
-      final RenderBox? renderBox = _columnKey.currentContext?.findRenderObject() as RenderBox?;
-      if (renderBox != null && renderBox.size.height > availableHeight) {
-        currentWidgets.removeLast();
-        setState(() {
-          _pageContent.clear();
-          _pageContent.addAll(currentWidgets);
-        });
-        break;
-      } else {
-        _endingBlockIndex = currentBlockIndex;
-        currentBlockIndex++;
-      }
-    }
+              currentWidgets.add(HtmlContentWidget(
+                key: ValueKey('block_${block.id}_${block.chapterIndex}_${block.blockIndexInChapter}'),
+                block: block,
+                blockIndex: currentBlockIndex,
+                viewSize: widget.viewSize,
+                highlights: blockHighlights,
+                onSelectionChanged: (selection, renderObject, blockTextContent) {
+                  widget.onSelectionChanged?.call(selection, renderObject, currentBlockIndex, blockTextContent);
+                },
+              ));
 
-    if(mounted && !_isLayoutDone) {
-      _isLayoutDone = true;
-      print("  [BookPageWidget] Page ${widget.pageIndex} layout complete. Starts at ${widget.startingBlockIndex}, ends at $_endingBlockIndex.");
-      widget.onPageBuilt(widget.pageIndex, widget.startingBlockIndex, _endingBlockIndex);
-    }
-  }
+              setState(() {
+                _pageContent.clear();
+                _pageContent.addAll(currentWidgets);
+              });
 
-  @override
-  Widget build(BuildContext context) {
-    return SingleChildScrollView(
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 30),
-      physics: const NeverScrollableScrollPhysics(),
-      child: Column(
-        key: _columnKey,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisSize: MainAxisSize.min,
-        children: _pageContent,
-      ),
-    );
-  }
-}
+              await Future.delayed(Duration.zero);
+              if (!mounted) return;
+
+              final RenderBox? renderBox = _columnKey.currentContext?.findRenderObject() as RenderBox?;
+              if (renderBox != null) {
+                if (renderBox.size.height > availableHeight && currentWidgets.isNotEmpty) {
+                  currentWidgets.removeLast();
+                  setState(() {
+                    _pageContent.clear();
+                    _pageContent.addAll(currentWidgets);
+                  });
+                  break;
+                }
+              }
+
+              _endingBlockIndex = currentBlockIndex;
+              currentBlockIndex++;
+            }
+
+            if (mounted && !_isLayoutDone) {
+              _isLayoutDone = true;
+              debugPrint("  [BookPageWidget] Page ${widget.pageIndex} layout complete. Starts at ${widget.startingBlockIndex}, ends at $_endingBlockIndex.");
+              widget.onPageBuilt(widget.pageIndex, widget.startingBlockIndex, _endingBlockIndex);
+            }
+          }
+
+          @override
+          Widget build(BuildContext context) {
+            return SingleChildScrollView(
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 30),
+              physics: const NeverScrollableScrollPhysics(),
+              child: Column(
+                key: _columnKey,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: _pageContent,
+              ),
+            );
+          }
+        }

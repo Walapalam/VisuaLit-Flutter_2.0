@@ -10,45 +10,48 @@ class Highlight implements SyncableEntity {
   @Index()
   late int bookId;
 
-  // A composite index to quickly find all highlights for a specific chapter.
+  /// Composite index to efficiently query highlights within a chapter and by block order
   @Index(composite: [
-    CompositeIndex('blockIndexInChapter', type: IndexType.value)
+    CompositeIndex('blockIndexInChapter', type: IndexType.value),
   ])
   int? chapterIndex;
 
+  /// Index of the block within the chapter where the highlight exists
   int? blockIndexInChapter;
 
-  /// The selected text content.
+  /// The selected text content
   late String text;
 
-  /// The start offset of the selection within the block's plain text.
+  /// The start offset of the selection within the block's plain text
   late int startOffset;
 
-  /// The end offset of the selection within the block's plain text.
+  /// The end offset of the selection within the block's plain text
   late int endOffset;
 
-  /// The ARGB color value of the highlight.
+  /// The ARGB color value of the highlight
   late int color;
 
+  /// Timestamp when the highlight was created
   DateTime timestamp = DateTime.now();
 
-  String? note; // For future annotation features
+  /// Optional user annotation/note
+  String? note;
 
-  /// Unique identifier for synchronization across devices.
+  // ---------- SyncableEntity fields ----------
+
+  /// Unique identifier for synchronization across devices
   @override
   String? syncId;
 
-  /// Timestamp of when this entity was last modified.
+  /// Timestamp of last local modification
   @override
   DateTime lastModified = DateTime.now();
 
-  /// Flag indicating whether this entity has local changes
-  /// that need to be synchronized to the server.
+  /// Whether this entity has unsynced local changes
   @override
   bool isDirty = true;
 
-  /// Updates the lastModified timestamp to the current time
-  /// and marks the entity as dirty.
+  /// Marks this entity as dirty and updates lastModified
   @override
   void markDirty() {
     lastModified = DateTime.now();

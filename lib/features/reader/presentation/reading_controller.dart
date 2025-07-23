@@ -1,27 +1,25 @@
 import 'dart:async';
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:isar/isar.dart';
-import 'package:path/path.dart' as p;
 import 'package:visualit/core/providers/isar_provider.dart';
-import 'package:visualit/features/reader/application/layout_cache_service.dart';
 import 'package:visualit/features/reader/data/book_data.dart';
 import 'package:visualit/features/reader/data/highlight.dart';
 import 'package:visualit/features/reader/data/toc_entry.dart';
 import 'package:visualit/features/reader/presentation/reading_preferences_controller.dart';
-import 'package:device_info_plus/device_info_plus.dart';
+import 'package:path/path.dart' as p;
 
 @immutable
 class ReadingState {
   final int bookId;
-  final Book? book; // <-- ADDED: The full book object for metadata
+  final Book? book;
   final List<ContentBlock> blocks;
   final int currentPage;
   final bool isBookLoaded;
   final Map<int, int> pageToBlockIndexMap;
   final int totalPages;
-  final String? currentLayoutKey; // Current layout fingerprint key
-  final bool isUsingCachedLayout; // Whether the current layout is from cache
+  final Size? viewSize;
 
   const ReadingState({
     required this.bookId,
@@ -31,11 +29,9 @@ class ReadingState {
     this.isBookLoaded = false,
     this.pageToBlockIndexMap = const {0: 0},
     this.totalPages = 1,
-    this.currentLayoutKey,
-    this.isUsingCachedLayout = false,
+    this.viewSize,
   });
 
-  // --- HELPER GETTER for chapter progress ---
   String get chapterProgress {
     if (blocks.isEmpty || pageToBlockIndexMap[currentPage] == null) {
       return "Loading chapter...";
@@ -58,15 +54,13 @@ class ReadingState {
     int? chapterEndPage;
     for (final entry in pageToBlockIndexMap.entries) {
       if(entry.value > chapterEndBlock) {
-        chapterEndPage = entry.key -1;
+        chapterEndPage = entry.key - 1;
         break;
       }
     }
-    chapterEndPage ??= totalPages -1;
+    chapterEndPage ??= totalPages - 1;
 
-    final pagesInChapter = (chapterEndPage - chapterStartPage) + 1;
     final pagesLeft = chapterEndPage - currentPage;
-
     if (pagesLeft <= 0) return "Last page in chapter";
     return "$pagesLeft pages left in chapter";
   }
@@ -78,8 +72,7 @@ class ReadingState {
     bool? isBookLoaded,
     Map<int, int>? pageToBlockIndexMap,
     int? totalPages,
-    String? currentLayoutKey,
-    bool? isUsingCachedLayout,
+    Size? viewSize,
   }) {
     return ReadingState(
       bookId: bookId,
@@ -89,8 +82,7 @@ class ReadingState {
       isBookLoaded: isBookLoaded ?? this.isBookLoaded,
       pageToBlockIndexMap: pageToBlockIndexMap ?? this.pageToBlockIndexMap,
       totalPages: totalPages ?? this.totalPages,
-      currentLayoutKey: currentLayoutKey ?? this.currentLayoutKey,
-      isUsingCachedLayout: isUsingCachedLayout ?? this.isUsingCachedLayout,
+      viewSize: viewSize ?? this.viewSize,
     );
   }
 }
@@ -98,252 +90,63 @@ class ReadingState {
 class ReadingController extends StateNotifier<ReadingState> {
   final Isar _isar;
   final _Debouncer _debouncer = _Debouncer(milliseconds: 1000);
-  final Completer<void> _layoutCompleter = Completer<void>();
-  late final LayoutCacheService _layoutCacheService;
-  String? _deviceId;
-  ReadingPreferences? _currentPreferences;
-  Size? _currentScreenSize;
 
   ReadingController(this._isar, int bookId) : super(ReadingState(bookId: bookId)) {
-    _layoutCacheService = LayoutCacheService(_isar);
     _initialize();
-    _initDeviceId();
-  }
-
-  Future<void> _initDeviceId() async {
-    try {
-      final deviceInfo = DeviceInfoPlugin();
-
-      // Try to get platform-specific device ID
-      try {
-        final androidInfo = await deviceInfo.androidInfo;
-        _deviceId = androidInfo.id;
-        return;
-      } catch (_) {}
-
-      try {
-        final iosInfo = await deviceInfo.iosInfo;
-        _deviceId = iosInfo.identifierForVendor;
-        return;
-      } catch (_) {}
-
-      // For web or desktop, generate a persistent ID
-      _deviceId = 'device_${DateTime.now().millisecondsSinceEpoch}';
-    } catch (e) {
-      print('Error getting device ID: $e');
-      _deviceId = 'unknown_device';
-    }
   }
 
   Future<void> _initialize() async {
-    // --- UPDATED: Fetch both book and blocks ---
     final book = await _isar.books.get(state.bookId);
-
-    if (book == null) {
-      if (mounted) {
-        state = state.copyWith(
-          isBookLoaded: true,
-          blocks: [],
-        );
-      }
-      return;
-    }
-
-    // Update lastAccessedAt timestamp for cache management
-    await _isar.writeTxn(() async {
-      book.lastAccessedAt = DateTime.now();
-      await _isar.books.put(book);
-    });
-
-    // Load only blocks from processed chapters
-    List<ContentBlock> blocks = [];
-    if (book.status == ProcessingStatus.ready) {
-      // If book is fully ready, load all blocks
-      blocks = await _isar.contentBlocks.filter().bookIdEqualTo(state.bookId).findAll();
-    } else if (book.status == ProcessingStatus.partiallyReady) {
-      // If book is partially ready, load only blocks from processed chapters
-      if (book.processedChapters.isNotEmpty) {
-        blocks = await _isar.contentBlocks
-            .filter()
-            .bookIdEqualTo(state.bookId)
-            .anyOf(book.processedChapters, (q, chapterIndex) => q.chapterIndexEqualTo(chapterIndex))
-            .findAll();
-      }
-
-      // Start a timer to check for newly processed chapters
-      _startProcessingCheckTimer();
-    }
+    final blocks = await _isar.contentBlocks.filter().bookIdEqualTo(state.bookId).findAll();
 
     if (mounted) {
       state = state.copyWith(
-        book: book, // Save the book object to state
+        book: book,
         blocks: blocks,
-        currentPage: book.lastReadPage ?? 0,
+        currentPage: book?.lastReadPage ?? 0,
         isBookLoaded: true,
       );
+      if (state.viewSize != null) {
+        _recalculateLayout();
+      }
     }
   }
 
-  Timer? _processingCheckTimer;
-
-  void _startProcessingCheckTimer() {
-    // Check every 5 seconds for newly processed chapters
-    _processingCheckTimer = Timer.periodic(const Duration(seconds: 5), (_) => _checkForNewChapters());
-  }
-
-  @override
-  void dispose() {
-    _processingCheckTimer?.cancel();
-    super.dispose();
-  }
-
-  Future<void> _checkForNewChapters() async {
-    if (!mounted) return;
-
-    final book = await _isar.books.get(state.bookId);
-    if (book == null) return;
-
-    // If book is now fully ready, load all blocks
-    if (book.status == ProcessingStatus.ready) {
-      final allBlocks = await _isar.contentBlocks.filter().bookIdEqualTo(state.bookId).findAll();
+  void setLayoutParameters(ReadingPreferences prefs, Size viewSize) {
+    if (state.viewSize != viewSize) {
       if (mounted) {
-        state = state.copyWith(
-          book: book,
-          blocks: allBlocks,
-        );
+        state = state.copyWith(viewSize: viewSize);
       }
-      _processingCheckTimer?.cancel();
-      return;
-    }
-
-    // If book is still partially ready, check for new processed chapters
-    if (book.status == ProcessingStatus.partiallyReady) {
-      // Find chapters that are processed but not loaded yet
-      final currentChapters = state.blocks
-          .map((block) => block.chapterIndex)
-          .toSet();
-
-      final newChapters = book.processedChapters
-          .where((chapterIndex) => !currentChapters.contains(chapterIndex))
-          .toList();
-
-      if (newChapters.isNotEmpty) {
-        // Load blocks from newly processed chapters
-        final newBlocks = await _isar.contentBlocks
-            .filter()
-            .bookIdEqualTo(state.bookId)
-            .anyOf(newChapters, (q, chapterIndex) => q.chapterIndexEqualTo(chapterIndex))
-            .findAll();
-
-        if (mounted && newBlocks.isNotEmpty) {
-          // Combine existing blocks with new blocks and sort by chapter and block index
-          final allBlocks = [...state.blocks, ...newBlocks];
-          allBlocks.sort((a, b) {
-            final chapterComparison = (a.chapterIndex ?? 0).compareTo(b.chapterIndex ?? 0);
-            if (chapterComparison != 0) return chapterComparison;
-            return (a.blockIndexInChapter ?? 0).compareTo(b.blockIndexInChapter ?? 0);
-          });
-
-          state = state.copyWith(
-            book: book,
-            blocks: allBlocks,
-          );
-        }
-      }
+      _recalculateLayout();
     }
   }
 
-  /// Set the current reading preferences and screen size
-  /// This should be called whenever these values change
-  void setLayoutParameters(ReadingPreferences preferences, Size screenSize) {
-    _currentPreferences = preferences;
-    _currentScreenSize = screenSize;
+  void _recalculateLayout() {
+    if (!mounted || state.blocks.isEmpty || state.viewSize == null) return;
 
-    // If we have all the necessary information, generate a new layout key
-    if (_currentPreferences != null && _currentScreenSize != null) {
-      final newLayoutKey = _layoutCacheService.generateLayoutKey(_currentPreferences!, _currentScreenSize!);
-
-      // If the layout key has changed, try to load a cached layout
-      if (newLayoutKey != state.currentLayoutKey) {
-        _tryLoadCachedLayout(newLayoutKey);
-      }
-    }
-  }
-
-  /// Try to load a cached layout for the given layout key
-  Future<void> _tryLoadCachedLayout(String layoutKey) async {
-    if (_deviceId == null || state.blocks.isEmpty) return;
-
-    try {
-      final cachedLayout = await _layoutCacheService.getCachedPageLayout(
-        bookId: state.bookId,
-        deviceId: _deviceId!,
-        layoutKey: layoutKey,
-      );
-
-      if (cachedLayout != null && cachedLayout.isNotEmpty) {
-        print('📚 [ReadingController] Found cached layout for key: $layoutKey');
-
-        // Calculate the current block index
-        int? currentBlockIndex;
-        if (state.pageToBlockIndexMap.containsKey(state.currentPage)) {
-          currentBlockIndex = state.pageToBlockIndexMap[state.currentPage];
-        }
-
-        // Update the state with the cached layout
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          if (mounted) {
-            state = state.copyWith(
-              pageToBlockIndexMap: cachedLayout,
-              currentLayoutKey: layoutKey,
-              isUsingCachedLayout: true,
-            );
-
-            // If we have a current block index, find the corresponding page in the new layout
-            if (currentBlockIndex != null) {
-              _findPageForBlockAndUpdate(currentBlockIndex);
-            }
-          }
-        });
-      } else {
-        // No cached layout found, update the layout key
-        if (mounted) {
-          state = state.copyWith(
-            currentLayoutKey: layoutKey,
-            isUsingCachedLayout: false,
-          );
-        }
-      }
-    } catch (e) {
-      print('Error loading cached layout: $e');
-    }
-  }
-
-  /// Find the page for a given block index and update the current page
-  Future<void> _findPageForBlockAndUpdate(int blockIndex) async {
-    final page = await _findPageForBlock(blockIndex);
-    if (page != null && mounted) {
-      state = state.copyWith(currentPage: page);
-    }
+    final newPageToBlockIndexMap = <int, int>{0: 0};
+    state = state.copyWith(
+      pageToBlockIndexMap: newPageToBlockIndexMap,
+      totalPages: 1,
+    );
   }
 
   void updatePageLayout(int pageIndex, int startingBlock, int endingBlock) {
     if (!mounted) return;
     final nextPageIndex = pageIndex + 1;
     final nextBlockIndex = endingBlock + 1;
-    if (state.pageToBlockIndexMap[nextPageIndex] != nextBlockIndex) {
+
+    if ((state.pageToBlockIndexMap[nextPageIndex] == null || state.pageToBlockIndexMap[nextPageIndex]! < nextBlockIndex) && nextBlockIndex <= state.blocks.length) {
       final newMap = Map<int, int>.from(state.pageToBlockIndexMap);
       newMap[nextPageIndex] = nextBlockIndex;
+
       int newTotalPages = state.totalPages;
       if (nextBlockIndex >= state.blocks.length) {
-        newTotalPages = nextPageIndex;
-        if (!_layoutCompleter.isCompleted) _layoutCompleter.complete();
-
-        // Cache the layout if we have all the necessary information
-        _cacheCurrentLayout(newMap, newTotalPages);
+        newTotalPages = nextPageIndex + 1;
       } else {
-        newTotalPages = state.totalPages > nextPageIndex ? state.totalPages : nextPageIndex + 1;
+        newTotalPages = math.max(state.totalPages, nextPageIndex + 1);
       }
+
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) {
           state = state.copyWith(pageToBlockIndexMap: newMap, totalPages: newTotalPages);
@@ -352,44 +155,14 @@ class ReadingController extends StateNotifier<ReadingState> {
     }
   }
 
-  /// Cache the current layout
-  Future<void> _cacheCurrentLayout(Map<int, int> pageMap, int totalPages) async {
-    if (_deviceId == null || _currentPreferences == null || _currentScreenSize == null) return;
-
-    final layoutKey = state.currentLayoutKey ?? 
-        _layoutCacheService.generateLayoutKey(_currentPreferences!, _currentScreenSize!);
-
-    try {
-      await _layoutCacheService.cachePageLayout(
-        bookId: state.bookId,
-        deviceId: _deviceId!,
-        layoutKey: layoutKey,
-        pageToBlockMap: pageMap,
-        totalPages: totalPages,
-      );
-
-      print('📚 [ReadingController] Cached layout with key: $layoutKey');
-
-      // Update the state to reflect that we're using a cached layout
-      if (mounted) {
-        state = state.copyWith(
-          currentLayoutKey: layoutKey,
-          isUsingCachedLayout: true,
-        );
-      }
-    } catch (e) {
-      print('Error caching layout: $e');
-    }
-  }
-
   void onPageChanged(int page) {
     if (page != state.currentPage) {
       if (mounted) state = state.copyWith(currentPage: page);
-      _debouncer.run(() => _saveProgress(page));
+      _debouncer.run(() => _saveProgressToDb(page));
     }
   }
 
-  Future<void> _saveProgress(int page) async {
+  Future<void> _saveProgressToDb(int page) async {
     await _isar.writeTxn(() async {
       final book = await _isar.books.get(state.bookId);
       if (book != null) {
@@ -400,140 +173,81 @@ class ReadingController extends StateNotifier<ReadingState> {
     });
   }
 
-  /// Finds the closest TOC entry for a given slider position (0.0 to 1.0)
-  TOCEntry? findClosestTOCEntry(double sliderPosition) {
-    if (state.book == null || state.book!.toc.isEmpty) return null;
-
-    // Convert slider position to page index
-    final targetPage = (sliderPosition * (state.totalPages - 1)).round();
-
-    // Get the block index for this page
-    final blockIndex = state.pageToBlockIndexMap[targetPage];
-    if (blockIndex == null) return null;
-
-    // Find the TOC entry with the closest blockIndexStart
-    TOCEntry? closestEntry;
-    int? closestDistance;
-
-    // Helper function to process TOC entries recursively
-    void processTOCEntry(TOCEntry entry) {
-      if (entry.blockIndexStart != null) {
-        final distance = (entry.blockIndexStart! - blockIndex).abs();
-        if (closestDistance == null || distance < closestDistance!) {
-          closestDistance = distance;
-          closestEntry = entry;
-        }
-      }
-
-      // Process children
-      for (final child in entry.children) {
-        processTOCEntry(child);
-      }
-    }
-
-    // Process all TOC entries
-    for (final entry in state.book!.toc) {
-      processTOCEntry(entry);
-    }
-
-    return closestEntry;
-  }
-
-  /// Gets the chapter name for a given slider position
-  String? getChapterNameForPosition(double sliderPosition) {
-    final entry = findClosestTOCEntry(sliderPosition);
-    return entry?.title;
-  }
-
-  Future<int?> _findPageForBlock(int targetBlockIndex) async {
-    if (!mounted) return null;
-    for (final entry in state.pageToBlockIndexMap.entries) {
-      final start = entry.value;
-      final end = (state.pageToBlockIndexMap[entry.key + 1] ?? state.blocks.length) - 1;
-      if (targetBlockIndex >= start && targetBlockIndex <= end) {
-        return entry.key;
-      }
-    }
-    int lastKnownPage = state.pageToBlockIndexMap.keys.last;
-    state = state.copyWith(currentPage: lastKnownPage);
-    while (mounted) {
-      await Future.delayed(const Duration(milliseconds: 50));
-      final lastBlockOnLastPage = (state.pageToBlockIndexMap[lastKnownPage + 1] ?? 0) - 1;
-      if (targetBlockIndex <= lastBlockOnLastPage) {
-        return lastKnownPage;
-      }
-      if (lastBlockOnLastPage >= state.blocks.length - 1) {
-        return lastKnownPage;
-      }
-      lastKnownPage++;
-      state = state.copyWith(currentPage: lastKnownPage);
-    }
-    return null;
-  }
-
   Future<void> jumpToLocation(TOCEntry entry) async {
-    // If blockIndexStart is available, use it for precise navigation
-    if (entry.blockIndexStart != null) {
-      final targetBlockIndex = entry.blockIndexStart!;
-      if (targetBlockIndex >= 0 && targetBlockIndex < state.blocks.length) {
-        final targetPage = await _findPageForBlock(targetBlockIndex);
-        if (targetPage != null && mounted) {
-          state = state.copyWith(currentPage: targetPage);
-        }
-        return;
+    if (entry.src == null || state.blocks.isEmpty) return;
+
+    int targetBlockIndex = state.blocks.indexWhere((b) => b.src == entry.src);
+
+    if (entry.fragment != null && entry.fragment!.isNotEmpty && targetBlockIndex != -1) {
+      final fragmentBlockIndex = state.blocks.indexWhere((block) =>
+      block.chapterIndex == state.blocks[targetBlockIndex].chapterIndex &&
+          block.htmlContent?.contains('id="${entry.fragment}"') == true);
+      if (fragmentBlockIndex != -1) {
+        targetBlockIndex = fragmentBlockIndex;
       }
     }
 
-    // Fall back to src-based navigation if blockIndexStart is not available
-    if (entry.src == null) return;
-    final targetBlockIndex = state.blocks.indexWhere((b) => b.src == entry.src);
     if (targetBlockIndex != -1) {
       final targetPage = await _findPageForBlock(targetBlockIndex);
       if (targetPage != null && mounted) {
         state = state.copyWith(currentPage: targetPage);
+      } else {
+        if (mounted) {
+          state = state.copyWith(currentPage: 0);
+        }
       }
     }
+  }
+
+  Future<int?> _findPageForBlock(int targetBlockIndex) async {
+    if (!mounted) return null;
+
+    for (final entry in state.pageToBlockIndexMap.entries) {
+      final startBlockOfPage = entry.value;
+      final endBlockOfPage = (state.pageToBlockIndexMap[entry.key + 1] ?? state.blocks.length) - 1;
+
+      if (targetBlockIndex >= startBlockOfPage && targetBlockIndex <= endBlockOfPage) {
+        return entry.key;
+      }
+    }
+
+    int lastKnownPage = state.pageToBlockIndexMap.keys.isNotEmpty ? state.pageToBlockIndexMap.keys.last : 0;
+    if (lastKnownPage == 0 && state.pageToBlockIndexMap[0] == null) lastKnownPage = 0;
+
+    while (mounted && lastKnownPage < state.totalPages) {
+      if (mounted) {
+        state = state.copyWith(currentPage: lastKnownPage);
+      }
+      await Future.delayed(const Duration(milliseconds: 50));
+
+      final currentLastBlockOnPage = (state.pageToBlockIndexMap[lastKnownPage + 1] ?? state.blocks.length) - 1;
+
+      if (targetBlockIndex <= currentLastBlockOnPage) {
+        return lastKnownPage;
+      }
+      if (currentLastBlockOnPage >= state.blocks.length - 1) {
+        return lastKnownPage;
+      }
+      lastKnownPage++;
+    }
+    return state.currentPage;
   }
 
   Future<void> jumpToHref(String href, String currentBlockSrc) async {
     final resolvedPath = p.normalize(p.join(p.dirname(currentBlockSrc), href));
     final parts = resolvedPath.split('#');
-    final src = parts.isNotEmpty ? parts[0] : null;
+    final src = parts.isNotEmpty && parts[0].isNotEmpty ? parts[0] : null;
+    final fragment = parts.length > 1 ? parts[1] : null;
+
     if (src != null) {
-      await jumpToLocation(TOCEntry()..src = src..title = 'Internal Link');
+      await jumpToLocation(TOCEntry()..src = src..fragment = fragment..title = 'Internal Link');
     }
   }
 
-  Future<void> addHighlight(TextSelection selection, int blockIndex, Color color) async {
-    if (!selection.isValid || blockIndex < 0 || blockIndex >= state.blocks.length) {
-      return;
-    }
-    final block = state.blocks[blockIndex];
-    final selectedText = selection.textInside(block.textContent ?? '');
-    if (selectedText.isEmpty) {
-      return;
-    }
-    final newHighlight = Highlight()
-      ..bookId = state.bookId
-      ..chapterIndex = block.chapterIndex
-      ..blockIndexInChapter = block.blockIndexInChapter
-      ..text = selectedText
-      ..startOffset = selection.start
-      ..endOffset = selection.end
-      ..color = color.value;
+  Future<void> addHighlight(Highlight newHighlight) async {
     await _isar.writeTxn(() async {
       await _isar.highlights.put(newHighlight);
     });
-  }
-}
-
-class _Debouncer {
-  final int milliseconds;
-  Timer? _timer;
-  _Debouncer({required this.milliseconds});
-  run(VoidCallback action) {
-    _timer?.cancel();
-    _timer = Timer(Duration(milliseconds: milliseconds), action);
   }
 }
 
@@ -542,3 +256,15 @@ StateNotifierProvider.family.autoDispose<ReadingController, ReadingState, int>((
   final isar = ref.watch(isarDBProvider).value!;
   return ReadingController(isar, bookId);
 });
+
+class _Debouncer {
+  final int milliseconds;
+  Timer? _timer;
+
+  _Debouncer({required this.milliseconds});
+
+  void run(VoidCallback action) {
+    _timer?.cancel();
+    _timer = Timer(Duration(milliseconds: milliseconds), action);
+  }
+}

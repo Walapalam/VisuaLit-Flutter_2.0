@@ -9,6 +9,7 @@ enum ProcessingStatus { queued, processing, ready, error, partiallyReady }
 enum BlockType { p, h1, h2, h3, h4, h5, h6, img, unsupported }
 
 // ---- Collections ----
+
 @collection
 class Book {
   Id id = Isar.autoIncrement;
@@ -20,7 +21,8 @@ class Book {
   String? author;
   List<byte>? coverImageBytes;
 
-  // New metadata fields
+  // Metadata fields
+  String? isbn;
   String? publisher;
   String? language;
   DateTime? publicationDate;
@@ -45,8 +47,10 @@ class Book {
   // Progressive loading tracking
   List<int> processedChapters = [];
   int totalChapters = 0;
-  double processingProgress = 0.0; // 0.0 to 1.0
+  double processingProgress = 0.0;
 
+  // TOC is ignored by Isar (stored/loaded separately or as embedded later)
+  @ignore
   List<TOCEntry> toc = [];
 }
 
@@ -58,33 +62,26 @@ class ContentBlock {
   int? bookId;
 
   @Index()
-  int? chapterId; // Reference to Chapter model
+  int? chapterId; // Reserved for future chapter model linking
 
-  // Keep for backward compatibility
   @Index()
-  int? chapterIndex;
+  int? chapterIndex; // Fallback if chapterId not used
 
   int? blockIndexInChapter;
 
   @Index()
-  String? src; // The source XHTML file of this block
+  String? src;
 
   @enumerated
   late BlockType blockType;
 
-  // Now the primary source for rendering
   String? htmlContent;
-
-  // Keep plain text for searching, indexing, or simple displays
   String? textContent;
 
-  // Search index fields
-  List<String>? tokenizedText; // Words split and normalized for search
-  List<String>? stemmedText;   // Stemmed words for better search matching
+  List<String>? tokenizedText;
+  List<String>? stemmedText;
 
-  // Store image data directly if the block is an image
   List<byte>? imageBytes;
 
-  // Size tracking for cache management
   int? sizeInBytes;
 }

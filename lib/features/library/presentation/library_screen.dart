@@ -178,6 +178,10 @@ class LibraryScreen extends ConsumerWidget {
                                       child: Icon(Icons.book, size: 40)),
                                 );
                               },
+                            ): Container(
+                              color: Colors.grey[800],
+                              child: const Center(
+                                  child: Icon(Icons.book, size: 40)),
                             ),
                           ),
                           // Error badge

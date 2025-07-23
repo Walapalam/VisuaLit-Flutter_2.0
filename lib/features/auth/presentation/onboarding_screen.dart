@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:visualit/core/theme/app_theme.dart';
 import 'package:visualit/features/auth/presentation/auth_controller.dart';
 
 class OnboardingScreen extends ConsumerWidget {
@@ -8,14 +9,22 @@ class OnboardingScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    ref.listen<AuthState>(authControllerProvider, (previous, next) {
+      if (next.errorMessage != null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(next.errorMessage!), backgroundColor: Colors.red),
+        );
+      }
+    });
+
+    final authState = ref.watch(authControllerProvider);
+    final isLoading = authState.status == AuthStatus.loading;
+
     return Scaffold(
       body: Container(
         decoration: BoxDecoration(
           gradient: LinearGradient(
-            colors: [
-              const Color(0xFF2ECC71).withOpacity(0.7),
-              Theme.of(context).scaffoldBackgroundColor,
-            ],
+            colors: [const Color(0xFF2ECC71).withOpacity(0.7), Theme.of(context).scaffoldBackgroundColor],
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
             stops: const [0.0, 0.5],
@@ -23,44 +32,50 @@ class OnboardingScreen extends ConsumerWidget {
         ),
         child: SafeArea(
           child: Center(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Image.asset('assets/images/AppLogo.png', height: 100),
-                const SizedBox(height: 24),
-                Text(
-                  'VisuaLit',
-                  style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                    fontSize: 36,
-                    color: Colors.white,
+            child: Padding(
+              padding: const EdgeInsets.all(24.0),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Image.asset('assets/images/AppLogo.png', height: 100), // Ensure this asset exists
+                  const SizedBox(height: 24),
+                  Text(
+                    'VisuaLit',
+                    textAlign: TextAlign.center,
+                    style: Theme.of(context).textTheme.displaySmall?.copyWith(
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
-                ),
-                const SizedBox(height: 48),
-                ElevatedButton(
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF2ECC71),
-                    foregroundColor: Colors.black,
-                    minimumSize: const Size(220, 48),
+                  const SizedBox(height: 48),
+                  ElevatedButton(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppTheme.primaryGreen,
+                      foregroundColor: AppTheme.black,
+                      minimumSize: const Size(220, 50),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
+                    onPressed: isLoading
+                        ? null
+                        : () => ref.read(authControllerProvider.notifier).signInAsGuest(),
+                    child: isLoading
+                        ? const CircularProgressIndicator(color: AppTheme.black)
+                        : const Text('Start Reading as Guest'),
                   ),
-                  onPressed: () async {
-                    await ref.read(authControllerProvider.notifier).signInAsGuest();
-                    context.go('/preferences');
-                  },
-                  child: const Text('Start Reading as Guest'),
-                ),
-                const SizedBox(height: 16),
-                OutlinedButton(
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: const Color(0xFF2ECC71),
-                    side: const BorderSide(color: Color(0xFF2ECC71)),
-                    minimumSize: const Size(220, 48),
+                  const SizedBox(height: 16),
+                  OutlinedButton(
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: AppTheme.primaryGreen,
+                      side: const BorderSide(color: AppTheme.primaryGreen),
+                      minimumSize: const Size(220, 50),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
+                    onPressed: isLoading ? null : () => context.goNamed('login'),
+                    child: const Text('Continue with an Account'),
                   ),
-                  onPressed: () {
-                    context.goNamed('login', extra: false);
-                  },
-                  child: const Text('Continue with an Account'),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
         ),

@@ -22,12 +22,11 @@ class ReadingPreferences {
   final Color textColor;
   final bool isLineGuideEnabled;
   final String fontFamily;
-
-  // --- NEW PROPERTIES ---
   final double brightness;
   final PageTurnStyle pageTurnStyle;
   final bool matchDeviceTheme;
   final BackgroundDimming backgroundDimming;
+  final double textIndent;
 
   const ReadingPreferences({
     this.fontSize = 18.0,
@@ -37,10 +36,11 @@ class ReadingPreferences {
     this.textColor = const Color(0xFFE0E0E0),
     this.isLineGuideEnabled = false,
     this.fontFamily = 'Georgia',
-    this.brightness = 1.0, // Full brightness by default
-    this.pageTurnStyle = PageTurnStyle.paged, // Paged turning by default
+    this.brightness = 1.0,
+    this.pageTurnStyle = PageTurnStyle.paged,
     this.matchDeviceTheme = false,
     this.backgroundDimming = BackgroundDimming.medium,
+    this.textIndent = 1.5,
   });
 
   static const ReadingPreferences light = ReadingPreferences(
@@ -71,6 +71,7 @@ class ReadingPreferences {
     PageTurnStyle? pageTurnStyle,
     bool? matchDeviceTheme,
     BackgroundDimming? backgroundDimming,
+    double? textIndent,
   }) {
     return ReadingPreferences(
       fontSize: fontSize ?? this.fontSize,
@@ -84,6 +85,7 @@ class ReadingPreferences {
       pageTurnStyle: pageTurnStyle ?? this.pageTurnStyle,
       matchDeviceTheme: matchDeviceTheme ?? this.matchDeviceTheme,
       backgroundDimming: backgroundDimming ?? this.backgroundDimming,
+      textIndent: textIndent ?? this.textIndent,
     );
   }
 
@@ -106,24 +108,40 @@ class ReadingPreferences {
 class ReadingPreferencesController extends StateNotifier<ReadingPreferences> {
   ReadingPreferencesController() : super(ReadingPreferences.dark);
 
-  void setFontSize(double size) => state = state.copyWith(fontSize: size);
-  void setFontFamily(String family) => state = state.copyWith(fontFamily: family);
+  void setFontSize(double size) {
+    print("DEBUG: [PrefsController] Setting font size to: $size");
+    state = state.copyWith(fontSize: size);
+  }
+  void setFontFamily(String family) {
+    print("DEBUG: [PrefsController] Setting font family to: $family");
+    state = state.copyWith(fontFamily: family);
+  }
+  void setLineSpacing(double spacing) {
+    print("DEBUG: [PrefsController] Setting line spacing to: $spacing");
+    state = state.copyWith(lineSpacing: spacing);
+  }
   void toggleLineGuide(bool enabled) => state = state.copyWith(isLineGuideEnabled: enabled);
-
-  // --- NEW METHODS ---
   void setBrightness(double newBrightness) => state = state.copyWith(brightness: newBrightness.clamp(0.1, 1.0));
   void setPageTurnStyle(PageTurnStyle style) => state = state.copyWith(pageTurnStyle: style);
   void setMatchDeviceTheme(bool match) => state = state.copyWith(matchDeviceTheme: match, themeMode: match ? ThemeMode.system : state.themeMode);
   void setThemeMode(ThemeMode mode) => state = state.copyWith(themeMode: mode, matchDeviceTheme: false);
+  void setTextIndent(double indent) {
+    print("DEBUG: [PrefsController] Setting text indent to: $indent");
+    state = state.copyWith(textIndent: indent);
+  }
+
 
   void applyTheme(ReadingPreferences theme) {
+    print("DEBUG: [PrefsController] Applying new theme. Page color: ${theme.pageColor}");
     state = theme.copyWith(
         fontSize: state.fontSize,
         fontFamily: state.fontFamily,
         brightness: state.brightness,
         pageTurnStyle: state.pageTurnStyle,
         isLineGuideEnabled: state.isLineGuideEnabled,
-        matchDeviceTheme: state.matchDeviceTheme
+        matchDeviceTheme: state.matchDeviceTheme,
+        textIndent: state.textIndent,
+        lineSpacing: state.lineSpacing
     );
   }
 }

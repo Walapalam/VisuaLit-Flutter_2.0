@@ -7,6 +7,7 @@ class ReadingSettingsPanel extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    print("DEBUG: ReadingSettingsPanel.build() called.");
     final prefs = ref.watch(readingPreferencesProvider);
     final prefsController = ref.read(readingPreferencesProvider.notifier);
     final isDark = Theme.of(context).brightness == Brightness.dark;
@@ -49,11 +50,28 @@ class ReadingSettingsPanel extends ConsumerWidget {
                         min: 12,
                         max: 32,
                         divisions: 20,
+                        label: prefs.fontSize.round().toString(),
                         onChanged: prefsController.setFontSize,
                       ),
                     ),
                     const Text('A', style: TextStyle(fontSize: 22)),
                   ],
+                ),
+              ),
+              const Divider(),
+              // --- NEW WIDGET: LINE SPACING SLIDER ---
+              _SettingsRow(
+                icon: Icons.format_line_spacing,
+                child: Slider(
+                  value: prefs.lineSpacing,
+                  min: 1.2,   // Minimum line spacing
+                  max: 2.5,   // Maximum line spacing
+                  divisions: 13,
+                  label: prefs.lineSpacing.toStringAsFixed(1),
+                  onChanged: (value) {
+                    print("DEBUG: [SettingsPanel] Line spacing slider changed to $value");
+                    prefsController.setLineSpacing(value);
+                  },
                 ),
               ),
               const Divider(),
@@ -66,6 +84,22 @@ class ReadingSettingsPanel extends ConsumerWidget {
                     scrollDirection: Axis.horizontal,
                     children: availableFonts.map((font) => _FontButton(fontFamily: font)).toList(),
                   ),
+                ),
+              ),
+              const Divider(),
+              // Indentation Slider
+              _SettingsRow(
+                icon: Icons.format_indent_increase,
+                child: Slider(
+                  value: prefs.textIndent,
+                  min: 0.0,
+                  max: 4.0,
+                  divisions: 8,
+                  label: "${prefs.textIndent.toStringAsFixed(1)}em",
+                  onChanged: (value) {
+                    print("DEBUG: [SettingsPanel] Indent slider changed to $value");
+                    prefsController.setTextIndent(value);
+                  },
                 ),
               ),
               const Divider(),
@@ -150,7 +184,10 @@ class _ThemeChip extends ConsumerWidget {
     final bool isSelected = selectedTheme.pageColor == theme.pageColor;
 
     return GestureDetector(
-      onTap: () => ref.read(readingPreferencesProvider.notifier).applyTheme(theme),
+      onTap: () {
+        print("DEBUG: [SettingsPanel] Theme chip tapped. Applying theme.");
+        ref.read(readingPreferencesProvider.notifier).applyTheme(theme);
+      },
       child: Container(
         width: 40,
         height: 40,
@@ -179,7 +216,10 @@ class _FontButton extends ConsumerWidget {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 4.0),
       child: OutlinedButton(
-        onPressed: () => ref.read(readingPreferencesProvider.notifier).setFontFamily(fontFamily),
+        onPressed: () {
+          print("DEBUG: [SettingsPanel] Font button tapped: $fontFamily");
+          ref.read(readingPreferencesProvider.notifier).setFontFamily(fontFamily);
+        },
         style: OutlinedButton.styleFrom(
           backgroundColor: isSelected ? Theme.of(context).colorScheme.primary.withAlpha(51) : null,
           foregroundColor: prefs.textColor,

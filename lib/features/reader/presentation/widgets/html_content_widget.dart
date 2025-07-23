@@ -21,8 +21,40 @@ class HtmlContentWidget extends ConsumerWidget {
     required this.viewSize,
   });
 
+  String _generateOverrideCss(ReadingPreferences prefs) {
+    // General reset for all block-level elements to control spacing and base fonts.
+    final resetCss = """
+      body, div, h1, h2, h3, h4, h5, h6, li, blockquote, td, th, a {
+        font-family: '${prefs.fontFamily}' !important;
+        font-size: ${prefs.fontSize}px !important;
+        line-height: ${prefs.lineSpacing} !important;
+        color: ${Color(prefs.textColor.value).toCss()} !important;
+        background-color: transparent !important;
+        text-align: left !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        text-indent: 0 !important; /* Explicitly reset indent on all elements first */
+      }
+    """;
+
+    // --- FIX: Specific rule for paragraph indentation ---
+    // This rule targets only 'p' tags to apply the user's desired first-line indent.
+    final indentCss = """
+      p {
+        text-indent: ${prefs.textIndent}em !important;
+        /* Add a small bottom margin to paragraphs for better readability between them */
+        margin-bottom: 0.5em !important;
+      }
+    """;
+
+    final finalCss = resetCss + indentCss;
+    print("DEBUG: [CSS Injection] Generated CSS for block $blockIndex: $finalCss");
+    return finalCss;
+  }
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    print("DEBUG: HtmlContentWidget.build() for blockIndex: $blockIndex");
     final preferences = ref.watch(readingPreferencesProvider);
     final highlightsAsync = ref.watch(highlightsProvider(block.bookId!));
 
@@ -48,12 +80,13 @@ class HtmlContentWidget extends ConsumerWidget {
 
     blockHighlights.sort((a, b) => a.startOffset.compareTo(b.startOffset));
 
+    final injectedCss = _generateOverrideCss(preferences);
+    final contentWithHighlights = _injectHighlightTags(block.htmlContent!, blockHighlights);
+    final finalHtml = '<style>$injectedCss</style>$contentWithHighlights';
+
     return SelectionArea(
-      // The contextMenuBuilder has been removed entirely to eliminate the source of the error.
-      // This will cause the default OS text selection menu to appear (Copy, Select All, etc.).
       child: HtmlWidget(
-        // The logic to render existing highlights remains.
-        _injectHighlightTags(block.htmlContent!, blockHighlights),
+        finalHtml,
         textStyle: preferences.getStyleForBlock(block.blockType),
         customStylesBuilder: (element) {
           if (element.localName == 'highlight') {
@@ -65,6 +98,7 @@ class HtmlContentWidget extends ConsumerWidget {
           return null;
         },
         onTapUrl: (url) {
+          print("DEBUG: URL tapped in block $blockIndex: $url");
           if (block.src != null && block.bookId != null) {
             ref.read(readingControllerProvider(block.bookId!).notifier).jumpToHref(url, block.src!);
             return true;
@@ -101,4 +135,9 @@ class HtmlContentWidget extends ConsumerWidget {
     }
     return result;
   }
+}
+
+// Helper extension to convert Flutter Color to CSS color string
+extension ToCss on Color {
+  String toCss() => 'rgba($red, $green, $blue, ${alpha / 255})';
 }

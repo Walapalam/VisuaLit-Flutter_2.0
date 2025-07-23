@@ -20,36 +20,31 @@ class ReadingScreen extends ConsumerStatefulWidget {
 
 class _ReadingScreenState extends ConsumerState<ReadingScreen> {
   bool _isUiVisible = false;
-  PageController? _pageController;
-  ScrollController? _scrollController;
   bool _isLocked = false;
+  late final PageController _pageController;
+  late final ScrollController _scrollController;
 
   @override
   void initState() {
     super.initState();
-    _initializePageStyleControllers();
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersive);
-  }
-
-  void _initializePageStyleControllers() {
-    final prefs = ref.read(readingPreferencesProvider);
-    final readingState = ref.read(readingControllerProvider(widget.bookId));
-
-    if (prefs.pageTurnStyle == PageTurnStyle.paged) {
-      _pageController = PageController(initialPage: readingState.currentPage);
-      _scrollController?.dispose();
-      _scrollController = null;
-    } else {
-      _scrollController = ScrollController();
-      _pageController?.dispose();
-      _pageController = null;
-    }
+    final initialPage = ref.read(readingControllerProvider(widget.bookId)).currentPage;
+    _pageController = PageController(initialPage: initialPage);
+    _scrollController = ScrollController();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      print("SCREEN: initState callback - Initializing controller.");
+      final viewSize = MediaQuery.of(context).size;
+      final prefs = ref.read(readingPreferencesProvider);
+      ref.read(readingControllerProvider(widget.bookId).notifier).initialize(viewSize: viewSize, preferences: prefs);
+    });
   }
 
   @override
   void dispose() {
-    _pageController?.dispose();
-    _scrollController?.dispose();
+    print("SCREEN: Disposing ReadingScreen.");
+    _pageController.dispose();
+    _scrollController.dispose();
     ScreenBrightness().resetScreenBrightness();
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
     super.dispose();
@@ -59,9 +54,7 @@ class _ReadingScreenState extends ConsumerState<ReadingScreen> {
     if (_isLocked) return;
     setState(() {
       _isUiVisible = !_isUiVisible;
-      SystemChrome.setEnabledSystemUIMode(
-        _isUiVisible ? SystemUiMode.edgeToEdge : SystemUiMode.immersive,
-      );
+      SystemChrome.setEnabledSystemUIMode(_isUiVisible ? SystemUiMode.edgeToEdge : SystemUiMode.immersive);
     });
   }
 
@@ -76,65 +69,87 @@ class _ReadingScreenState extends ConsumerState<ReadingScreen> {
 
   @override
   Widget build(BuildContext context) {
+    print("SCREEN: Build method called.");
     final viewSize = MediaQuery.of(context).size;
     final provider = readingControllerProvider(widget.bookId);
     final state = ref.watch(provider);
     final prefs = ref.watch(readingPreferencesProvider);
 
     ref.listen(provider.select((s) => s.currentPage), (previous, next) {
-      if (next != previous && _pageController?.hasClients == true) {
-        if (_pageController!.page?.round() != next) {
-          _pageController!.jumpToPage(next);
-        }
+      if (_pageController.hasClients && _pageController.page?.round() != next) {
+        print("SCREEN: State changed to page $next. Commanding PageController to jump.");
+        _pageController.jumpToPage(next);
       }
     });
 
     ref.listen(readingPreferencesProvider.select((p) => p.pageTurnStyle), (prev, next) {
-      if (prev != next) setState(_initializePageStyleControllers);
+      if (prev != next) {
+        print("SCREEN: Page turn style changed. Rebuilding UI.");
+        setState(() {});
+      }
     });
 
     ref.listen(readingPreferencesProvider.select((p) => p.brightness), (_, next) async {
-      try { await ScreenBrightness().setScreenBrightness(next); } catch (e) { /* ignore */ }
+      try { await ScreenBrightness().setScreenBrightness(next); } catch (e) { print("SCREEN: Failed to set brightness: $e"); }
     });
 
-    final readerContent = Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 40),
-      child: _buildBody(state, viewSize, provider, prefs),
-    );
+    Widget screenBody;
+    if (state.viewStatus == ReadingViewStatus.formatting || !state.isBookLoaded) {
+      screenBody = const Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            CircularProgressIndicator(),
+            SizedBox(height: 16),
+            Text("Formatting book..."),
+          ],
+        ),
+      );
+    }
+    // FIX: Defensive check for when processing completes but yields no content.
+    else if (state.isBookLoaded && state.blocks.isEmpty) {
+      screenBody = const Center(
+        child: Padding(
+          padding: EdgeInsets.all(24.0),
+          child: Text(
+            "This book appears to have no content or could not be loaded correctly.",
+            textAlign: TextAlign.center,
+            style: TextStyle(fontSize: 16),
+          ),
+        ),
+      );
+    }
+    else {
+      if (prefs.pageTurnStyle == PageTurnStyle.scroll) {
+        screenBody = _buildScrollView(state, viewSize);
+      } else {
+        screenBody = _buildPageView(state);
+      }
+    }
 
     return Scaffold(
       backgroundColor: prefs.pageColor,
       appBar: PreferredSize(
         preferredSize: const Size.fromHeight(kToolbarHeight),
         child: AnimatedOpacity(
-          opacity: 1.0,
+          opacity: _isUiVisible ? 1.0 : 0.0,
           duration: const Duration(milliseconds: 250),
           child: AppBar(
-            backgroundColor: _isUiVisible ? prefs.pageColor.withAlpha(200) : Colors.transparent,
+            backgroundColor: prefs.pageColor.withAlpha(200),
             elevation: 0,
             automaticallyImplyLeading: false,
             centerTitle: true,
             title: Text(
-              _isUiVisible ? state.chapterProgress : state.book?.title ?? "Loading...",
+              state.viewStatus == ReadingViewStatus.ready ? state.chapterProgress : "Formatting...",
               style: TextStyle(color: prefs.textColor, fontSize: 12),
             ),
-            actions: [
-              AnimatedOpacity(
-                opacity: _isUiVisible ? 1.0 : 0.0,
-                duration: const Duration(milliseconds: 200),
-                child: IconButton(
-                  icon: Icon(Icons.close, color: prefs.textColor),
-                  onPressed: () => context.go('/home'),
-                ),
-              )
-            ],
+            actions: [IconButton(icon: Icon(Icons.close, color: prefs.textColor), onPressed: () => context.go('/home'))],
           ),
         ),
       ),
       bottomNavigationBar: AnimatedContainer(
         duration: const Duration(milliseconds: 250),
         height: _isUiVisible ? 80 : 0,
-        // --- FIX: The method signature is simplified ---
         child: _isUiVisible ? _buildBottomScrubber(state, prefs) : null,
       ),
       floatingActionButton: _buildSpeedDialFab(),
@@ -142,53 +157,48 @@ class _ReadingScreenState extends ConsumerState<ReadingScreen> {
         onTap: _toggleUiVisibility,
         child: AbsorbPointer(
           absorbing: _isLocked,
-          child: Stack(
-            children: [
-              readerContent,
-            ],
-          ),
+          child: screenBody,
         ),
       ),
     );
   }
 
-  Widget _buildBody(ReadingState state, Size viewSize,
-      AutoDisposeStateNotifierProvider<ReadingController, ReadingState> provider, ReadingPreferences prefs) {
-    if (!state.isBookLoaded) return const Center(child: CircularProgressIndicator());
-    if (state.blocks.isEmpty) return const Center(child: Text('This book has no content.'));
+  Widget _buildPageView(ReadingState state) {
+    return PageView.builder(
+      controller: _pageController,
+      itemCount: state.totalPages,
+      onPageChanged: ref.read(readingControllerProvider(widget.bookId).notifier).onPageChanged,
+      itemBuilder: (context, index) {
+        final startingBlockIndex = state.pageToBlockIndexMap[index];
+        if (startingBlockIndex == null) {
+          return const Center(child: CircularProgressIndicator());
+        }
+        return BookPageWidget(
+          key: ValueKey('page_${index}_$startingBlockIndex'),
+          allBlocks: state.blocks,
+          startingBlockIndex: startingBlockIndex,
+          viewSize: MediaQuery.of(context).size,
+          pageIndex: index,
+          onPageBuilt: ref.read(readingControllerProvider(widget.bookId).notifier).updatePageLayout,
+        );
+      },
+    );
+  }
 
-    if (prefs.pageTurnStyle == PageTurnStyle.scroll) {
-      return ListView.builder(
-        controller: _scrollController,
-        itemCount: state.blocks.length,
-        itemBuilder: (context, index) {
-          return HtmlContentWidget(
-            key: ValueKey('block_${state.blocks[index].id}'),
-            block: state.blocks[index],
-            blockIndex: index,
-            viewSize: viewSize,
-          );
-        },
-      );
-    } else {
-      return PageView.builder(
-        controller: _pageController,
-        itemCount: state.totalPages,
-        onPageChanged: ref.read(provider.notifier).onPageChanged,
-        itemBuilder: (context, index) {
-          final startingBlockIndex = state.pageToBlockIndexMap[index];
-          if (startingBlockIndex == null) return const Center(child: CircularProgressIndicator());
-          return BookPageWidget(
-            key: ValueKey('page_${index}_$startingBlockIndex'),
-            allBlocks: state.blocks,
-            startingBlockIndex: startingBlockIndex,
-            viewSize: viewSize,
-            pageIndex: index,
-            onPageBuilt: ref.read(provider.notifier).updatePageLayout,
-          );
-        },
-      );
-    }
+  Widget _buildScrollView(ReadingState state, Size viewSize) {
+    if (state.blocks.isEmpty) return const Center(child: Text('This book has no content.'));
+    return ListView.builder(
+      controller: _scrollController,
+      itemCount: state.blocks.length,
+      itemBuilder: (context, index) {
+        return HtmlContentWidget(
+          key: ValueKey('block_${state.blocks[index].id}'),
+          block: state.blocks[index],
+          blockIndex: index,
+          viewSize: viewSize,
+        );
+      },
+    );
   }
 
   Widget _buildSpeedDialFab() {
@@ -217,10 +227,8 @@ class _ReadingScreenState extends ConsumerState<ReadingScreen> {
     );
   }
 
-  // --- FIX: The method no longer needs the provider passed to it ---
   Widget _buildBottomScrubber(ReadingState state, ReadingPreferences prefs) {
     if (prefs.pageTurnStyle == PageTurnStyle.scroll) return const SizedBox.shrink();
-
     return BottomAppBar(
       color: Theme.of(context).colorScheme.surface.withAlpha(242),
       elevation: 0,
@@ -234,7 +242,6 @@ class _ReadingScreenState extends ConsumerState<ReadingScreen> {
                 value: state.currentPage.toDouble().clamp(0, (state.totalPages > 0 ? state.totalPages - 1 : 0).toDouble()),
                 min: 0,
                 max: (state.totalPages > 0 ? state.totalPages - 1 : 0).toDouble(),
-                // It can now access the provider directly using `ref`.
                 onChanged: (value) => ref.read(readingControllerProvider(widget.bookId).notifier).onPageChanged(value.round()),
                 activeColor: prefs.textColor,
                 inactiveColor: prefs.textColor.withAlpha(77),

@@ -5,7 +5,6 @@ part 'book_data.g.dart';
 
 // ---- Enums ----
 enum ProcessingStatus { queued, processing, ready, error }
-
 enum BlockType { p, h1, h2, h3, h4, h5, h6, img, unsupported }
 
 // ---- Collections ----
@@ -19,8 +18,6 @@ class Book {
   String? title;
   String? author;
   List<byte>? coverImageBytes;
-
-  // New metadata fields
   String? publisher;
   String? language;
   DateTime? publicationDate;
@@ -28,8 +25,19 @@ class Book {
   @enumerated
   ProcessingStatus status = ProcessingStatus.queued;
 
+  // --- FIX: Add the required fields for reading state ---
   int lastReadPage = 0;
   DateTime? lastReadTimestamp;
+
+  /// The chapter index the user was last reading. Essential for the JIT loader.
+  int? lastReadChapter;
+
+  /// The total number of chapters in the book. Essential for pre-fetching logic.
+  int chaptersCount = 0;
+
+  /// The total number of content blocks in the book. Essential for robust cache validation.
+  int blocksCount = 0;
+  // --- END OF FIX ---
 
   List<TOCEntry> toc = [];
 }
@@ -37,27 +45,16 @@ class Book {
 @collection
 class ContentBlock {
   Id id = Isar.autoIncrement;
-
   @Index()
   int? bookId;
-
   @Index()
   int? chapterIndex;
-
   int? blockIndexInChapter;
-
   @Index()
-  String? src; // The source XHTML file of this block
-
+  String? src;
   @enumerated
   late BlockType blockType;
-
-  // Now the primary source for rendering
   String? htmlContent;
-
-  // Keep plain text for searching, indexing, or simple displays
   String? textContent;
-
-  // Store image data directly if the block is an image
   List<byte>? imageBytes;
 }

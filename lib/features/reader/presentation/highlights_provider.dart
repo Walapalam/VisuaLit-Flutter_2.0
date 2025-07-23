@@ -3,6 +3,7 @@ import 'package:isar/isar.dart';
 import 'package:visualit/core/providers/isar_provider.dart';
 import 'package:visualit/features/reader/data/highlight.dart';
 
+
 // This provider returns a stream of all highlights for a specific bookId.
 // The UI can subscribe to this to get real-time updates.
 final highlightsProvider = StreamProvider.family.autoDispose<List<Highlight>, int>((ref, bookId) {

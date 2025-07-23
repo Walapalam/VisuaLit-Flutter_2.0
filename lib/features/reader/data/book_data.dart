@@ -19,8 +19,6 @@ class Book {
   String? title;
   String? author;
   List<byte>? coverImageBytes;
-
-  // New metadata fields
   String? publisher;
   String? language;
   DateTime? publicationDate;
@@ -28,12 +26,19 @@ class Book {
   @enumerated
   ProcessingStatus status = ProcessingStatus.queued;
 
-  int lastReadPage = 0;
+  // --- CORRECTED PROGRESS TRACKING ---
+  /// Stores the index of the last read chapter.
+  int lastReadChapterIndex = 0;
+
+  /// Stores the page number within the last read chapter.
+  int lastReadPageInChapter = 0;
+
   DateTime? lastReadTimestamp;
 
   List<TOCEntry> toc = [];
 }
 
+// The ContentBlock class remains unchanged.
 @collection
 class ContentBlock {
   Id id = Isar.autoIncrement;
@@ -52,12 +57,7 @@ class ContentBlock {
   @enumerated
   late BlockType blockType;
 
-  // Now the primary source for rendering
   String? htmlContent;
-
-  // Keep plain text for searching, indexing, or simple displays
   String? textContent;
-
-  // Store image data directly if the block is an image
   List<byte>? imageBytes;
 }

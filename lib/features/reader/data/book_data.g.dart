@@ -37,39 +37,44 @@ const BookSchema = CollectionSchema(
       name: r'language',
       type: IsarType.string,
     ),
-    r'lastReadPage': PropertySchema(
+    r'lastReadChapterIndex': PropertySchema(
       id: 4,
-      name: r'lastReadPage',
+      name: r'lastReadChapterIndex',
+      type: IsarType.long,
+    ),
+    r'lastReadPageInChapter': PropertySchema(
+      id: 5,
+      name: r'lastReadPageInChapter',
       type: IsarType.long,
     ),
     r'lastReadTimestamp': PropertySchema(
-      id: 5,
+      id: 6,
       name: r'lastReadTimestamp',
       type: IsarType.dateTime,
     ),
     r'publicationDate': PropertySchema(
-      id: 6,
+      id: 7,
       name: r'publicationDate',
       type: IsarType.dateTime,
     ),
     r'publisher': PropertySchema(
-      id: 7,
+      id: 8,
       name: r'publisher',
       type: IsarType.string,
     ),
     r'status': PropertySchema(
-      id: 8,
+      id: 9,
       name: r'status',
       type: IsarType.byte,
       enumMap: _BookstatusEnumValueMap,
     ),
     r'title': PropertySchema(
-      id: 9,
+      id: 10,
       name: r'title',
       type: IsarType.string,
     ),
     r'toc': PropertySchema(
-      id: 10,
+      id: 11,
       name: r'toc',
       type: IsarType.objectList,
       target: r'TOCEntry',
@@ -161,14 +166,15 @@ void _bookSerialize(
   writer.writeByteList(offsets[1], object.coverImageBytes);
   writer.writeString(offsets[2], object.epubFilePath);
   writer.writeString(offsets[3], object.language);
-  writer.writeLong(offsets[4], object.lastReadPage);
-  writer.writeDateTime(offsets[5], object.lastReadTimestamp);
-  writer.writeDateTime(offsets[6], object.publicationDate);
-  writer.writeString(offsets[7], object.publisher);
-  writer.writeByte(offsets[8], object.status.index);
-  writer.writeString(offsets[9], object.title);
+  writer.writeLong(offsets[4], object.lastReadChapterIndex);
+  writer.writeLong(offsets[5], object.lastReadPageInChapter);
+  writer.writeDateTime(offsets[6], object.lastReadTimestamp);
+  writer.writeDateTime(offsets[7], object.publicationDate);
+  writer.writeString(offsets[8], object.publisher);
+  writer.writeByte(offsets[9], object.status.index);
+  writer.writeString(offsets[10], object.title);
   writer.writeObjectList<TOCEntry>(
-    offsets[10],
+    offsets[11],
     allOffsets,
     TOCEntrySchema.serialize,
     object.toc,
@@ -187,15 +193,16 @@ Book _bookDeserialize(
   object.epubFilePath = reader.readString(offsets[2]);
   object.id = id;
   object.language = reader.readStringOrNull(offsets[3]);
-  object.lastReadPage = reader.readLong(offsets[4]);
-  object.lastReadTimestamp = reader.readDateTimeOrNull(offsets[5]);
-  object.publicationDate = reader.readDateTimeOrNull(offsets[6]);
-  object.publisher = reader.readStringOrNull(offsets[7]);
-  object.status = _BookstatusValueEnumMap[reader.readByteOrNull(offsets[8])] ??
+  object.lastReadChapterIndex = reader.readLong(offsets[4]);
+  object.lastReadPageInChapter = reader.readLong(offsets[5]);
+  object.lastReadTimestamp = reader.readDateTimeOrNull(offsets[6]);
+  object.publicationDate = reader.readDateTimeOrNull(offsets[7]);
+  object.publisher = reader.readStringOrNull(offsets[8]);
+  object.status = _BookstatusValueEnumMap[reader.readByteOrNull(offsets[9])] ??
       ProcessingStatus.queued;
-  object.title = reader.readStringOrNull(offsets[9]);
+  object.title = reader.readStringOrNull(offsets[10]);
   object.toc = reader.readObjectList<TOCEntry>(
-        offsets[10],
+        offsets[11],
         TOCEntrySchema.deserialize,
         allOffsets,
         TOCEntry(),
@@ -222,17 +229,19 @@ P _bookDeserializeProp<P>(
     case 4:
       return (reader.readLong(offset)) as P;
     case 5:
-      return (reader.readDateTimeOrNull(offset)) as P;
+      return (reader.readLong(offset)) as P;
     case 6:
       return (reader.readDateTimeOrNull(offset)) as P;
     case 7:
-      return (reader.readStringOrNull(offset)) as P;
+      return (reader.readDateTimeOrNull(offset)) as P;
     case 8:
+      return (reader.readStringOrNull(offset)) as P;
+    case 9:
       return (_BookstatusValueEnumMap[reader.readByteOrNull(offset)] ??
           ProcessingStatus.queued) as P;
-    case 9:
-      return (reader.readStringOrNull(offset)) as P;
     case 10:
+      return (reader.readStringOrNull(offset)) as P;
+    case 11:
       return (reader.readObjectList<TOCEntry>(
             offset,
             TOCEntrySchema.deserialize,
@@ -1073,43 +1082,44 @@ extension BookQueryFilter on QueryBuilder<Book, Book, QFilterCondition> {
     });
   }
 
-  QueryBuilder<Book, Book, QAfterFilterCondition> lastReadPageEqualTo(
+  QueryBuilder<Book, Book, QAfterFilterCondition> lastReadChapterIndexEqualTo(
       int value) {
     return QueryBuilder.apply(this, (query) {
       return query.addFilterCondition(FilterCondition.equalTo(
-        property: r'lastReadPage',
+        property: r'lastReadChapterIndex',
         value: value,
       ));
     });
   }
 
-  QueryBuilder<Book, Book, QAfterFilterCondition> lastReadPageGreaterThan(
+  QueryBuilder<Book, Book, QAfterFilterCondition>
+      lastReadChapterIndexGreaterThan(
     int value, {
     bool include = false,
   }) {
     return QueryBuilder.apply(this, (query) {
       return query.addFilterCondition(FilterCondition.greaterThan(
         include: include,
-        property: r'lastReadPage',
+        property: r'lastReadChapterIndex',
         value: value,
       ));
     });
   }
 
-  QueryBuilder<Book, Book, QAfterFilterCondition> lastReadPageLessThan(
+  QueryBuilder<Book, Book, QAfterFilterCondition> lastReadChapterIndexLessThan(
     int value, {
     bool include = false,
   }) {
     return QueryBuilder.apply(this, (query) {
       return query.addFilterCondition(FilterCondition.lessThan(
         include: include,
-        property: r'lastReadPage',
+        property: r'lastReadChapterIndex',
         value: value,
       ));
     });
   }
 
-  QueryBuilder<Book, Book, QAfterFilterCondition> lastReadPageBetween(
+  QueryBuilder<Book, Book, QAfterFilterCondition> lastReadChapterIndexBetween(
     int lower,
     int upper, {
     bool includeLower = true,
@@ -1117,7 +1127,61 @@ extension BookQueryFilter on QueryBuilder<Book, Book, QFilterCondition> {
   }) {
     return QueryBuilder.apply(this, (query) {
       return query.addFilterCondition(FilterCondition.between(
-        property: r'lastReadPage',
+        property: r'lastReadChapterIndex',
+        lower: lower,
+        includeLower: includeLower,
+        upper: upper,
+        includeUpper: includeUpper,
+      ));
+    });
+  }
+
+  QueryBuilder<Book, Book, QAfterFilterCondition> lastReadPageInChapterEqualTo(
+      int value) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'lastReadPageInChapter',
+        value: value,
+      ));
+    });
+  }
+
+  QueryBuilder<Book, Book, QAfterFilterCondition>
+      lastReadPageInChapterGreaterThan(
+    int value, {
+    bool include = false,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        include: include,
+        property: r'lastReadPageInChapter',
+        value: value,
+      ));
+    });
+  }
+
+  QueryBuilder<Book, Book, QAfterFilterCondition> lastReadPageInChapterLessThan(
+    int value, {
+    bool include = false,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.lessThan(
+        include: include,
+        property: r'lastReadPageInChapter',
+        value: value,
+      ));
+    });
+  }
+
+  QueryBuilder<Book, Book, QAfterFilterCondition> lastReadPageInChapterBetween(
+    int lower,
+    int upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.between(
+        property: r'lastReadPageInChapter',
         lower: lower,
         includeLower: includeLower,
         upper: upper,
@@ -1739,15 +1803,27 @@ extension BookQuerySortBy on QueryBuilder<Book, Book, QSortBy> {
     });
   }
 
-  QueryBuilder<Book, Book, QAfterSortBy> sortByLastReadPage() {
+  QueryBuilder<Book, Book, QAfterSortBy> sortByLastReadChapterIndex() {
     return QueryBuilder.apply(this, (query) {
-      return query.addSortBy(r'lastReadPage', Sort.asc);
+      return query.addSortBy(r'lastReadChapterIndex', Sort.asc);
     });
   }
 
-  QueryBuilder<Book, Book, QAfterSortBy> sortByLastReadPageDesc() {
+  QueryBuilder<Book, Book, QAfterSortBy> sortByLastReadChapterIndexDesc() {
     return QueryBuilder.apply(this, (query) {
-      return query.addSortBy(r'lastReadPage', Sort.desc);
+      return query.addSortBy(r'lastReadChapterIndex', Sort.desc);
+    });
+  }
+
+  QueryBuilder<Book, Book, QAfterSortBy> sortByLastReadPageInChapter() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'lastReadPageInChapter', Sort.asc);
+    });
+  }
+
+  QueryBuilder<Book, Book, QAfterSortBy> sortByLastReadPageInChapterDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'lastReadPageInChapter', Sort.desc);
     });
   }
 
@@ -1861,15 +1937,27 @@ extension BookQuerySortThenBy on QueryBuilder<Book, Book, QSortThenBy> {
     });
   }
 
-  QueryBuilder<Book, Book, QAfterSortBy> thenByLastReadPage() {
+  QueryBuilder<Book, Book, QAfterSortBy> thenByLastReadChapterIndex() {
     return QueryBuilder.apply(this, (query) {
-      return query.addSortBy(r'lastReadPage', Sort.asc);
+      return query.addSortBy(r'lastReadChapterIndex', Sort.asc);
     });
   }
 
-  QueryBuilder<Book, Book, QAfterSortBy> thenByLastReadPageDesc() {
+  QueryBuilder<Book, Book, QAfterSortBy> thenByLastReadChapterIndexDesc() {
     return QueryBuilder.apply(this, (query) {
-      return query.addSortBy(r'lastReadPage', Sort.desc);
+      return query.addSortBy(r'lastReadChapterIndex', Sort.desc);
+    });
+  }
+
+  QueryBuilder<Book, Book, QAfterSortBy> thenByLastReadPageInChapter() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'lastReadPageInChapter', Sort.asc);
+    });
+  }
+
+  QueryBuilder<Book, Book, QAfterSortBy> thenByLastReadPageInChapterDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'lastReadPageInChapter', Sort.desc);
     });
   }
 
@@ -1962,9 +2050,15 @@ extension BookQueryWhereDistinct on QueryBuilder<Book, Book, QDistinct> {
     });
   }
 
-  QueryBuilder<Book, Book, QDistinct> distinctByLastReadPage() {
+  QueryBuilder<Book, Book, QDistinct> distinctByLastReadChapterIndex() {
     return QueryBuilder.apply(this, (query) {
-      return query.addDistinctBy(r'lastReadPage');
+      return query.addDistinctBy(r'lastReadChapterIndex');
+    });
+  }
+
+  QueryBuilder<Book, Book, QDistinct> distinctByLastReadPageInChapter() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'lastReadPageInChapter');
     });
   }
 
@@ -2032,9 +2126,15 @@ extension BookQueryProperty on QueryBuilder<Book, Book, QQueryProperty> {
     });
   }
 
-  QueryBuilder<Book, int, QQueryOperations> lastReadPageProperty() {
+  QueryBuilder<Book, int, QQueryOperations> lastReadChapterIndexProperty() {
     return QueryBuilder.apply(this, (query) {
-      return query.addPropertyName(r'lastReadPage');
+      return query.addPropertyName(r'lastReadChapterIndex');
+    });
+  }
+
+  QueryBuilder<Book, int, QQueryOperations> lastReadPageInChapterProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'lastReadPageInChapter');
     });
   }
 

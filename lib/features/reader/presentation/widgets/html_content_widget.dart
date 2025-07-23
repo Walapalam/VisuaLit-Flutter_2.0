@@ -8,7 +8,8 @@ import 'package:visualit/features/reader/presentation/highlights_provider.dart';
 import 'package:visualit/features/reader/presentation/reading_controller.dart';
 import 'package:visualit/features/reader/presentation/reading_preferences_controller.dart';
 
-// The widget is now a simple ConsumerWidget as it no longer manages selection state.
+// NOTE: This widget is part of the OLD implementation and is no longer used by the reader.
+// However, the `jumpToHref` call within it needs to be valid.
 class HtmlContentWidget extends ConsumerWidget {
   final ContentBlock block;
   final int blockIndex;
@@ -22,7 +23,6 @@ class HtmlContentWidget extends ConsumerWidget {
   });
 
   String _generateOverrideCss(ReadingPreferences prefs) {
-    // General reset for all block-level elements to control spacing and base fonts.
     final resetCss = """
       body, div, h1, h2, h3, h4, h5, h6, li, blockquote, td, th, a {
         font-family: '${prefs.fontFamily}' !important;
@@ -33,28 +33,22 @@ class HtmlContentWidget extends ConsumerWidget {
         text-align: left !important;
         margin: 0 !important;
         padding: 0 !important;
-        text-indent: 0 !important; /* Explicitly reset indent on all elements first */
+        text-indent: 0 !important;
       }
     """;
 
-    // --- FIX: Specific rule for paragraph indentation ---
-    // This rule targets only 'p' tags to apply the user's desired first-line indent.
     final indentCss = """
       p {
         text-indent: ${prefs.textIndent}em !important;
-        /* Add a small bottom margin to paragraphs for better readability between them */
         margin-bottom: 0.5em !important;
       }
     """;
 
-    final finalCss = resetCss + indentCss;
-    print("DEBUG: [CSS Injection] Generated CSS for block $blockIndex: $finalCss");
-    return finalCss;
+    return resetCss + indentCss;
   }
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    print("DEBUG: HtmlContentWidget.build() for blockIndex: $blockIndex");
     final preferences = ref.watch(readingPreferencesProvider);
     final highlightsAsync = ref.watch(highlightsProvider(block.bookId!));
 
@@ -98,8 +92,8 @@ class HtmlContentWidget extends ConsumerWidget {
           return null;
         },
         onTapUrl: (url) {
-          print("DEBUG: URL tapped in block $blockIndex: $url");
           if (block.src != null && block.bookId != null) {
+            // This line is now valid again.
             ref.read(readingControllerProvider(block.bookId!).notifier).jumpToHref(url, block.src!);
             return true;
           }
@@ -111,25 +105,17 @@ class HtmlContentWidget extends ConsumerWidget {
 
   String _injectHighlightTags(String html, List<Highlight> highlights) {
     if (highlights.isEmpty) return html;
-
     String result = html;
     int offset = 0;
-
     for (final h in highlights) {
       final color = Color(h.color);
       final colorString = 'rgba(${color.red},${color.green},${color.blue},${(color.alpha / 255).toStringAsFixed(2)})';
       final startTag = '<highlight color="$colorString">';
       final endTag = '</highlight>';
-
       final start = h.startOffset + offset;
       final end = h.endOffset + offset;
-
       if (start >= 0 && end <= result.length && start < end) {
-        result = result.substring(0, start) +
-            startTag +
-            result.substring(start, end) +
-            endTag +
-            result.substring(end);
+        result = result.substring(0, start) + startTag + result.substring(start, end) + endTag + result.substring(end);
         offset += startTag.length + endTag.length;
       }
     }
@@ -137,7 +123,6 @@ class HtmlContentWidget extends ConsumerWidget {
   }
 }
 
-// Helper extension to convert Flutter Color to CSS color string
 extension ToCss on Color {
   String toCss() => 'rgba($red, $green, $blue, ${alpha / 255})';
 }

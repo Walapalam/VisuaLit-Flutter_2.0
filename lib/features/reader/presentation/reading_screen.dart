@@ -3,12 +3,12 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_speed_dial/flutter_speed_dial.dart';
 import 'package:go_router/go_router.dart';
-import 'package:screen_brightness/screen_brightness.dart';
+import 'package:visualit/core/providers/isar_provider.dart';
 import 'package:visualit/features/reader/presentation/reading_controller.dart';
 import 'package:visualit/features/reader/presentation/reading_preferences_controller.dart';
-import 'package:visualit/features/reader/presentation/widgets/book_page_widget.dart';
-import 'package:visualit/features/reader/presentation/widgets/html_content_widget.dart';
+import 'package:visualit/features/reader/presentation/widgets/page_content_widget.dart';
 import 'package:visualit/features/reader/presentation/widgets/reading_settings_panel.dart';
+import 'package:visualit/features/reader/presentation/widgets/toc_panel.dart';
 
 class ReadingScreen extends ConsumerStatefulWidget {
   final int bookId;
@@ -19,231 +19,198 @@ class ReadingScreen extends ConsumerStatefulWidget {
 }
 
 class _ReadingScreenState extends ConsumerState<ReadingScreen> {
-  bool _isUiVisible = false;
   PageController? _pageController;
-  ScrollController? _scrollController;
-  bool _isLocked = false;
-  bool _brightnessPermissionWarningShown = false; // Prevents spamming the user
+  bool _isUiVisible = false;
+  bool _isLocked = false; // State for the lock button
 
   @override
   void initState() {
     super.initState();
-    print("DEBUG: [ReadingScreen] initState called for bookId: ${widget.bookId}");
-    _initializePageStyleControllers();
-    SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersive);
-    _setInitialBrightness();
-  }
-
-  // --- FIX: This function now correctly tries to set brightness and handles the specific error ---
-  Future<void> _setBrightness(double brightness) async {
-    try {
-      print("DEBUG: [ReadingScreen] Attempting to set screen brightness to: $brightness");
-      await ScreenBrightness().setScreenBrightness(brightness);
-      print("DEBUG: [ReadingScreen] System brightness set successfully.");
-    } on PlatformException catch (e, s) {
-      // This is the specific error thrown when permission is denied.
-      print("❌ DEBUG: [ReadingScreen] PlatformException while setting brightness: ${e.message}");
-      print("DEBUG: [ReadingScreen] Stacktrace: $s");
-
-      // Inform the user how to fix it, but only show the message once per session.
-      if (mounted && !_brightnessPermissionWarningShown) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Cannot change brightness. Please grant "Modify system settings" permission for VisuaLit.'),
-            duration: Duration(seconds: 6),
-          ),
-        );
-        setState(() {
-          _brightnessPermissionWarningShown = true;
-        });
-      }
-    } catch (e, s) {
-      // Catch any other unexpected errors.
-      print("❌ DEBUG: [ReadingScreen] Unexpected error setting brightness: $e\n$s");
-    }
-  }
-
-  Future<void> _setInitialBrightness() async {
-    await Future.delayed(const Duration(milliseconds: 100));
-    final initialBrightness = ref.read(readingPreferencesProvider).brightness;
-    await _setBrightness(initialBrightness);
-  }
-
-  void _initializePageStyleControllers() {
-    print("DEBUG: [ReadingScreen] Initializing page style controllers.");
-    final prefs = ref.read(readingPreferencesProvider);
-    final readingState = ref.read(readingControllerProvider(widget.bookId));
-
-    if (prefs.pageTurnStyle == PageTurnStyle.paged) {
-      print("DEBUG: [ReadingScreen] Setting up PageController for paged view at page ${readingState.currentPage}.");
-      _pageController = PageController(initialPage: readingState.currentPage);
-      _scrollController?.dispose();
-      _scrollController = null;
-    } else {
-      print("DEBUG: [ReadingScreen] Setting up ScrollController for scroll view.");
-      _scrollController = ScrollController();
-      _pageController?.dispose();
-      _pageController = null;
-    }
+    print("-> [ReadingScreen] initState for bookId: ${widget.bookId}");
+    _pageController = PageController();
+    SystemChrome.setEnabledSystemUIMode(SystemUiMode.manual, overlays: []); // Immersive mode
   }
 
   @override
   void dispose() {
-    print("DEBUG: [ReadingScreen] dispose called. Resetting UI and brightness.");
+    print("-> [ReadingScreen] dispose called.");
     _pageController?.dispose();
-    _scrollController?.dispose();
-    // It's good practice to reset the brightness when the user leaves the screen.
-    ScreenBrightness().resetScreenBrightness();
-    SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
+    SystemChrome.setEnabledSystemUIMode(SystemUiMode.manual, overlays: SystemUiOverlay.values); // Restore UI overlays
     super.dispose();
   }
 
   void _toggleUiVisibility() {
-    if (_isLocked) {
-      print("DEBUG: [ReadingScreen] UI toggle blocked by screen lock.");
-      return;
-    }
+    if (_isLocked) return; // Prevent UI toggle when screen is locked
+
     setState(() {
       _isUiVisible = !_isUiVisible;
-      print("DEBUG: [ReadingScreen] Toggling UI visibility. New state: $_isUiVisible");
-      SystemChrome.setEnabledSystemUIMode(
-        _isUiVisible ? SystemUiMode.edgeToEdge : SystemUiMode.immersive,
-      );
+      print("  - UI visibility toggled to: $_isUiVisible");
+      if (_isUiVisible) {
+        SystemChrome.setEnabledSystemUIMode(SystemUiMode.manual, overlays: SystemUiOverlay.values);
+      } else {
+        SystemChrome.setEnabledSystemUIMode(SystemUiMode.manual, overlays: []);
+      }
     });
-  }
-
-  void _showMainSettingsPanel() {
-    print("DEBUG: [ReadingScreen] Showing main settings panel.");
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (context) => const ReadingSettingsPanel(),
-    );
   }
 
   @override
   Widget build(BuildContext context) {
-    print("DEBUG: [ReadingScreen] build() called.");
-    final viewSize = MediaQuery.of(context).size;
-    final provider = readingControllerProvider(widget.bookId);
-    final state = ref.watch(provider);
-    final prefs = ref.watch(readingPreferencesProvider);
+    print("-> [ReadingScreen] build called.");
 
-    // --- FIX: This listener now calls our new robust _setBrightness method ---
-    ref.listen(readingPreferencesProvider.select((p) => p.brightness), (_, next) {
-      _setBrightness(next);
-    });
+    final isarAsync = ref.watch(isarDBProvider);
 
-    ref.listen(provider.select((s) => s.currentPage), (previous, next) {
-      if (next != previous && _pageController?.hasClients == true) {
-        if (_pageController!.page?.round() != next) {
-          print("DEBUG: [ReadingScreen] Page state changed to $next. Jumping PageController.");
-          _pageController!.jumpToPage(next);
-        }
-      }
-    });
+    return isarAsync.when(
+      loading: () => const Scaffold(body: Center(child: CircularProgressIndicator())),
+      error: (err, stack) => Scaffold(
+        appBar: AppBar(title: const Text("Database Error")),
+        body: Center(child: Text("Could not open database.\n\n$err")),
+      ),
+      data: (isar) {
+        final readingState = ref.watch(readingControllerProvider(widget.bookId));
+        final prefs = ref.watch(readingPreferencesProvider);
 
-    ref.listen(readingPreferencesProvider.select((p) => p.pageTurnStyle), (prev, next) {
-      if (prev != next) {
-        print("DEBUG: [ReadingScreen] Page turn style changed. Re-initializing controllers.");
-        setState(_initializePageStyleControllers);
-      }
-    });
+        // Listener to sync PageController
+        ref.listen(readingControllerProvider(widget.bookId), (prev, next) {
+          if (prev == null || !_pageController!.hasClients) return;
+          if (prev.currentChapterIndex != next.currentChapterIndex) {
+            _pageController!.jumpToPage(0);
+          } else if (prev.currentPageInChapter != next.currentPageInChapter) {
+            if (_pageController!.page?.round() != next.currentPageInChapter) {
+              _pageController!.jumpToPage(next.currentPageInChapter);
+            }
+          }
+        });
 
-    final readerContent = Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 40),
-      child: _buildBody(state, viewSize, provider, prefs),
-    );
-
-    return Scaffold(
-      backgroundColor: prefs.pageColor,
-      appBar: PreferredSize(
-        preferredSize: const Size.fromHeight(kToolbarHeight),
-        child: AnimatedOpacity(
-          opacity: _isUiVisible ? 1.0 : 0.0,
-          duration: const Duration(milliseconds: 250),
-          child: AppBar(
-            backgroundColor: prefs.pageColor.withAlpha(200),
-            elevation: 0,
-            automaticallyImplyLeading: false,
-            centerTitle: true,
-            title: Text(
-              state.chapterProgress,
-              style: TextStyle(color: prefs.textColor, fontSize: 12),
+        // The main Scaffold, now structured like your old implementation
+        return Scaffold(
+          backgroundColor: prefs.pageColor,
+          // --- AppBar IMPLEMENTATION ---
+          appBar: PreferredSize(
+            preferredSize: const Size.fromHeight(kToolbarHeight),
+            child: AnimatedOpacity(
+              opacity: _isUiVisible ? 1.0 : 0.0,
+              duration: const Duration(milliseconds: 250),
+              child: _buildTopBar(readingState, prefs),
             ),
-            actions: [
-              IconButton(
-                icon: Icon(Icons.close, color: prefs.textColor),
-                onPressed: () {
-                  print("DEBUG: [ReadingScreen] Close button pressed. Navigating to /home.");
-                  context.go('/home');
-                },
-              )
-            ],
           ),
-        ),
-      ),
-      bottomNavigationBar: AnimatedContainer(
-        duration: const Duration(milliseconds: 250),
-        height: _isUiVisible ? 80 : 0,
-        child: _isUiVisible ? _buildBottomScrubber(state, prefs) : null,
-      ),
-      floatingActionButton: _buildSpeedDialFab(),
-      body: GestureDetector(
-        onTap: _toggleUiVisibility,
-        child: AbsorbPointer(
-          absorbing: _isLocked,
-          child: Stack(
-            children: [
-              readerContent,
-            ],
+          // --- BottomNavigationBar IMPLEMENTATION ---
+          bottomNavigationBar: AnimatedContainer(
+            duration: const Duration(milliseconds: 250),
+            height: _isUiVisible ? 80 : 0,
+            child: _isUiVisible ? _buildBottomScrubber(readingState, prefs) : null,
           ),
-        ),
-      ),
+          // --- FloatingActionButton IMPLEMENTATION ---
+          floatingActionButton: _buildSpeedDialFab(readingState),
+          // The main body of the scaffold
+          body: !readingState.isBookLoaded
+              ? const Center(child: CircularProgressIndicator())
+              : GestureDetector(
+            onTap: _toggleUiVisibility,
+            child: AbsorbPointer(
+              absorbing: _isLocked,
+              child: _buildReaderBody(readingState, prefs),
+            ),
+          ),
+        );
+      },
     );
   }
 
-  Widget _buildBody(ReadingState state, Size viewSize,
-      AutoDisposeStateNotifierProvider<ReadingController, ReadingState> provider, ReadingPreferences prefs) {
-    if (!state.isBookLoaded) return const Center(child: CircularProgressIndicator());
-    if (state.blocks.isEmpty) return const Center(child: Text('This book has no content.'));
+  // --- Helper methods for building UI sections ---
 
-    if (prefs.pageTurnStyle == PageTurnStyle.scroll) {
-      return ListView.builder(
-        controller: _scrollController,
-        itemCount: state.blocks.length,
-        itemBuilder: (context, index) {
-          return HtmlContentWidget(
-            key: ValueKey('block_${state.blocks[index].id}'),
-            block: state.blocks[index],
-            blockIndex: index,
-            viewSize: viewSize,
-          );
-        },
-      );
-    } else {
+  Widget _buildTopBar(ReadingState state, ReadingPreferences prefs) {
+    // This is the actual AppBar widget, now built separately for clarity
+    return AppBar(
+      backgroundColor: prefs.pageColor.withAlpha(200),
+      elevation: 0,
+      automaticallyImplyLeading: false,
+      centerTitle: true,
+      title: Text(state.chapterProgress, style: TextStyle(color: prefs.textColor, fontSize: 12)),
+      actions: [
+        IconButton(
+          icon: Icon(Icons.list, color: prefs.textColor),
+          onPressed: () => showModalBottomSheet(
+            context: context,
+            isScrollControlled: true,
+            builder: (_) => TOCPanel(bookId: state.bookId, viewSize: MediaQuery.of(context).size),
+          ),
+        ),
+        IconButton(
+          icon: Icon(Icons.close, color: prefs.textColor),
+          onPressed: () => context.go('/home'),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildReaderBody(ReadingState state, ReadingPreferences prefs) {
+    return LayoutBuilder(builder: (context, constraints) {
+      final pageHeight = constraints.maxHeight;
+      final providerNotifier = ref.read(readingControllerProvider(widget.bookId).notifier);
+      final pageContentKey = ValueKey('chapter_${state.currentChapterIndex}_${prefs.fontSize}_${prefs.fontFamily}_${prefs.lineSpacing}_${prefs.textIndent}');
+
       return PageView.builder(
         controller: _pageController,
-        itemCount: state.totalPages,
-        onPageChanged: ref.read(provider.notifier).onPageChanged,
+        itemCount: state.pagesInCurrentChapter,
+        onPageChanged: providerNotifier.onPageChangedBySwipe,
         itemBuilder: (context, index) {
-          final startingBlockIndex = state.pageToBlockIndexMap[index];
-          if (startingBlockIndex == null) return const Center(child: CircularProgressIndicator());
-          return BookPageWidget(
-            key: ValueKey('page_${index}_$startingBlockIndex'),
-            allBlocks: state.blocks,
-            startingBlockIndex: startingBlockIndex,
-            viewSize: viewSize,
-            pageIndex: index,
-            onPageBuilt: ref.read(provider.notifier).updatePageLayout,
+          if (state.blocksForCurrentChapter.isEmpty) {
+            return const Center(child: Text("Empty Chapter"));
+          }
+          return Padding( // Added padding here to match old layout
+            padding: const EdgeInsets.symmetric(horizontal: 20.0),
+            child: PageContentWidget(
+              key: pageContentKey,
+              chapterBlocks: state.blocksForCurrentChapter,
+              preferences: prefs,
+              currentPage: index,
+              pageHeight: pageHeight,
+              chapterIndex: state.currentChapterIndex,
+              onLayoutCalculated: (chapterIdx, totalHeight) {
+                providerNotifier.updateChapterLayout(chapterIdx, totalHeight, pageHeight);
+              },
+            ),
           );
         },
       );
-    }
+    });
   }
 
-  Widget _buildSpeedDialFab() {
+  // NOTE: This now combines the scrubber and chapter navigation
+  Widget _buildBottomScrubber(ReadingState state, ReadingPreferences prefs) {
+    final totalPagesInChapter = state.pagesInCurrentChapter;
+    return BottomAppBar(
+      color: Theme.of(context).colorScheme.surface.withAlpha(242),
+      elevation: 0,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16.0),
+        child: Row(
+          children: [
+            IconButton(onPressed: ref.read(readingControllerProvider(widget.bookId).notifier).goToPreviousChapter, icon: Icon(Icons.chevron_left, color: prefs.textColor)),
+            Expanded(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Text('Page ${state.currentPageInChapter + 1} of $totalPagesInChapter', style: TextStyle(color: prefs.textColor, fontSize: 12)),
+                  Slider(
+                    value: state.currentPageInChapter.toDouble().clamp(0, (totalPagesInChapter > 0 ? totalPagesInChapter - 1 : 0).toDouble()),
+                    min: 0,
+                    max: (totalPagesInChapter > 0 ? totalPagesInChapter - 1 : 0).toDouble(),
+                    divisions: totalPagesInChapter > 1 ? totalPagesInChapter - 1 : null,
+                    onChanged: (value) => _pageController?.jumpToPage(value.round()),
+                  ),
+                ],
+              ),
+            ),
+            IconButton(onPressed: ref.read(readingControllerProvider(widget.bookId).notifier).goToNextChapter, icon: Icon(Icons.chevron_right, color: prefs.textColor)),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // --- SpeedDial FAB implementation, just like the old one ---
+  Widget _buildSpeedDialFab(ReadingState state) {
     return SpeedDial(
       icon: Icons.more_horiz,
       activeIcon: Icons.close,
@@ -257,7 +224,6 @@ class _ReadingScreenState extends ConsumerState<ReadingScreen> {
       visible: _isUiVisible,
       children: [
         SpeedDialChild(child: const Icon(Icons.bookmark_border), label: 'Bookmark', onTap: () {}),
-        SpeedDialChild(child: const Icon(Icons.share_outlined), label: 'Share', onTap: () {}),
         SpeedDialChild(
           child: Icon(_isLocked ? Icons.lock_open_outlined : Icons.lock_outline),
           label: _isLocked ? 'Unlock' : 'Lock Screen',
@@ -266,37 +232,17 @@ class _ReadingScreenState extends ConsumerState<ReadingScreen> {
             print("DEBUG: [ReadingScreen] Screen lock toggled. New state: $_isLocked");
           },
         ),
-        SpeedDialChild(child: const Icon(Icons.search), label: 'Search', onTap: () {}),
-        SpeedDialChild(child: const Icon(Icons.tune_outlined), label: 'Theme & Settings', onTap: _showMainSettingsPanel),
-      ],
-    );
-  }
-
-  Widget _buildBottomScrubber(ReadingState state, ReadingPreferences prefs) {
-    if (prefs.pageTurnStyle == PageTurnStyle.scroll) return const SizedBox.shrink();
-
-    return BottomAppBar(
-      color: Theme.of(context).colorScheme.surface.withAlpha(242),
-      elevation: 0,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16.0),
-        child: Row(
-          children: [
-            Text('Page ${state.currentPage + 1}', style: TextStyle(color: prefs.textColor, fontSize: 12)),
-            Expanded(
-              child: Slider(
-                value: state.currentPage.toDouble().clamp(0, (state.totalPages > 0 ? state.totalPages - 1 : 0).toDouble()),
-                min: 0,
-                max: (state.totalPages > 0 ? state.totalPages - 1 : 0).toDouble(),
-                onChanged: (value) => ref.read(readingControllerProvider(widget.bookId).notifier).onPageChanged(value.round()),
-                activeColor: prefs.textColor,
-                inactiveColor: prefs.textColor.withAlpha(77),
-              ),
-            ),
-            Text('${state.totalPages}', style: TextStyle(color: prefs.textColor, fontSize: 12)),
-          ],
+        SpeedDialChild(
+          child: const Icon(Icons.tune_outlined),
+          label: 'Theme & Settings',
+          onTap: () => showModalBottomSheet(
+            context: context,
+            isScrollControlled: true,
+            backgroundColor: Colors.transparent,
+            builder: (context) => const ReadingSettingsPanel(),
+          ),
         ),
-      ),
+      ],
     );
   }
 }

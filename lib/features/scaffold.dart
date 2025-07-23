@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'app_drawer.dart';
+import 'audiobook_player/presentation/mini_audio_player.dart';
 
 class MainShell extends StatelessWidget {
   const MainShell({
@@ -13,6 +14,7 @@ class MainShell extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      // The AppBar and endDrawer remain unchanged
       appBar: AppBar(
         title: Text(
           'Visualit',
@@ -53,7 +55,24 @@ class MainShell extends StatelessWidget {
         ],
       ),
       endDrawer: const AppDrawer(),
-      body: navigationShell,
+
+      // +++ THIS IS THE MAIN CHANGE +++
+      // We use a Column to stack the main page content on top of the mini-player.
+      body: Column(
+        children: [
+          // The Expanded widget ensures the main content (your pages)
+          // takes up all available space, pushing the mini-player to the bottom.
+          Expanded(
+            child: navigationShell,
+          ),
+
+          // The MiniAudioPlayer is placed here.
+          // It will automatically be visible only when an audiobook is loaded
+          // in the global AudiobookPlayerService.
+          const MiniAudioPlayer(),
+        ],
+      ),
+
       bottomNavigationBar: BottomNavigationBar(
         backgroundColor: Theme.of(context).colorScheme.primary,
         selectedItemColor: Theme.of(context).colorScheme.onPrimary,

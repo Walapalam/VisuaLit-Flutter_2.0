@@ -32,6 +32,7 @@ class MainShell extends StatelessWidget {
               icon: CircleAvatar(
                 backgroundColor: Theme.of(context).colorScheme.surface,
                 radius: 16,
+                child: const Icon(Icons.person, size: 20), // User icon inside
               ),
               onPressed: () {
                 Scaffold.of(context).openEndDrawer();

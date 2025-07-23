@@ -27,18 +27,6 @@ class MainShell extends StatelessWidget {
         backgroundColor: Theme.of(context).colorScheme.primary,
         elevation: 0,
         actions: [
-          IconButton(
-            icon: Icon(
-              Icons.search,
-              color: Theme.of(context).colorScheme.onPrimary,
-            ),
-            onPressed: () {
-              showSearch(
-                context: context,
-                delegate: MySearchDelegate(),
-              );
-            },
-          ),
           Builder(
             builder: (context) => IconButton(
               icon: CircleAvatar(
@@ -90,47 +78,8 @@ class MainShell extends StatelessWidget {
             activeIcon: Icon(Icons.store),
             label: 'Marketplace',
           ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.settings_outlined),
-            activeIcon: Icon(Icons.settings),
-            label: 'Settings',
-          ),
         ],
       ),
     );
-  }
-}
-// Your MySearchDelegate code remains the same
-class MySearchDelegate extends SearchDelegate<String> {
-  @override
-  List<Widget>? buildActions(BuildContext context) {
-    return [
-      IconButton(
-        icon: const Icon(Icons.clear),
-        onPressed: () {
-          query = '';
-        },
-      ),
-    ];
-  }
-
-  @override
-  Widget? buildLeading(BuildContext context) {
-    return IconButton(
-      icon: const Icon(Icons.arrow_back),
-      onPressed: () {
-        close(context, '');
-      },
-    );
-  }
-
-  @override
-  Widget buildResults(BuildContext context) {
-    return Center(child: Text('You searched for: $query'));
-  }
-
-  @override
-  Widget buildSuggestions(BuildContext context) {
-    return Container();
   }
 }

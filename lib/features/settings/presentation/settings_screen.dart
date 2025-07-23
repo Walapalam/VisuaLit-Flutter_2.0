@@ -47,6 +47,12 @@ import 'package:flutter/material.dart';
                         title: const Text('Settings'),
                         centerTitle: true,
                         elevation: 0,
+                        leading: IconButton(
+                          icon: const Icon(Icons.arrow_back),
+                          onPressed: () {
+                            context.goNamed('home'); // Navigate back to the previous screen
+                          },
+                        ),
                       ),
                       body: SingleChildScrollView(
                         padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 24.0),

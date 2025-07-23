@@ -53,34 +53,20 @@ final goRouterProvider = Provider<GoRouter>((ref) {
         builder: (context, state) => const SignUpScreen(),
       ),
       GoRoute(
-        path: '/book/:bookId',
-        name: 'bookReader',
-        builder: (context, state) {
-          final bookId = int.tryParse(state.pathParameters['bookId'] ?? '0') ?? 0;
-          return ReadingScreen(bookId: bookId);
-        },
-      ),
-      GoRoute(
-        path: '/audiobook/:audiobookId',
-        name: 'audiobookPlayer',
-        builder: (context, state) {
-          final audiobookId = int.tryParse(state.pathParameters['audiobookId'] ?? '0') ?? 0;
-          return AudiobookPlayerScreen(audiobookId: audiobookId);
-        },
+        path: '/settings',
+        name: 'settings',
+        builder: (context, state) => const SettingsScreen(),
       ),
       GoRoute(
         path: '/storage-settings',
         name: 'storageSettings',
-        builder: (context, state) => const StorageSettingsScreen(),),
-
+        builder: (context, state) => const StorageSettingsScreen(),
+      ),
       GoRoute(
         path: '/cart',
         name: 'cart',
         builder: (context, state) => const CartScreen(),
       ),
-      // TODO: Add '/preferences' route here when built
-
-      // Main application shell route
       StatefulShellRoute.indexedStack(
         builder: (context, state, navigationShell) => MainShell(navigationShell: navigationShell),
         branches: [
@@ -93,17 +79,8 @@ final goRouterProvider = Provider<GoRouter>((ref) {
           StatefulShellBranch(routes: [
             GoRoute(path: '/audio', name: 'audio', builder: (context, state) => const AudiobooksScreen()),
           ]),
-          StatefulShellBranch(
-            routes: [
-              GoRoute(
-                path: '/marketplace', name: 'marketplace',
-                builder: (context, state) => const MarketplaceScreen(),
-              ),
-            ],
-          ),
-
           StatefulShellBranch(routes: [
-            GoRoute(path: '/settings', name: 'settings', builder: (context, state) => const SettingsScreen()),
+            GoRoute(path: '/marketplace', name: 'marketplace', builder: (context, state) => const MarketplaceScreen()),
           ]),
         ],
       ),
@@ -113,23 +90,19 @@ final goRouterProvider = Provider<GoRouter>((ref) {
       final location = state.matchedLocation;
       final publicRoutes = ['/splash', '/onboarding', '/login', '/signup'];
 
-      // Stay on splash until initialization is complete (including loading state)
       if ((status == AuthStatus.initial || status == AuthStatus.loading) && location != '/splash') {
         return '/splash';
       }
 
-      // If authenticated or guest, redirect to home from public routes
       if ((status == AuthStatus.authenticated || status == AuthStatus.guest) &&
           publicRoutes.contains(location)) {
         return '/home';
       }
 
-      // If unauthenticated and not on a public route, redirect to onboarding
       if (status == AuthStatus.unauthenticated && !publicRoutes.contains(location)) {
         return '/onboarding';
       }
 
-      // If on splash and initialization is complete, redirect based on status
       if (location == '/splash' && status != AuthStatus.initial && status != AuthStatus.loading) {
         return status == AuthStatus.unauthenticated ? '/onboarding' : '/home';
       }

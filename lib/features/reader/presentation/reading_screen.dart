@@ -12,7 +12,9 @@ import 'package:visualit/features/reader/presentation/widgets/reading_settings_p
 // Import the BookOverviewDialog (and remove AllBooksOverviewDialog import if it was there)
 import 'package:visualit/features/reader/presentation/widgets/book_overview_dialog.dart';
 // Also need to import your local Book data models from Isar
-import 'package:visualit/features/reader/data/book_data.dart' as local_book_data; // Alias to avoid conflict
+import 'package:visualit/features/reader/data/book_data.dart' as local_book_data;
+
+import '../../../core/services/isbn_lookup_service.dart'; // Alias to avoid conflict
 
 
 class ReadingScreen extends ConsumerStatefulWidget {
@@ -92,6 +94,24 @@ class _ReadingScreenState extends ConsumerState<ReadingScreen> {
       return;
     }
 
+    // Show a loading indicator while fetching the ISBN
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => const Center(child: CircularProgressIndicator()),
+    );
+
+    // Perform ISBN lookup if missing
+    String? localBookISBN = localBook.isbn;
+    if (localBookISBN == null || localBookISBN.isEmpty) {
+      localBookISBN = await IsbnLookupService.lookupIsbnByTitle(localBook.title!);
+      print("ISBN fetched");// Static method call
+      // Optionally: Save the fetched ISBN to the local book model
+    }
+
+    // Dismiss the loading indicator
+    Navigator.of(context).pop();
+
     // Get current chapter index from the reading state
     final currentChapterIndex = readingState.blocks[readingState.pageToBlockIndexMap[readingState.currentPage]!].chapterIndex;
 
@@ -108,31 +128,31 @@ class _ReadingScreenState extends ConsumerState<ReadingScreen> {
         .toList();
 
     // Combine HTML content of blocks to form chapter_content
-    // This assumes your backend can process concatenated HTML.
-    // If your backend needs plain text, you'd combine block.textContent.
     final currentChapterContent = chapterBlocks
         .map((block) => block.htmlContent ?? '')
-        .join('\n'); // Join with newline for readability for parser
+        .join('\n');
 
-    // Get ISBN from local book data. Your local Book model (lib/features/reader/data/book_data.dart)
-    // currently does NOT have an ISBN field. If your backend needs ISBN for lookup,
-    // you MUST add `String? isbn;` to your local `Book` model and populate it during import.
-    final String? localBookISBN = localBook.isbn; // Assuming you might add an 'isbn' field to local_book_data.Book later.
+    // Log the values to debug
+    print('Book Title: ${localBook.title}');
+    print('Book ISBN: $localBookISBN');
+    print('Current Chapter Index: $currentChapterIndex');
+    print('Current Chapter Content: $currentChapterContent');
 
+    // Show the BookOverviewDialog
     showGeneralDialog(
       context: context,
-      barrierColor: Colors.transparent, // Make barrier transparent
-      barrierDismissible: true, // Allow dismissing by tapping outside
+      barrierColor: Colors.transparent,
+      barrierDismissible: true,
       barrierLabel: 'Book Visualizations',
       transitionDuration: const Duration(milliseconds: 300),
       pageBuilder: (context, animation, secondaryAnimation) {
-        return FadeTransition( // Smooth fade transition for dialog
+        return FadeTransition(
           opacity: animation,
           child: BookOverviewDialog(
             bookTitleForLookup: localBook.title!,
-            localBookISBN: localBookISBN, // Pass local book's ISBN
-            localChapterNumber: currentChapterIndex, // Pass current chapter number
-            localChapterContent: currentChapterContent, // Pass current chapter content
+            localBookISBN: "9781472624031",
+            localChapterNumber: 1,
+            localChapterContent: currentChapterContent,
           ),
         );
       },

@@ -4,7 +4,7 @@ class Book {
   final String title;
   final String? author;
   final String characterPersonas; // Storing as String, assuming it's JSON
-
+//This is a simplified model for a book in a library system.
   Book({
     required this.id,
     required this.isbn,
@@ -12,7 +12,7 @@ class Book {
     this.author,
     required this.characterPersonas,
   });
-
+//this is a factory constructor to create a Book instance from a JSON map.
   factory Book.fromJson(Map<String, dynamic> json) {
     return Book(
       id: json['\$id'] as String,

@@ -21,13 +21,14 @@ class ReadingScreen extends ConsumerStatefulWidget {
 
 class _ReadingScreenState extends ConsumerState<ReadingScreen> {
   PageController? _pageController;
-  bool _isUiVisible = false;
+  bool _isUiVisible = true; // Changed to true for debugging
   bool _isLocked = false;
 
   @override
   void initState() {
     super.initState();
     print("-> [ReadingScreen] initState for bookId: ${widget.bookId}");
+    print("  - Initial lock state: $_isLocked");
     _pageController = PageController();
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.manual, overlays: []);
   }
@@ -41,7 +42,11 @@ class _ReadingScreenState extends ConsumerState<ReadingScreen> {
   }
 
   void _toggleUiVisibility() {
-    if (_isLocked) return;
+    print("-> [ReadingScreen] GestureDetector tapped");
+    if (_isLocked) {
+      print("  - UI toggle blocked: screen is locked");
+      return;
+    }
 
     setState(() {
       _isUiVisible = !_isUiVisible;
@@ -70,12 +75,19 @@ class _ReadingScreenState extends ConsumerState<ReadingScreen> {
         final readingState = ref.watch(readingControllerProvider(widget.bookId));
         final prefs = ref.watch(readingPreferencesProvider);
 
+        print("  - ReadingState: isBookLoaded=${readingState.isBookLoaded}, "
+            "chapter=${readingState.currentChapterIndex}, page=${readingState.currentPageInChapter}");
+        print("  - Preferences: pageColor=${prefs.pageColor}, textColor=${prefs.textColor}, "
+            "fontSize=${prefs.fontSize}");
+
         ref.listen(readingControllerProvider(widget.bookId), (prev, next) {
           if (prev == null || !_pageController!.hasClients) return;
           if (prev.currentChapterIndex != next.currentChapterIndex) {
+            print("  - Chapter changed from ${prev.currentChapterIndex} to ${next.currentChapterIndex}");
             _pageController!.jumpToPage(0);
           } else if (prev.currentPageInChapter != next.currentPageInChapter) {
             if (_pageController!.page?.round() != next.currentPageInChapter) {
+              print("  - Page changed from ${prev.currentPageInChapter} to ${next.currentPageInChapter}");
               _pageController!.jumpToPage(next.currentPageInChapter);
             }
           }
@@ -97,14 +109,11 @@ class _ReadingScreenState extends ConsumerState<ReadingScreen> {
             child: _isUiVisible ? _buildBottomScrubber(readingState, prefs) : null,
           ),
           floatingActionButton: _buildSpeedDialFab(readingState),
-          body: !readingState.isBookLoaded
-              ? const Center(child: CircularProgressIndicator())
-              : GestureDetector(
+          body: GestureDetector(
             onTap: _toggleUiVisibility,
-            child: AbsorbPointer(
-              absorbing: _isLocked,
-              child: _buildReaderBody(readingState, prefs),
-            ),
+            child: readingState.isBookLoaded
+                ? _buildReaderBody(readingState, prefs)
+                : const Center(child: CircularProgressIndicator()),
           ),
         );
       },
@@ -136,6 +145,17 @@ class _ReadingScreenState extends ConsumerState<ReadingScreen> {
   }
 
   Widget _buildReaderBody(ReadingState state, ReadingPreferences prefs) {
+    print("-> [ReadingScreen] _buildReaderBody: blocks=${state.blocksForCurrentChapter.length}, "
+        "pages=${state.pagesInCurrentChapter}");
+    if (state.blocksForCurrentChapter.isEmpty) {
+      return const Center(
+        child: Text(
+          "No content available",
+          style: TextStyle(color: Colors.white, fontSize: 20),
+        ),
+      );
+    }
+
     final viewSize = MediaQuery.of(context).size;
     final providerNotifier = ref.read(readingControllerProvider(widget.bookId).notifier);
 
@@ -157,7 +177,7 @@ class _ReadingScreenState extends ConsumerState<ReadingScreen> {
     }
 
     return LayoutBuilder(builder: (context, constraints) {
-      final pageHeight = constraints.maxHeight - 40.0; // Account for padding
+      final pageHeight = constraints.maxHeight - 40.0;
       final pageContentKey = ValueKey(
           'chapter_${state.currentChapterIndex}_${prefs.fontSize}_${prefs.fontFamily}_${prefs.lineSpacing}_${prefs.textIndent}_${prefs.themeMode}_${prefs.brightness}');
 
@@ -167,13 +187,16 @@ class _ReadingScreenState extends ConsumerState<ReadingScreen> {
           ? pageMap[state.currentPageInChapter + 1]! - 1
           : state.blocksForCurrentChapter.length - 1;
 
+      print("  - PageMap: $pageMap");
+      print("  - Page ${state.currentPageInChapter}: startIndex=$startBlockIndex, endIndex=$endBlockIndex");
+
       return PageView.builder(
         controller: _pageController,
         itemCount: state.pagesInCurrentChapter,
         onPageChanged: providerNotifier.onPageChangedBySwipe,
         itemBuilder: (context, index) {
           if (state.blocksForCurrentChapter.isEmpty) {
-            return const Center(child: Text("Empty Chapter"));
+            return const Center(child: Text("Empty Chapter", style: TextStyle(color: Colors.white)));
           }
           final pageStartIndex = pageMap[index] ?? 0;
           final pageEndIndex = pageMap[index + 1] != null

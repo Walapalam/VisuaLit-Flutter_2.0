@@ -35,7 +35,7 @@ class _PageContentWidgetState extends ConsumerState<PageContentWidget> {
   @override
   void initState() {
     super.initState();
-    // This now runs every time the key changes (i.e., when chapter changes)
+    _hasCalculated = false;
     WidgetsBinding.instance.addPostFrameCallback((_) => _buildPageContent());
   }
 
@@ -94,6 +94,17 @@ class _PageContentWidgetState extends ConsumerState<PageContentWidget> {
           "  -> [PageContentWidget] Page ${widget.currentPage} layout complete. Starts at ${widget.startBlockIndex}, ends at $endingBlockIndex.");
       // UPDATED: Call the simpler callback
       widget.onLayoutCalculated(widget.startBlockIndex, endingBlockIndex);
+    }
+  }
+
+  @override
+  void didUpdateWidget(covariant PageContentWidget oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.startBlockIndex != widget.startBlockIndex ||
+        oldWidget.chapterBlocks != widget.chapterBlocks ||
+        oldWidget.currentPage != widget.currentPage) {
+      _hasCalculated = false;
+      WidgetsBinding.instance.addPostFrameCallback((_) => _buildPageContent());
     }
   }
 

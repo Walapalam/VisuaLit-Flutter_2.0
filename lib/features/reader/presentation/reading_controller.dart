@@ -118,18 +118,24 @@ class ReadingController extends StateNotifier<ReadingState> {
     }
   }
 
+  // In class ReadingController...
+
   void updatePageLayout(int pageIndex, int startBlockIndex, int endBlockIndex) {
     if (!mounted) return;
 
-    print("DEBUG: Updating page layout for page $pageIndex");
-    print("DEBUG: Start block index: $startBlockIndex, End block index: $endBlockIndex");
-
     final newMap = Map<int, int>.from(state.pageToBlockIndexMap);
+    // This part is correct: record the start of the page we just laid out.
     newMap[pageIndex] = startBlockIndex;
 
-    print("DEBUG: Updated pageToBlockIndexMap: $newMap");
-
     final isLastBlock = endBlockIndex >= state.currentChapterBlocks.length - 1;
+
+    // --- THIS IS THE FIX ---
+    // If this isn't the last block, we now know where the *next* page must start.
+    // We must record this in our map.
+    if (!isLastBlock) {
+      newMap[pageIndex + 1] = endBlockIndex + 1;
+    }
+    // --- END OF FIX ---
 
     final knownPages = pageIndex + 1;
     if (state.pagesInCurrentChapter <= knownPages && !isLastBlock) {
@@ -137,9 +143,8 @@ class ReadingController extends StateNotifier<ReadingState> {
         if (mounted) {
           state = state.copyWith(
             pageToBlockIndexMap: newMap,
-            pagesInCurrentChapter: knownPages + 1, // Increment page count
+            pagesInCurrentChapter: knownPages + 1,
           );
-          print("DEBUG: Incremented pagesInCurrentChapter to ${state.pagesInCurrentChapter}");
         }
       });
     } else {
@@ -150,6 +155,7 @@ class ReadingController extends StateNotifier<ReadingState> {
       });
     }
   }
+
 
   void onPageChangedBySwipe(int newPage) {
     if (mounted && newPage != state.currentPageInChapter) {

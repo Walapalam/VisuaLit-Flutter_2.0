@@ -61,8 +61,15 @@ class _ReadingScreenState extends ConsumerState<ReadingScreen> {
   }
 
   void _toggleUiVisibility() {
+    // Bug Fix: Check for lock state first
+    if (_isLocked) return;
     setState(() {
       _isUiVisible = !_isUiVisible;
+      if (_isUiVisible) {
+        SystemChrome.setEnabledSystemUIMode(SystemUiMode.manual, overlays: SystemUiOverlay.values);
+      } else {
+        SystemChrome.setEnabledSystemUIMode(SystemUiMode.manual, overlays: []);
+      }
     });
   }
 
@@ -168,17 +175,22 @@ class _ReadingScreenState extends ConsumerState<ReadingScreen> {
   }
 
   Widget _buildReaderBody(ReadingState state, ReadingPreferences prefs) {
-    // UPDATED: Now works with currentChapterBlocks
+    // Debug: Entry point
+    print('[DEBUG] _buildReaderBody called. Chapter index: ${state.currentChapterIndex}, Page style: ${prefs.pageTurnStyle}');
+
     if (state.currentChapterBlocks.isEmpty && !state.isLoadingChapter) {
+      print('[DEBUG] No content in current chapter and not loading.');
       return const Center(child: Text("Chapter has no content."));
     }
 
     final providerNotifier = ref.read(readingControllerProvider(widget.bookId).notifier);
 
     if (prefs.pageTurnStyle == PageTurnStyle.scroll) {
+      print('[DEBUG] Rendering in scroll mode. Block count: ${state.currentChapterBlocks.length}');
       return ListView.builder(
         itemCount: state.currentChapterBlocks.length,
         itemBuilder: (context, index) {
+          print('[DEBUG] Building HtmlContentWidget for block index: $index, block id: ${state.currentChapterBlocks[index].id}');
           return Padding(
             padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 8.0),
             child: HtmlContentWidget(
@@ -194,34 +206,38 @@ class _ReadingScreenState extends ConsumerState<ReadingScreen> {
 
     return LayoutBuilder(builder: (context, constraints) {
       final pageHeight = constraints.maxHeight - 40.0;
-      // Key now depends on the chapter index to force rebuild on chapter change
       final pageContentKey = ValueKey(
           'chapter_${state.currentChapterIndex}_${prefs.fontSize}_${prefs.fontFamily}_${prefs.lineSpacing}_${prefs.textIndent}_${prefs.themeMode}_${prefs.brightness}');
-
       final pageMap = state.pageToBlockIndexMap;
+
+      print('[DEBUG] Rendering in paged mode. Pages in chapter: ${state.pagesInCurrentChapter}, Page map: $pageMap');
 
       return PageView.builder(
         controller: _pageController,
         itemCount: state.pagesInCurrentChapter,
-        onPageChanged: providerNotifier.onPageChangedBySwipe,
+        onPageChanged: (page) {
+          print('[DEBUG] Page changed to: $page');
+          providerNotifier.onPageChangedBySwipe(page);
+        },
         itemBuilder: (context, index) {
           if (state.currentChapterBlocks.isEmpty) {
+            print('[DEBUG] Empty chapter blocks in PageView.builder');
             return const Center(child: Text("Empty Chapter", style: TextStyle(color: Colors.white)));
           }
           final pageStartIndex = pageMap[index] ?? 0;
+          print('[DEBUG] Building PageContentWidget for page: $index, startBlockIndex: $pageStartIndex');
 
           return Padding(
             padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 8.0),
             child: PageContentWidget(
               key: pageContentKey,
-              // UPDATED: Pass the current chapter's blocks and simpler callback
               chapterBlocks: state.currentChapterBlocks,
               preferences: prefs,
               currentPage: index,
               pageHeight: pageHeight,
               startBlockIndex: pageStartIndex,
               onLayoutCalculated: (startIdx, endIdx) {
-                // The controller implicitly knows the chapter index
+                print('[DEBUG] onLayoutCalculated for page: $index, startIdx: $startIdx, endIdx: $endIdx');
                 providerNotifier.updatePageLayout(index, startIdx, endIdx);
               },
             ),

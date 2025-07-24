@@ -7,8 +7,19 @@ import 'package:visualit/core/services/sync_service.dart';
 import 'package:visualit/core/theme/app_theme.dart';
 import 'package:visualit/core/theme/theme_controller.dart';
 
+
+import 'package:firebase_core/firebase_core.dart';
+import 'firebase_options.dart';
+
+
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  await Firebase.initializeApp(
+    options: DefaultFirebaseOptions.currentPlatform,
+  );
+
+  // Load environment variables from .env file
   await dotenv.load(fileName: ".env");
 
   runApp(const ProviderScope(

@@ -29,7 +29,7 @@ final goRouterProvider = Provider<GoRouter>((ref) {
 
   return GoRouter(
     navigatorKey: _rootNavigatorKey,
-    initialLocation: '/splash',
+    initialLocation: '/home',
     debugLogDiagnostics: true,
     routes: [
       GoRoute(
@@ -113,27 +113,23 @@ final goRouterProvider = Provider<GoRouter>((ref) {
       final location = state.matchedLocation;
       final publicRoutes = ['/splash', '/onboarding', '/login', '/signup'];
 
-      // Stay on splash until initialization is complete (including loading state)
-      if ((status == AuthStatus.initial || status == AuthStatus.loading) && location != '/splash') {
+      // Stay on splash only during initial loading
+      if (status == AuthStatus.initial && location != '/splash') {
         return '/splash';
       }
 
-      // If authenticated or guest, redirect to home from public routes
+      // After splash, if unauthenticated, go to onboarding
+      if (status == AuthStatus.unauthenticated && !publicRoutes.contains(location)) {
+        return '/onboarding';
+      }
+
+      // If authenticated or guest, allow access to all routes except public ones
       if ((status == AuthStatus.authenticated || status == AuthStatus.guest) &&
           publicRoutes.contains(location)) {
         return '/home';
       }
 
-      // If unauthenticated and not on a public route, redirect to onboarding
-      if (status == AuthStatus.unauthenticated && !publicRoutes.contains(location)) {
-        return '/onboarding';
-      }
-
-      // If on splash and initialization is complete, redirect based on status
-      if (location == '/splash' && status != AuthStatus.initial && status != AuthStatus.loading) {
-        return status == AuthStatus.unauthenticated ? '/onboarding' : '/home';
-      }
-
+      // No redirect needed
       return null;
     },
   );

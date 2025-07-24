@@ -186,23 +186,37 @@ class _ReadingScreenState extends ConsumerState<ReadingScreen> {
         padding: const EdgeInsets.symmetric(horizontal: 16.0),
         child: Row(
           children: [
-            IconButton(onPressed: ref.read(readingControllerProvider(widget.bookId).notifier).goToPreviousChapter, icon: Icon(Icons.chevron_left, color: prefs.textColor)),
+            IconButton(
+              onPressed: ref.read(readingControllerProvider(widget.bookId).notifier).goToPreviousChapter,
+              icon: Icon(Icons.chevron_left, color: prefs.textColor),
+            ),
             Expanded(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Text('Page ${state.currentPageInChapter + 1} of $totalPagesInChapter', style: TextStyle(color: prefs.textColor, fontSize: 12)),
-                  Slider(
-                    value: state.currentPageInChapter.toDouble().clamp(0, (totalPagesInChapter > 0 ? totalPagesInChapter - 1 : 0).toDouble()),
-                    min: 0,
-                    max: (totalPagesInChapter > 0 ? totalPagesInChapter - 1 : 0).toDouble(),
-                    divisions: totalPagesInChapter > 1 ? totalPagesInChapter - 1 : null,
-                    onChanged: (value) => _pageController?.jumpToPage(value.round()),
-                  ),
-                ],
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Text(
+                      'Page ${state.currentPageInChapter + 1} of $totalPagesInChapter',
+                      style: TextStyle(color: prefs.textColor, fontSize: 12),
+                    ),
+                    Slider(
+                      value: state.currentPageInChapter
+                          .toDouble()
+                          .clamp(0, (totalPagesInChapter > 0 ? totalPagesInChapter - 1 : 0).toDouble()),
+                      min: 0,
+                      max: (totalPagesInChapter > 0 ? totalPagesInChapter - 1 : 0).toDouble(),
+                      divisions: totalPagesInChapter > 1 ? totalPagesInChapter - 1 : null,
+                      onChanged: (value) => _pageController?.jumpToPage(value.round()),
+                    ),
+                  ],
+                ),
               ),
             ),
-            IconButton(onPressed: ref.read(readingControllerProvider(widget.bookId).notifier).goToNextChapter, icon: Icon(Icons.chevron_right, color: prefs.textColor)),
+            IconButton(
+              onPressed: ref.read(readingControllerProvider(widget.bookId).notifier).goToNextChapter,
+              icon: Icon(Icons.chevron_right, color: prefs.textColor),
+            ),
           ],
         ),
       ),

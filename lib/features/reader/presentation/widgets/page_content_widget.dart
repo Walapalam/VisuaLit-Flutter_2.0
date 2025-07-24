@@ -72,16 +72,18 @@ class _PageContentWidgetState extends ConsumerState<PageContentWidget> {
     return ClipRect(
       child: Transform.translate(
         offset: Offset(0, offset),
-        child: Column(
-          key: _contentKey,
-          mainAxisAlignment: MainAxisAlignment.start,
-          children: [
-            HtmlWidget(
-              _fullHtmlContent ?? '',
-              textStyle: widget.preferences.getStyleForBlock(BlockType.p),
+          child: SingleChildScrollView(
+            child: Column(
+              key: _contentKey,
+              mainAxisAlignment: MainAxisAlignment.start,
+              children: [
+                HtmlWidget(
+                  _fullHtmlContent ?? '',
+                  textStyle: widget.preferences.getStyleForBlock(BlockType.p),
+                ),
+              ],
             ),
-          ],
-        ),
+          ),
       ),
     );
   }

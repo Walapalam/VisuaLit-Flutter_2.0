@@ -1,13 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-
+import '../../../core/providers/isar_provider.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_speed_dial/flutter_speed_dial.dart';
 import 'package:go_router/go_router.dart';
-import 'package:visualit/core/providers/isar_provider.dart';
 import 'package:visualit/features/reader/presentation/reading_controller.dart';
 import 'package:visualit/features/reader/presentation/reading_preferences_controller.dart';
-import 'package:visualit/features/reader/presentation/widgets/book_page_widget.dart'; // IMPORTANT: Using BookPageWidget
+import 'package:visualit/features/reader/presentation/widgets/book_page_widget.dart';
+import 'package:visualit/features/reader/presentation/widgets/scroll_content_widget.dart';
 import 'package:visualit/features/reader/presentation/widgets/reading_settings_panel.dart';
 import 'package:visualit/features/reader/presentation/widgets/toc_panel.dart';
 
@@ -21,21 +21,40 @@ class ReadingScreen extends ConsumerStatefulWidget {
 
 class _ReadingScreenState extends ConsumerState<ReadingScreen> {
   PageController? _pageController;
+  ScrollController? _scrollController;
   bool _isUiVisible = false;
   bool _isLocked = false;
 
   @override
   void initState() {
     super.initState();
-    // Initialize with the saved page number from the now-correct controller
-    final initialPage = ref.read(readingControllerProvider(widget.bookId)).currentPage;
-    _pageController = PageController(initialPage: initialPage);
+    // It's safer to initialize controllers after the first frame
+    // to ensure providers are ready.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      _initializeControllers();
+    });
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.manual, overlays: []);
+  }
+
+  void _initializeControllers() {
+    final readingState = ref.read(readingControllerProvider(widget.bookId));
+    final prefs = ref.read(readingPreferencesProvider);
+
+    if (prefs.pageTurnStyle == PageTurnStyle.paged) {
+      _pageController = PageController(initialPage: readingState.currentPage);
+    } else {
+      _scrollController = ScrollController();
+      // A full implementation would calculate the pixel offset from the saved page
+    }
+    // Force a rebuild to ensure the correct controller is used in the build method
+    setState(() {});
   }
 
   @override
   void dispose() {
     _pageController?.dispose();
+    _scrollController?.dispose();
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.manual, overlays: SystemUiOverlay.values);
     super.dispose();
   }
@@ -63,14 +82,32 @@ class _ReadingScreenState extends ConsumerState<ReadingScreen> {
         final readingState = ref.watch(readingControllerProvider(widget.bookId));
         final prefs = ref.watch(readingPreferencesProvider);
 
-        // Listener to sync PageController if state changes externally (e.g., TOC jump)
-        ref.listen(readingControllerProvider(widget.bookId).select((s) => s.currentPage), (prev, next) {
-          if (_pageController?.hasClients == true && _pageController!.page?.round() != next) {
-            _pageController!.jumpToPage(next);
+        // Listener to switch controllers if the user changes the reading mode
+        ref.listen(readingPreferencesProvider.select((p) => p.pageTurnStyle), (prev, next) {
+          if (prev != next) {
+            setState(() {
+              if (next == PageTurnStyle.paged) {
+                _scrollController?.dispose();
+                _scrollController = null;
+                _pageController = PageController(initialPage: readingState.currentPage);
+              } else {
+                _pageController?.dispose();
+                _pageController = null;
+                _scrollController = ScrollController();
+              }
+            });
           }
         });
 
-        // The Scaffold is structured exactly like your original implementation
+        // Listener to sync PageController for Paged Mode
+        if (prefs.pageTurnStyle == PageTurnStyle.paged) {
+          ref.listen(readingControllerProvider(widget.bookId).select((s) => s.currentPage), (prev, next) {
+            if (_pageController?.hasClients == true && _pageController!.page?.round() != next) {
+              _pageController!.jumpToPage(next);
+            }
+          });
+        }
+
         return Scaffold(
           backgroundColor: prefs.pageColor,
           appBar: PreferredSize(
@@ -101,24 +138,17 @@ class _ReadingScreenState extends ConsumerState<ReadingScreen> {
     );
   }
 
-  // --- UI Helper Methods ---
-
   Widget _buildTopBar(ReadingState state, ReadingPreferences prefs) {
     return AppBar(
       backgroundColor: prefs.pageColor.withAlpha(200),
       elevation: 0,
       automaticallyImplyLeading: false,
       centerTitle: true,
-      // The chapterProgress getter in the new controller provides meaningful text
       title: Text(state.chapterProgress, style: TextStyle(color: prefs.textColor, fontSize: 12)),
       actions: [
         IconButton(
           icon: Icon(Icons.list, color: prefs.textColor),
-          onPressed: () => showModalBottomSheet(
-            context: context,
-            isScrollControlled: true,
-            builder: (_) => TOCPanel(bookId: state.bookId, viewSize: MediaQuery.of(context).size),
-          ),
+          onPressed: () => showModalBottomSheet(context: context, isScrollControlled: true, builder: (_) => TOCPanel(bookId: state.bookId, viewSize: MediaQuery.of(context).size)),
         ),
         IconButton(
           icon: Icon(Icons.close, color: prefs.textColor),
@@ -128,40 +158,41 @@ class _ReadingScreenState extends ConsumerState<ReadingScreen> {
     );
   }
 
-  // THIS IS THE CORE CHANGE: It now uses BookPageWidget
   Widget _buildReaderBody(ReadingState state, ReadingPreferences prefs) {
     final viewSize = MediaQuery.of(context).size;
     final providerNotifier = ref.read(readingControllerProvider(widget.bookId).notifier);
 
-    // The reading mode toggle is now implemented correctly here
     if (prefs.pageTurnStyle == PageTurnStyle.scroll) {
-      // NOTE: ScrollContentWidget needs to be created for this mode to work
-      return Center(child: Text("Scroll Mode UI needs to be implemented."));
+      if (_scrollController == null) return const Center(child: CircularProgressIndicator());
+      return ScrollContentWidget(
+        allBlocks: state.allBlocks,
+        viewSize: viewSize,
+        scrollController: _scrollController!,
+      );
     } else {
-      // --- PAGED MODE (TRUE PAGINATION) ---
+      if (_pageController == null) return const Center(child: CircularProgressIndicator());
       return PageView.builder(
         controller: _pageController,
-        itemCount: state.totalPages, // Driven by dynamically discovered total pages
+        itemCount: state.totalPages,
         onPageChanged: providerNotifier.onPageChanged,
         itemBuilder: (context, index) {
           final startingBlockIndex = state.pageToBlockIndexMap[index];
 
           if (startingBlockIndex == null) {
-            // This is normal. It means the app is still calculating the layout for this page.
             return const Center(child: CircularProgressIndicator());
           }
 
-          // Create the widget that will measure and render this single page
+          const double verticalPadding = 80.0;
           return Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 40.0),
+            padding: EdgeInsets.symmetric(horizontal: 20.0, vertical: verticalPadding / 2),
             child: BookPageWidget(
-              // The key now includes font settings to force a recalculation on style change
               key: ValueKey('page_${index}_${prefs.fontSize}_${prefs.fontFamily}_${prefs.lineSpacing}'),
               allBlocks: state.allBlocks,
               startingBlockIndex: startingBlockIndex,
               viewSize: viewSize,
               pageIndex: index,
               onPageBuilt: providerNotifier.updatePageLayout,
+              verticalPadding: verticalPadding,
             ),
           );
         },
@@ -170,7 +201,10 @@ class _ReadingScreenState extends ConsumerState<ReadingScreen> {
   }
 
   Widget _buildBottomScrubber(ReadingState state, ReadingPreferences prefs) {
-    // This now correctly uses the book-wide page numbers from the new controller
+    if (prefs.pageTurnStyle == PageTurnStyle.scroll) {
+      // The scrubber is not shown in scroll mode.
+      return const SizedBox.shrink();
+    }
     return BottomAppBar(
       color: Theme.of(context).colorScheme.surface.withAlpha(242),
       elevation: 0,
@@ -184,7 +218,12 @@ class _ReadingScreenState extends ConsumerState<ReadingScreen> {
                 value: state.currentPage.toDouble().clamp(0, (state.totalPages > 0 ? state.totalPages - 1 : 0).toDouble()),
                 min: 0,
                 max: (state.totalPages > 0 ? state.totalPages - 1 : 0).toDouble(),
-                onChanged: (value) => _pageController?.jumpToPage(value.round()),
+                onChanged: (value) {
+                  // Only allow jumping to pages that have been calculated
+                  if((state.pageToBlockIndexMap[value.round()] != null)) {
+                    _pageController?.jumpToPage(value.round());
+                  }
+                },
               ),
             ),
             Text('${state.totalPages}', style: TextStyle(color: prefs.textColor, fontSize: 12)),
@@ -195,17 +234,11 @@ class _ReadingScreenState extends ConsumerState<ReadingScreen> {
   }
 
   Widget _buildSpeedDialFab(ReadingState state) {
-    // This is identical to your original implementation
     return SpeedDial(
       icon: Icons.more_horiz,
       activeIcon: Icons.close,
       backgroundColor: Theme.of(context).colorScheme.secondary,
       foregroundColor: Theme.of(context).colorScheme.onSecondary,
-      overlayColor: Colors.black,
-      overlayOpacity: 0.5,
-      buttonSize: const Size(48, 48),
-      childrenButtonSize: const Size(44, 44),
-      curve: Curves.bounceIn,
       visible: _isUiVisible,
       children: [
         SpeedDialChild(child: const Icon(Icons.bookmark_border), label: 'Bookmark', onTap: () {}),
@@ -217,12 +250,7 @@ class _ReadingScreenState extends ConsumerState<ReadingScreen> {
         SpeedDialChild(
           child: const Icon(Icons.tune_outlined),
           label: 'Theme & Settings',
-          onTap: () => showModalBottomSheet(
-            context: context,
-            isScrollControlled: true,
-            backgroundColor: Colors.transparent,
-            builder: (context) => const ReadingSettingsPanel(),
-          ),
+          onTap: () => showModalBottomSheet(context: context, isScrollControlled: true, backgroundColor: Colors.transparent, builder: (context) => const ReadingSettingsPanel()),
         ),
       ],
     );

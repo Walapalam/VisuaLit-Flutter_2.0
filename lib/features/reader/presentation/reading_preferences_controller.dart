@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:visualit/features/reader/data/book_data.dart';
 
-// Enum for the new page turning style setting
 enum PageTurnStyle { paged, scroll }
 enum BackgroundDimming { none, low, medium, high }
 
@@ -108,31 +107,17 @@ class ReadingPreferences {
 class ReadingPreferencesController extends StateNotifier<ReadingPreferences> {
   ReadingPreferencesController() : super(ReadingPreferences.dark);
 
-  void setFontSize(double size) {
-    print("DEBUG: [PrefsController] Setting font size to: $size");
-    state = state.copyWith(fontSize: size);
-  }
-  void setFontFamily(String family) {
-    print("DEBUG: [PrefsController] Setting font family to: $family");
-    state = state.copyWith(fontFamily: family);
-  }
-  void setLineSpacing(double spacing) {
-    print("DEBUG: [PrefsController] Setting line spacing to: $spacing");
-    state = state.copyWith(lineSpacing: spacing);
-  }
+  void setFontSize(double size) => state = state.copyWith(fontSize: size);
+  void setFontFamily(String family) => state = state.copyWith(fontFamily: family);
+  void setLineSpacing(double spacing) => state = state.copyWith(lineSpacing: spacing);
   void toggleLineGuide(bool enabled) => state = state.copyWith(isLineGuideEnabled: enabled);
   void setBrightness(double newBrightness) => state = state.copyWith(brightness: newBrightness.clamp(0.1, 1.0));
   void setPageTurnStyle(PageTurnStyle style) => state = state.copyWith(pageTurnStyle: style);
   void setMatchDeviceTheme(bool match) => state = state.copyWith(matchDeviceTheme: match, themeMode: match ? ThemeMode.system : state.themeMode);
   void setThemeMode(ThemeMode mode) => state = state.copyWith(themeMode: mode, matchDeviceTheme: false);
-  void setTextIndent(double indent) {
-    print("DEBUG: [PrefsController] Setting text indent to: $indent");
-    state = state.copyWith(textIndent: indent);
-  }
-
+  void setTextIndent(double indent) => state = state.copyWith(textIndent: indent);
 
   void applyTheme(ReadingPreferences theme) {
-    print("DEBUG: [PrefsController] Applying new theme. Page color: ${theme.pageColor}");
     state = theme.copyWith(
         fontSize: state.fontSize,
         fontFamily: state.fontFamily,

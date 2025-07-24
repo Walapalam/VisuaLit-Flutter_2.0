@@ -1,0 +1,39 @@
+{
+  "project_info": {
+    "project_number": "172549574701",
+    "project_id": "visualit-b67bc",
+    "storage_bucket": "visualit-b67bc.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:172549574701:android:e99ad5603ff199cac6e8a4",
+        "android_client_info": {
+          "package_name": "com.visualit.app.visualit"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "172549574701-3vvobq529846fsofqu16dku37710jvuc.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCH0XX3VhLKZ03hCmkRuzr9sB7JDaqx7ZY"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "172549574701-3vvobq529846fsofqu16dku37710jvuc.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

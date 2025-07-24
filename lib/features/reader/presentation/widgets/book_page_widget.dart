@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:visualit/features/reader/data/book_data.dart';
 import 'package:visualit/features/reader/presentation/widgets/html_content_widget.dart';
 
+// NOTE: This widget is not used by the current implementation in reading_screen.dart,
+// which uses PageContentWidget instead.
 class BookPageWidget extends StatefulWidget {
   final List<ContentBlock> allBlocks;
   final int startingBlockIndex;
@@ -46,10 +48,9 @@ class _BookPageWidgetState extends State<BookPageWidget> {
 
     while (currentBlockIndex < widget.allBlocks.length) {
       final block = widget.allBlocks[currentBlockIndex];
-      // Pass the block's absolute index to the widget.
       currentWidgets.add(HtmlContentWidget(
           block: block,
-          blockIndex: currentBlockIndex, // <-- THE FIX
+          blockIndex: currentBlockIndex,
           viewSize: widget.viewSize
       ));
 

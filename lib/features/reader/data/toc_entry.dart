@@ -11,4 +11,8 @@ class TOCEntry {
 
   // For nesting chapters
   List<TOCEntry> children = [];
+
+
+  TOCEntry({this.title, this.src, this.fragment, List<TOCEntry> children = const []})
+      : children = children;
 }

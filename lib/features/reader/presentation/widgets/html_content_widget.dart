@@ -104,10 +104,14 @@ class HtmlContentWidget extends ConsumerWidget {
           return null;
         },
         onTapUrl: (url) {
+          // This part would need to be updated along with the jumpToLocation logic
+          // For now, it might not work across chapters.
+          /*
           if (block.src != null && block.bookId != null) {
             ref.read(readingControllerProvider(block.bookId!).notifier).jumpToHref(url, block.src!);
             return true;
           }
+          */
           return false;
         },
       ),

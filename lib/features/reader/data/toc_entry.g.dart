@@ -99,17 +99,18 @@ TOCEntry _tOCEntryDeserialize(
   List<int> offsets,
   Map<Type, List<int>> allOffsets,
 ) {
-  final object = TOCEntry();
-  object.children = reader.readObjectList<TOCEntry>(
-        offsets[0],
-        TOCEntrySchema.deserialize,
-        allOffsets,
-        TOCEntry(),
-      ) ??
-      [];
-  object.fragment = reader.readStringOrNull(offsets[1]);
-  object.src = reader.readStringOrNull(offsets[2]);
-  object.title = reader.readStringOrNull(offsets[3]);
+  final object = TOCEntry(
+    children: reader.readObjectList<TOCEntry>(
+          offsets[0],
+          TOCEntrySchema.deserialize,
+          allOffsets,
+          TOCEntry(),
+        ) ??
+        const [],
+    fragment: reader.readStringOrNull(offsets[1]),
+    src: reader.readStringOrNull(offsets[2]),
+    title: reader.readStringOrNull(offsets[3]),
+  );
   return object;
 }
 
@@ -127,7 +128,7 @@ P _tOCEntryDeserializeProp<P>(
             allOffsets,
             TOCEntry(),
           ) ??
-          []) as P;
+          const []) as P;
     case 1:
       return (reader.readStringOrNull(offset)) as P;
     case 2:

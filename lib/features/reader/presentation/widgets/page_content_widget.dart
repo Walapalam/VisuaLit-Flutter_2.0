@@ -9,10 +9,9 @@ class PageContentWidget extends ConsumerStatefulWidget {
   final ReadingPreferences preferences;
   final int currentPage;
   final double pageHeight;
-  final Function(int, int, int) onLayoutCalculated;
-  final int chapterIndex;
+  // UPDATED: Simpler callback signature
+  final Function(int, int) onLayoutCalculated;
   final int startBlockIndex;
-  final int endBlockIndex;
 
   const PageContentWidget({
     super.key,
@@ -21,9 +20,7 @@ class PageContentWidget extends ConsumerStatefulWidget {
     required this.currentPage,
     required this.pageHeight,
     required this.onLayoutCalculated,
-    required this.chapterIndex,
     required this.startBlockIndex,
-    required this.endBlockIndex,
   });
 
   @override
@@ -38,6 +35,7 @@ class _PageContentWidgetState extends ConsumerState<PageContentWidget> {
   @override
   void initState() {
     super.initState();
+    // This now runs every time the key changes (i.e., when chapter changes)
     WidgetsBinding.instance.addPostFrameCallback((_) => _buildPageContent());
   }
 
@@ -94,7 +92,8 @@ class _PageContentWidgetState extends ConsumerState<PageContentWidget> {
       _hasCalculated = true;
       print(
           "  -> [PageContentWidget] Page ${widget.currentPage} layout complete. Starts at ${widget.startBlockIndex}, ends at $endingBlockIndex.");
-      widget.onLayoutCalculated(widget.chapterIndex, widget.startBlockIndex, endingBlockIndex);
+      // UPDATED: Call the simpler callback
+      widget.onLayoutCalculated(widget.startBlockIndex, endingBlockIndex);
     }
   }
 

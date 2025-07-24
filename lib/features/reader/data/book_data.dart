@@ -22,6 +22,7 @@ class Book {
   String? publisher;
   String? language;
   DateTime? publicationDate;
+  int chapterCount = 0;
 
   @enumerated
   ProcessingStatus status = ProcessingStatus.queued;

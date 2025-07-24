@@ -22,59 +22,64 @@ const BookSchema = CollectionSchema(
       name: r'author',
       type: IsarType.string,
     ),
-    r'coverImageBytes': PropertySchema(
+    r'chapterCount': PropertySchema(
       id: 1,
+      name: r'chapterCount',
+      type: IsarType.long,
+    ),
+    r'coverImageBytes': PropertySchema(
+      id: 2,
       name: r'coverImageBytes',
       type: IsarType.byteList,
     ),
     r'epubFilePath': PropertySchema(
-      id: 2,
+      id: 3,
       name: r'epubFilePath',
       type: IsarType.string,
     ),
     r'language': PropertySchema(
-      id: 3,
+      id: 4,
       name: r'language',
       type: IsarType.string,
     ),
     r'lastReadChapterIndex': PropertySchema(
-      id: 4,
+      id: 5,
       name: r'lastReadChapterIndex',
       type: IsarType.long,
     ),
     r'lastReadPageInChapter': PropertySchema(
-      id: 5,
+      id: 6,
       name: r'lastReadPageInChapter',
       type: IsarType.long,
     ),
     r'lastReadTimestamp': PropertySchema(
-      id: 6,
+      id: 7,
       name: r'lastReadTimestamp',
       type: IsarType.dateTime,
     ),
     r'publicationDate': PropertySchema(
-      id: 7,
+      id: 8,
       name: r'publicationDate',
       type: IsarType.dateTime,
     ),
     r'publisher': PropertySchema(
-      id: 8,
+      id: 9,
       name: r'publisher',
       type: IsarType.string,
     ),
     r'status': PropertySchema(
-      id: 9,
+      id: 10,
       name: r'status',
       type: IsarType.byte,
       enumMap: _BookstatusEnumValueMap,
     ),
     r'title': PropertySchema(
-      id: 10,
+      id: 11,
       name: r'title',
       type: IsarType.string,
     ),
     r'toc': PropertySchema(
-      id: 11,
+      id: 12,
       name: r'toc',
       type: IsarType.objectList,
       target: r'TOCEntry',
@@ -163,18 +168,19 @@ void _bookSerialize(
   Map<Type, List<int>> allOffsets,
 ) {
   writer.writeString(offsets[0], object.author);
-  writer.writeByteList(offsets[1], object.coverImageBytes);
-  writer.writeString(offsets[2], object.epubFilePath);
-  writer.writeString(offsets[3], object.language);
-  writer.writeLong(offsets[4], object.lastReadChapterIndex);
-  writer.writeLong(offsets[5], object.lastReadPageInChapter);
-  writer.writeDateTime(offsets[6], object.lastReadTimestamp);
-  writer.writeDateTime(offsets[7], object.publicationDate);
-  writer.writeString(offsets[8], object.publisher);
-  writer.writeByte(offsets[9], object.status.index);
-  writer.writeString(offsets[10], object.title);
+  writer.writeLong(offsets[1], object.chapterCount);
+  writer.writeByteList(offsets[2], object.coverImageBytes);
+  writer.writeString(offsets[3], object.epubFilePath);
+  writer.writeString(offsets[4], object.language);
+  writer.writeLong(offsets[5], object.lastReadChapterIndex);
+  writer.writeLong(offsets[6], object.lastReadPageInChapter);
+  writer.writeDateTime(offsets[7], object.lastReadTimestamp);
+  writer.writeDateTime(offsets[8], object.publicationDate);
+  writer.writeString(offsets[9], object.publisher);
+  writer.writeByte(offsets[10], object.status.index);
+  writer.writeString(offsets[11], object.title);
   writer.writeObjectList<TOCEntry>(
-    offsets[11],
+    offsets[12],
     allOffsets,
     TOCEntrySchema.serialize,
     object.toc,
@@ -189,20 +195,21 @@ Book _bookDeserialize(
 ) {
   final object = Book();
   object.author = reader.readStringOrNull(offsets[0]);
-  object.coverImageBytes = reader.readByteList(offsets[1]);
-  object.epubFilePath = reader.readString(offsets[2]);
+  object.chapterCount = reader.readLong(offsets[1]);
+  object.coverImageBytes = reader.readByteList(offsets[2]);
+  object.epubFilePath = reader.readString(offsets[3]);
   object.id = id;
-  object.language = reader.readStringOrNull(offsets[3]);
-  object.lastReadChapterIndex = reader.readLong(offsets[4]);
-  object.lastReadPageInChapter = reader.readLong(offsets[5]);
-  object.lastReadTimestamp = reader.readDateTimeOrNull(offsets[6]);
-  object.publicationDate = reader.readDateTimeOrNull(offsets[7]);
-  object.publisher = reader.readStringOrNull(offsets[8]);
-  object.status = _BookstatusValueEnumMap[reader.readByteOrNull(offsets[9])] ??
+  object.language = reader.readStringOrNull(offsets[4]);
+  object.lastReadChapterIndex = reader.readLong(offsets[5]);
+  object.lastReadPageInChapter = reader.readLong(offsets[6]);
+  object.lastReadTimestamp = reader.readDateTimeOrNull(offsets[7]);
+  object.publicationDate = reader.readDateTimeOrNull(offsets[8]);
+  object.publisher = reader.readStringOrNull(offsets[9]);
+  object.status = _BookstatusValueEnumMap[reader.readByteOrNull(offsets[10])] ??
       ProcessingStatus.queued;
-  object.title = reader.readStringOrNull(offsets[10]);
+  object.title = reader.readStringOrNull(offsets[11]);
   object.toc = reader.readObjectList<TOCEntry>(
-        offsets[11],
+        offsets[12],
         TOCEntrySchema.deserialize,
         allOffsets,
         TOCEntry(),
@@ -221,27 +228,29 @@ P _bookDeserializeProp<P>(
     case 0:
       return (reader.readStringOrNull(offset)) as P;
     case 1:
-      return (reader.readByteList(offset)) as P;
-    case 2:
-      return (reader.readString(offset)) as P;
-    case 3:
-      return (reader.readStringOrNull(offset)) as P;
-    case 4:
       return (reader.readLong(offset)) as P;
+    case 2:
+      return (reader.readByteList(offset)) as P;
+    case 3:
+      return (reader.readString(offset)) as P;
+    case 4:
+      return (reader.readStringOrNull(offset)) as P;
     case 5:
       return (reader.readLong(offset)) as P;
     case 6:
-      return (reader.readDateTimeOrNull(offset)) as P;
+      return (reader.readLong(offset)) as P;
     case 7:
       return (reader.readDateTimeOrNull(offset)) as P;
     case 8:
-      return (reader.readStringOrNull(offset)) as P;
+      return (reader.readDateTimeOrNull(offset)) as P;
     case 9:
+      return (reader.readStringOrNull(offset)) as P;
+    case 10:
       return (_BookstatusValueEnumMap[reader.readByteOrNull(offset)] ??
           ProcessingStatus.queued) as P;
-    case 10:
-      return (reader.readStringOrNull(offset)) as P;
     case 11:
+      return (reader.readStringOrNull(offset)) as P;
+    case 12:
       return (reader.readObjectList<TOCEntry>(
             offset,
             TOCEntrySchema.deserialize,
@@ -595,6 +604,59 @@ extension BookQueryFilter on QueryBuilder<Book, Book, QFilterCondition> {
       return query.addFilterCondition(FilterCondition.greaterThan(
         property: r'author',
         value: '',
+      ));
+    });
+  }
+
+  QueryBuilder<Book, Book, QAfterFilterCondition> chapterCountEqualTo(
+      int value) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'chapterCount',
+        value: value,
+      ));
+    });
+  }
+
+  QueryBuilder<Book, Book, QAfterFilterCondition> chapterCountGreaterThan(
+    int value, {
+    bool include = false,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        include: include,
+        property: r'chapterCount',
+        value: value,
+      ));
+    });
+  }
+
+  QueryBuilder<Book, Book, QAfterFilterCondition> chapterCountLessThan(
+    int value, {
+    bool include = false,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.lessThan(
+        include: include,
+        property: r'chapterCount',
+        value: value,
+      ));
+    });
+  }
+
+  QueryBuilder<Book, Book, QAfterFilterCondition> chapterCountBetween(
+    int lower,
+    int upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.between(
+        property: r'chapterCount',
+        lower: lower,
+        includeLower: includeLower,
+        upper: upper,
+        includeUpper: includeUpper,
       ));
     });
   }
@@ -1779,6 +1841,18 @@ extension BookQuerySortBy on QueryBuilder<Book, Book, QSortBy> {
     });
   }
 
+  QueryBuilder<Book, Book, QAfterSortBy> sortByChapterCount() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'chapterCount', Sort.asc);
+    });
+  }
+
+  QueryBuilder<Book, Book, QAfterSortBy> sortByChapterCountDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'chapterCount', Sort.desc);
+    });
+  }
+
   QueryBuilder<Book, Book, QAfterSortBy> sortByEpubFilePath() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'epubFilePath', Sort.asc);
@@ -1898,6 +1972,18 @@ extension BookQuerySortThenBy on QueryBuilder<Book, Book, QSortThenBy> {
   QueryBuilder<Book, Book, QAfterSortBy> thenByAuthorDesc() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'author', Sort.desc);
+    });
+  }
+
+  QueryBuilder<Book, Book, QAfterSortBy> thenByChapterCount() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'chapterCount', Sort.asc);
+    });
+  }
+
+  QueryBuilder<Book, Book, QAfterSortBy> thenByChapterCountDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'chapterCount', Sort.desc);
     });
   }
 
@@ -2030,6 +2116,12 @@ extension BookQueryWhereDistinct on QueryBuilder<Book, Book, QDistinct> {
     });
   }
 
+  QueryBuilder<Book, Book, QDistinct> distinctByChapterCount() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'chapterCount');
+    });
+  }
+
   QueryBuilder<Book, Book, QDistinct> distinctByCoverImageBytes() {
     return QueryBuilder.apply(this, (query) {
       return query.addDistinctBy(r'coverImageBytes');
@@ -2105,6 +2197,12 @@ extension BookQueryProperty on QueryBuilder<Book, Book, QQueryProperty> {
   QueryBuilder<Book, String?, QQueryOperations> authorProperty() {
     return QueryBuilder.apply(this, (query) {
       return query.addPropertyName(r'author');
+    });
+  }
+
+  QueryBuilder<Book, int, QQueryOperations> chapterCountProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'chapterCount');
     });
   }
 

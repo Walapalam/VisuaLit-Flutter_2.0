@@ -8,8 +8,6 @@ import 'package:visualit/features/reader/presentation/highlights_provider.dart';
 import 'package:visualit/features/reader/presentation/reading_controller.dart';
 import 'package:visualit/features/reader/presentation/reading_preferences_controller.dart';
 
-// NOTE: This widget is part of the OLD implementation and is no longer used by the reader.
-// However, the `jumpToHref` call within it needs to be valid.
 class HtmlContentWidget extends ConsumerWidget {
   final ContentBlock block;
   final int blockIndex;
@@ -44,7 +42,19 @@ class HtmlContentWidget extends ConsumerWidget {
       }
     """;
 
-    return resetCss + indentCss;
+    final lineGuideCss = prefs.isLineGuideEnabled
+        ? """
+      p::before {
+        content: '';
+        display: block;
+        height: 1px;
+        background-color: ${Color(prefs.textColor.value).withOpacity(0.3).toCss()};
+        margin-bottom: 2px;
+      }
+    """
+        : "";
+
+    return resetCss + indentCss + lineGuideCss;
   }
 
   @override
@@ -67,10 +77,12 @@ class HtmlContentWidget extends ConsumerWidget {
       return const SizedBox.shrink();
     }
 
-    final blockHighlights = highlightsAsync.asData?.value.where((h) =>
+    final blockHighlights = highlightsAsync.asData?.value
+        .where((h) =>
     h.blockIndexInChapter == block.blockIndexInChapter &&
-        h.chapterIndex == block.chapterIndex
-    ).toList() ?? [];
+        h.chapterIndex == block.chapterIndex)
+        .toList() ??
+        [];
 
     blockHighlights.sort((a, b) => a.startOffset.compareTo(b.startOffset));
 
@@ -93,7 +105,6 @@ class HtmlContentWidget extends ConsumerWidget {
         },
         onTapUrl: (url) {
           if (block.src != null && block.bookId != null) {
-            // This line is now valid again.
             ref.read(readingControllerProvider(block.bookId!).notifier).jumpToHref(url, block.src!);
             return true;
           }
@@ -115,7 +126,11 @@ class HtmlContentWidget extends ConsumerWidget {
       final start = h.startOffset + offset;
       final end = h.endOffset + offset;
       if (start >= 0 && end <= result.length && start < end) {
-        result = result.substring(0, start) + startTag + result.substring(start, end) + endTag + result.substring(end);
+        result = result.substring(0, start) +
+            startTag +
+            result.substring(start, end) +
+            endTag +
+            result.substring(end);
         offset += startTag.length + endTag.length;
       }
     }

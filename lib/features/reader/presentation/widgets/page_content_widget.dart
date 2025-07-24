@@ -1,16 +1,18 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:flutter_widget_from_html_core/flutter_widget_from_html_core.dart';
 import 'package:visualit/features/reader/data/book_data.dart';
 import 'package:visualit/features/reader/presentation/reading_preferences_controller.dart';
+import 'package:visualit/features/reader/presentation/widgets/html_content_widget.dart';
 
 class PageContentWidget extends ConsumerStatefulWidget {
   final List<ContentBlock> chapterBlocks;
   final ReadingPreferences preferences;
   final int currentPage;
   final double pageHeight;
-  final Function(int, double) onLayoutCalculated;
+  final Function(int, int, int) onLayoutCalculated;
   final int chapterIndex;
+  final int startBlockIndex;
+  final int endBlockIndex;
 
   const PageContentWidget({
     super.key,
@@ -20,6 +22,8 @@ class PageContentWidget extends ConsumerStatefulWidget {
     required this.pageHeight,
     required this.onLayoutCalculated,
     required this.chapterIndex,
+    required this.startBlockIndex,
+    required this.endBlockIndex,
   });
 
   @override
@@ -28,62 +32,96 @@ class PageContentWidget extends ConsumerStatefulWidget {
 
 class _PageContentWidgetState extends ConsumerState<PageContentWidget> {
   final GlobalKey _contentKey = GlobalKey();
-  String? _fullHtmlContent;
   bool _hasCalculated = false;
+  final List<Widget> _pageContent = [];
 
   @override
   void initState() {
     super.initState();
-    _prepareHtml();
-    WidgetsBinding.instance.addPostFrameCallback((_) => _calculateAndReportHeight());
+    WidgetsBinding.instance.addPostFrameCallback((_) => _buildPageContent());
   }
 
-  void _prepareHtml() {
-    final buffer = StringBuffer();
-    for (var block in widget.chapterBlocks) {
-      if (block.htmlContent != null) {
-        buffer.writeln(block.htmlContent);
-      }
-    }
-    _fullHtmlContent = buffer.toString();
-  }
-
-  void _calculateAndReportHeight() {
+  Future<void> _buildPageContent() async {
     if (_hasCalculated || !mounted) return;
 
-    final context = _contentKey.currentContext;
-    if (context == null) {
-      Future.delayed(const Duration(milliseconds: 50), _calculateAndReportHeight);
-      return;
-    }
-    final renderBox = context.findRenderObject() as RenderBox;
-    final totalHeight = renderBox.size.height;
-    print("  - [PageContentWidget] Calculated total height for chapter ${widget.chapterIndex}: $totalHeight");
+    final List<Widget> currentWidgets = [];
+    int currentBlockIndex = widget.startBlockIndex;
+    int endingBlockIndex = widget.startBlockIndex;
 
-    // Set flag to prevent recalculating on every rebuild
-    _hasCalculated = true;
-    widget.onLayoutCalculated(widget.chapterIndex, totalHeight);
+    while (currentBlockIndex < widget.chapterBlocks.length) {
+      final block = widget.chapterBlocks[currentBlockIndex];
+
+      currentWidgets.add(
+        Padding(
+          padding: const EdgeInsets.symmetric(vertical: 8.0),
+          child: HtmlContentWidget(
+            key: ValueKey('block_${block.id}'),
+            block: block,
+            blockIndex: currentBlockIndex,
+            viewSize: Size(widget.pageHeight, widget.pageHeight),
+          ),
+        ),
+      );
+
+      setState(() {
+        _pageContent.clear();
+        _pageContent.addAll(currentWidgets);
+      });
+
+      await Future.delayed(Duration.zero);
+      if (!mounted) return;
+
+      final RenderBox? renderBox = _contentKey.currentContext?.findRenderObject() as RenderBox?;
+      if (renderBox != null && renderBox.size.height > widget.pageHeight) {
+        if (currentBlockIndex == widget.startBlockIndex) {
+          // Single block exceeds page height; include it to avoid empty pages
+          endingBlockIndex = currentBlockIndex;
+          break;
+        }
+        currentWidgets.removeLast();
+        setState(() {
+          _pageContent.clear();
+          _pageContent.addAll(currentWidgets);
+        });
+        break;
+      } else {
+        endingBlockIndex = currentBlockIndex;
+        currentBlockIndex++;
+      }
+    }
+
+    if (mounted && !_hasCalculated) {
+      _hasCalculated = true;
+      print(
+          "  -> [PageContentWidget] Page ${widget.currentPage} layout complete. Starts at ${widget.startBlockIndex}, ends at $endingBlockIndex.");
+      widget.onLayoutCalculated(widget.chapterIndex, widget.startBlockIndex, endingBlockIndex);
+    }
   }
 
   @override
   Widget build(BuildContext context) {
-    final offset = -widget.currentPage * widget.pageHeight;
+    final opacity = () {
+      switch (widget.preferences.backgroundDimming) {
+        case BackgroundDimming.none:
+          return 1.0;
+        case BackgroundDimming.low:
+          return 0.9;
+        case BackgroundDimming.medium:
+          return 0.7;
+        case BackgroundDimming.high:
+          return 0.5;
+      }
+    }();
 
-    return ClipRect(
-      child: Transform.translate(
-        offset: Offset(0, offset),
-          child: SingleChildScrollView(
-            child: Column(
-              key: _contentKey,
-              mainAxisAlignment: MainAxisAlignment.start,
-              children: [
-                HtmlWidget(
-                  _fullHtmlContent ?? '',
-                  textStyle: widget.preferences.getStyleForBlock(BlockType.p),
-                ),
-              ],
-            ),
-          ),
+    return Opacity(
+      opacity: opacity * widget.preferences.brightness,
+      child: SingleChildScrollView(
+        physics: const NeverScrollableScrollPhysics(),
+        child: Column(
+          key: _contentKey,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: _pageContent,
+        ),
       ),
     );
   }

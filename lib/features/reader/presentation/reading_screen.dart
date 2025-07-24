@@ -6,6 +6,7 @@ import 'package:go_router/go_router.dart';
 import 'package:visualit/core/providers/isar_provider.dart';
 import 'package:visualit/features/reader/presentation/reading_controller.dart';
 import 'package:visualit/features/reader/presentation/reading_preferences_controller.dart';
+import 'package:visualit/features/reader/presentation/widgets/html_content_widget.dart';
 import 'package:visualit/features/reader/presentation/widgets/page_content_widget.dart';
 import 'package:visualit/features/reader/presentation/widgets/reading_settings_panel.dart';
 import 'package:visualit/features/reader/presentation/widgets/toc_panel.dart';
@@ -21,26 +22,26 @@ class ReadingScreen extends ConsumerStatefulWidget {
 class _ReadingScreenState extends ConsumerState<ReadingScreen> {
   PageController? _pageController;
   bool _isUiVisible = false;
-  bool _isLocked = false; // State for the lock button
+  bool _isLocked = false;
 
   @override
   void initState() {
     super.initState();
     print("-> [ReadingScreen] initState for bookId: ${widget.bookId}");
     _pageController = PageController();
-    SystemChrome.setEnabledSystemUIMode(SystemUiMode.manual, overlays: []); // Immersive mode
+    SystemChrome.setEnabledSystemUIMode(SystemUiMode.manual, overlays: []);
   }
 
   @override
   void dispose() {
     print("-> [ReadingScreen] dispose called.");
     _pageController?.dispose();
-    SystemChrome.setEnabledSystemUIMode(SystemUiMode.manual, overlays: SystemUiOverlay.values); // Restore UI overlays
+    SystemChrome.setEnabledSystemUIMode(SystemUiMode.manual, overlays: SystemUiOverlay.values);
     super.dispose();
   }
 
   void _toggleUiVisibility() {
-    if (_isLocked) return; // Prevent UI toggle when screen is locked
+    if (_isLocked) return;
 
     setState(() {
       _isUiVisible = !_isUiVisible;
@@ -69,7 +70,6 @@ class _ReadingScreenState extends ConsumerState<ReadingScreen> {
         final readingState = ref.watch(readingControllerProvider(widget.bookId));
         final prefs = ref.watch(readingPreferencesProvider);
 
-        // Listener to sync PageController
         ref.listen(readingControllerProvider(widget.bookId), (prev, next) {
           if (prev == null || !_pageController!.hasClients) return;
           if (prev.currentChapterIndex != next.currentChapterIndex) {
@@ -81,10 +81,8 @@ class _ReadingScreenState extends ConsumerState<ReadingScreen> {
           }
         });
 
-        // The main Scaffold, now structured like your old implementation
         return Scaffold(
           backgroundColor: prefs.pageColor,
-          // --- AppBar IMPLEMENTATION ---
           appBar: PreferredSize(
             preferredSize: const Size.fromHeight(kToolbarHeight),
             child: AnimatedOpacity(
@@ -93,15 +91,12 @@ class _ReadingScreenState extends ConsumerState<ReadingScreen> {
               child: _buildTopBar(readingState, prefs),
             ),
           ),
-          // --- BottomNavigationBar IMPLEMENTATION ---
           bottomNavigationBar: AnimatedContainer(
             duration: const Duration(milliseconds: 250),
             height: _isUiVisible ? 80 : 0,
             child: _isUiVisible ? _buildBottomScrubber(readingState, prefs) : null,
           ),
-          // --- FloatingActionButton IMPLEMENTATION ---
           floatingActionButton: _buildSpeedDialFab(readingState),
-          // The main body of the scaffold
           body: !readingState.isBookLoaded
               ? const Center(child: CircularProgressIndicator())
               : GestureDetector(
@@ -116,10 +111,7 @@ class _ReadingScreenState extends ConsumerState<ReadingScreen> {
     );
   }
 
-  // --- Helper methods for building UI sections ---
-
   Widget _buildTopBar(ReadingState state, ReadingPreferences prefs) {
-    // This is the actual AppBar widget, now built separately for clarity
     return AppBar(
       backgroundColor: prefs.pageColor.withAlpha(200),
       elevation: 0,
@@ -144,10 +136,36 @@ class _ReadingScreenState extends ConsumerState<ReadingScreen> {
   }
 
   Widget _buildReaderBody(ReadingState state, ReadingPreferences prefs) {
+    final viewSize = MediaQuery.of(context).size;
+    final providerNotifier = ref.read(readingControllerProvider(widget.bookId).notifier);
+
+    if (prefs.pageTurnStyle == PageTurnStyle.scroll) {
+      return ListView.builder(
+        itemCount: state.blocksForCurrentChapter.length,
+        itemBuilder: (context, index) {
+          return Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 8.0),
+            child: HtmlContentWidget(
+              key: ValueKey('block_${state.blocksForCurrentChapter[index].id}'),
+              block: state.blocksForCurrentChapter[index],
+              blockIndex: index,
+              viewSize: viewSize,
+            ),
+          );
+        },
+      );
+    }
+
     return LayoutBuilder(builder: (context, constraints) {
-      final pageHeight = constraints.maxHeight;
-      final providerNotifier = ref.read(readingControllerProvider(widget.bookId).notifier);
-      final pageContentKey = ValueKey('chapter_${state.currentChapterIndex}_${prefs.fontSize}_${prefs.fontFamily}_${prefs.lineSpacing}_${prefs.textIndent}');
+      final pageHeight = constraints.maxHeight - 40.0; // Account for padding
+      final pageContentKey = ValueKey(
+          'chapter_${state.currentChapterIndex}_${prefs.fontSize}_${prefs.fontFamily}_${prefs.lineSpacing}_${prefs.textIndent}_${prefs.themeMode}_${prefs.brightness}');
+
+      final pageMap = state.chapterPageToBlockIndexMap[state.currentChapterIndex] ?? {0: 0};
+      final startBlockIndex = pageMap[state.currentPageInChapter] ?? 0;
+      final endBlockIndex = pageMap[state.currentPageInChapter + 1] != null
+          ? pageMap[state.currentPageInChapter + 1]! - 1
+          : state.blocksForCurrentChapter.length - 1;
 
       return PageView.builder(
         controller: _pageController,
@@ -157,8 +175,12 @@ class _ReadingScreenState extends ConsumerState<ReadingScreen> {
           if (state.blocksForCurrentChapter.isEmpty) {
             return const Center(child: Text("Empty Chapter"));
           }
-          return Padding( // Added padding here to match old layout
-            padding: const EdgeInsets.symmetric(horizontal: 20.0),
+          final pageStartIndex = pageMap[index] ?? 0;
+          final pageEndIndex = pageMap[index + 1] != null
+              ? pageMap[index + 1]! - 1
+              : state.blocksForCurrentChapter.length - 1;
+          return Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 8.0),
             child: PageContentWidget(
               key: pageContentKey,
               chapterBlocks: state.blocksForCurrentChapter,
@@ -166,8 +188,10 @@ class _ReadingScreenState extends ConsumerState<ReadingScreen> {
               currentPage: index,
               pageHeight: pageHeight,
               chapterIndex: state.currentChapterIndex,
-              onLayoutCalculated: (chapterIdx, totalHeight) {
-                providerNotifier.updateChapterLayout(chapterIdx, totalHeight, pageHeight);
+              startBlockIndex: pageStartIndex,
+              endBlockIndex: pageEndIndex,
+              onLayoutCalculated: (chapterIdx, startIdx, endIdx) {
+                providerNotifier.updateChapterPageLayout(chapterIdx, index, startIdx, endIdx);
               },
             ),
           );
@@ -176,7 +200,6 @@ class _ReadingScreenState extends ConsumerState<ReadingScreen> {
     });
   }
 
-  // NOTE: This now combines the scrubber and chapter navigation
   Widget _buildBottomScrubber(ReadingState state, ReadingPreferences prefs) {
     final totalPagesInChapter = state.pagesInCurrentChapter;
     return BottomAppBar(
@@ -223,7 +246,6 @@ class _ReadingScreenState extends ConsumerState<ReadingScreen> {
     );
   }
 
-  // --- SpeedDial FAB implementation, just like the old one ---
   Widget _buildSpeedDialFab(ReadingState state) {
     return SpeedDial(
       icon: Icons.more_horiz,

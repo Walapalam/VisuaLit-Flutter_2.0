@@ -8,7 +8,6 @@ import 'package:visualit/features/reader/data/book_data.dart';
 import 'package:visualit/features/reader/data/toc_entry.dart';
 import 'package:visualit/features/reader/data/highlight.dart';
 
-
 @immutable
 class ReadingState {
   final int bookId;
@@ -18,6 +17,7 @@ class ReadingState {
   final int currentChapterIndex;
   final int currentPageInChapter;
   final Map<int, int> chapterPageCounts;
+  final Map<int, Map<int, int>> chapterPageToBlockIndexMap;
 
   const ReadingState({
     required this.bookId,
@@ -27,14 +27,18 @@ class ReadingState {
     this.currentChapterIndex = 0,
     this.currentPageInChapter = 0,
     this.chapterPageCounts = const {0: 1},
+    this.chapterPageToBlockIndexMap = const {},
   });
 
   int get totalChapters {
     if (allBlocks.isEmpty) return 0;
     return (allBlocks.last.chapterIndex ?? 0) + 1;
   }
+
   int get pagesInCurrentChapter => chapterPageCounts[currentChapterIndex] ?? 1;
-  List<ContentBlock> get blocksForCurrentChapter => allBlocks.where((b) => b.chapterIndex == currentChapterIndex).toList();
+
+  List<ContentBlock> get blocksForCurrentChapter =>
+      allBlocks.where((b) => b.chapterIndex == currentChapterIndex).toList();
 
   String get chapterProgress {
     final pagesLeft = pagesInCurrentChapter - currentPageInChapter - 1;
@@ -50,6 +54,7 @@ class ReadingState {
     int? currentChapterIndex,
     int? currentPageInChapter,
     Map<int, int>? chapterPageCounts,
+    Map<int, Map<int, int>>? chapterPageToBlockIndexMap,
   }) {
     return ReadingState(
       bookId: bookId,
@@ -59,6 +64,7 @@ class ReadingState {
       currentChapterIndex: currentChapterIndex ?? this.currentChapterIndex,
       currentPageInChapter: currentPageInChapter ?? this.currentPageInChapter,
       chapterPageCounts: chapterPageCounts ?? this.chapterPageCounts,
+      chapterPageToBlockIndexMap: chapterPageToBlockIndexMap ?? this.chapterPageToBlockIndexMap,
     );
   }
 }
@@ -75,13 +81,19 @@ class ReadingController extends StateNotifier<ReadingState> {
     print("-> [ReadingController] _initialize called.");
     final book = await _isar.books.get(state.bookId);
     if (book == null) {
-      if (mounted) state = state.copyWith(isBookLoaded: true); // Let UI show error
+      if (mounted) state = state.copyWith(isBookLoaded: true);
       return;
     }
 
-    final blocks = await _isar.contentBlocks.filter().bookIdEqualTo(state.bookId).sortByChapterIndex().thenByBlockIndexInChapter().findAll();
+    final blocks = await _isar.contentBlocks
+        .filter()
+        .bookIdEqualTo(state.bookId)
+        .sortByChapterIndex()
+        .thenByBlockIndexInChapter()
+        .findAll();
     print("  - Fetched '${book.title}' with ${blocks.length} blocks.");
-    print("  - Loading last read position: Chapter ${book.lastReadChapterIndex}, Page ${book.lastReadPageInChapter}");
+    print(
+        "  - Loading last read position: Chapter ${book.lastReadChapterIndex}, Page ${book.lastReadPageInChapter}");
 
     if (mounted) {
       state = state.copyWith(
@@ -91,21 +103,31 @@ class ReadingController extends StateNotifier<ReadingState> {
         currentChapterIndex: book.lastReadChapterIndex,
         currentPageInChapter: book.lastReadPageInChapter,
       );
-      print("  - State updated: isBookLoaded=true, start at Chapter ${state.currentChapterIndex}, Page ${state.currentPageInChapter}");
+      print(
+          "  - State updated: isBookLoaded=true, start at Chapter ${state.currentChapterIndex}, Page ${state.currentPageInChapter}");
     }
   }
 
-  void updateChapterLayout(int chapterIndex, double totalContentHeight, double pageHeight) {
-    if (pageHeight <= 0) return;
-    final newPageCount = (totalContentHeight / pageHeight).ceil();
-    if (state.chapterPageCounts[chapterIndex] != newPageCount) {
-      final newMap = Map<int, int>.from(state.chapterPageCounts);
-      newMap[chapterIndex] = newPageCount > 0 ? newPageCount : 1;
+  void updateChapterPageLayout(int chapterIndex, int pageIndex, int startBlockIndex, int endBlockIndex) {
+    final newChapterMap = Map<int, int>.from(state.chapterPageToBlockIndexMap[chapterIndex] ?? {});
+    newChapterMap[pageIndex] = startBlockIndex;
+    final newMap = Map<int, Map<int, int>>.from(state.chapterPageToBlockIndexMap);
+    newMap[chapterIndex] = newChapterMap;
 
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted) state = state.copyWith(chapterPageCounts: newMap);
-      });
+    final newPageCount = pageIndex + (endBlockIndex < state.blocksForCurrentChapter.length - 1 ? 1 : 0);
+    final newPageCounts = Map<int, int>.from(state.chapterPageCounts);
+    if (newPageCounts[chapterIndex] == null || newPageCounts[chapterIndex]! < newPageCount) {
+      newPageCounts[chapterIndex] = newPageCount;
     }
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        state = state.copyWith(
+          chapterPageToBlockIndexMap: newMap,
+          chapterPageCounts: newPageCounts,
+        );
+      }
+    });
   }
 
   void onPageChangedBySwipe(int newPage) {
@@ -134,18 +156,34 @@ class ReadingController extends StateNotifier<ReadingState> {
 
   Future<void> jumpToLocation(TOCEntry entry) async {
     if (entry.src == null) return;
-    final targetBlock = state.allBlocks.firstWhere((b) => b.src == entry.src, orElse: () => ContentBlock());
+    final targetBlock = state.allBlocks.firstWhere(
+          (b) => b.src == entry.src,
+      orElse: () => ContentBlock(),
+    );
 
     if (targetBlock.chapterIndex != null) {
+      final chapterIndex = targetBlock.chapterIndex!;
+      final pageMap = state.chapterPageToBlockIndexMap[chapterIndex] ?? {0: 0};
+      int targetPage = 0;
+      final targetBlockIndex = state.allBlocks.indexOf(targetBlock);
+      for (var entry in pageMap.entries) {
+        final startBlockIndex = entry.value;
+        final endBlockIndex = pageMap[entry.key + 1] != null
+            ? pageMap[entry.key + 1]! - 1
+            : state.blocksForCurrentChapter.length - 1;
+        if (targetBlockIndex >= startBlockIndex && targetBlockIndex <= endBlockIndex) {
+          targetPage = entry.key;
+          break;
+        }
+      }
       state = state.copyWith(
-          currentChapterIndex: targetBlock.chapterIndex!,
-          currentPageInChapter: 0
+        currentChapterIndex: chapterIndex,
+        currentPageInChapter: targetPage,
       );
       _debouncer.run(() => _saveProgress());
     }
   }
 
-  // --- THIS METHOD WAS MISSING ---
   Future<void> jumpToHref(String href, String currentBlockSrc) async {
     final resolvedPath = p.normalize(p.join(p.dirname(currentBlockSrc), href));
     final parts = resolvedPath.split('#');

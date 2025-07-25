@@ -1,5 +1,7 @@
 // lib/features/audiobook_player/presentation/audiobooks_screen.dart
 import 'package:flutter/material.dart';
+// Add this import to use Uint8List
+import 'dart:typed_data';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:visualit/features/audiobook_player/data/audiobook.dart';
@@ -70,7 +72,20 @@ class AudiobooksScreen extends ConsumerWidget {
               if (multiFileAudiobooks.isNotEmpty)
                 _buildSectionHeader('Multi-File Audiobooks'),
               ...multiFileAudiobooks.map((book) => ListTile(
-                leading: const Icon(Icons.folder_open, size: 40, color: Colors.orangeAccent),
+                // --- MODIFIED: Use cover art or fallback icon ---
+                leading: SizedBox(
+                  width: 40,
+                  height: 40,
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(4.0),
+                    child: book.coverImageBytes != null
+                        ? Image.memory(
+                      Uint8List.fromList(book.coverImageBytes!),
+                      fit: BoxFit.cover,
+                    )
+                        : const Icon(Icons.folder_open, size: 40, color: Colors.orangeAccent),
+                  ),
+                ),
                 title: Text(book.displayTitle),
                 subtitle: Text("${book.chapters.length} Chapters"),
                 onTap: () {
@@ -86,7 +101,20 @@ class AudiobooksScreen extends ConsumerWidget {
               if (singleFileAudiobooks.isNotEmpty)
                 _buildSectionHeader('Single-File Audiobooks'),
               ...singleFileAudiobooks.map((book) => ListTile(
-                leading: const Icon(Icons.music_note, size: 40, color: Colors.tealAccent),
+                // --- MODIFIED: Use cover art or fallback icon ---
+                leading: SizedBox(
+                  width: 40,
+                  height: 40,
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(4.0),
+                    child: book.coverImageBytes != null
+                        ? Image.memory(
+                      Uint8List.fromList(book.coverImageBytes!),
+                      fit: BoxFit.cover,
+                    )
+                        : const Icon(Icons.music_note, size: 40, color: Colors.tealAccent),
+                  ),
+                ),
                 title: Text(book.displayTitle),
                 subtitle: const Text("1 Chapter"),
                 onTap: () {

@@ -414,7 +414,7 @@ class _InfoSheetContentState extends ConsumerState<InfoSheetContent> {
   }
 }
 
-// --- NEW DEDICATED AND OPTIMIZED WIDGET FOR A SINGLE CHAPTER TILE ---
+// --- DEDICATED AND OPTIMIZED WIDGET FOR A SINGLE CHAPTER TILE ---
 class _ChapterListTile extends ConsumerWidget {
   final Audiobook book;
   final int index;
@@ -472,7 +472,8 @@ class _ChapterListTile extends ConsumerWidget {
         if (!isCurrentlyPlaying) {
           playerService.jumpToChapter(index);
         }
-        Navigator.pop(context);
+        // The Navigator.pop(context) call has been removed from here.
+        // This keeps the sheet open after selecting a new chapter.
       },
     );
   }

@@ -1,10 +1,8 @@
 // lib/features/audiobook_player/presentation/audiobook_player_service.dart
 import 'dart:async';
-import 'dart:convert';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:isar/isar.dart';
 import 'package:just_audio/just_audio.dart';
-import 'package:just_audio_background/just_audio_background.dart';
 import 'package:visualit/core/providers/isar_provider.dart';
 import 'package:visualit/features/audiobook_player/data/audiobook.dart';
 
@@ -50,8 +48,10 @@ class AudiobookPlayerState {
     this.isScreenLocked = false,
   });
 
+  // copyWith now accepts a nullable Audiobook for resetting
   AudiobookPlayerState copyWith({
-    Audiobook? audiobook,
+    // Using a simple trick to allow null assignment
+    Audiobook? Function()? audiobook,
     bool? isLoading,
     bool? isPlaying,
     Duration? currentPosition,
@@ -61,7 +61,8 @@ class AudiobookPlayerState {
     bool? isScreenLocked,
   }) {
     return AudiobookPlayerState(
-      audiobook: audiobook ?? this.audiobook,
+      // If the audiobook function is provided, call it. Otherwise, keep the existing one.
+      audiobook: audiobook != null ? audiobook() : this.audiobook,
       isLoading: isLoading ?? this.isLoading,
       isPlaying: isPlaying ?? this.isPlaying,
       currentPosition: currentPosition ?? this.currentPosition,
@@ -88,16 +89,19 @@ class AudiobookPlayerService extends StateNotifier<AudiobookPlayerState> {
     _listenToPlayerState();
   }
 
-  Future<void> stopAndUnloadPlayer() async {
+  // --- NEW IMPLEMENTATION for the "X" button ---
+  /// Stops the player, unloads the current audiobook, and resets the state.
+  /// This causes the MiniPlayer to disappear from the UI.
+  /// It preserves the user's playback speed for the next session.
+  Future<void> stopAndUnload() async {
     if (!mounted) return;
 
-    // First, pause the audio player.
-    await _audioPlayer.pause();
+    // Stop the audio player to release its resources completely.
+    await _audioPlayer.stop();
 
-    // Then, reset the state to its initial, empty state.
-    // This will cause any widgets watching the provider (like MiniAudioPlayer)
-    // to rebuild and hide themselves.
-    state = const AudiobookPlayerState();
+    // Reset the state, but carry over the last playback speed.
+    // Setting `audiobook: null` is what hides the mini-player.
+    state = AudiobookPlayerState(playbackSpeed: state.playbackSpeed);
   }
 
   // This is the new primary method to start or change a book.
@@ -108,7 +112,7 @@ class AudiobookPlayerService extends StateNotifier<AudiobookPlayerState> {
     await _audioPlayer.stop();
 
     state = state.copyWith(
-      audiobook: book,
+      audiobook: () => book,
       currentChapterIndex: book.lastReadChapterIndex,
       isLoading: true,
     );
@@ -154,7 +158,6 @@ class AudiobookPlayerService extends StateNotifier<AudiobookPlayerState> {
 
     try {
       final initialPosition = seekToInitialPosition ? Duration(seconds: book.lastReadPositionInSeconds) : Duration.zero;
-      // We don't need the MediaItem tag for now unless you set up background audio
       await _audioPlayer.setAudioSource(AudioSource.file(chapter.filePath!), initialPosition: initialPosition);
       _audioPlayer.play();
     } catch (e) {
@@ -169,7 +172,7 @@ class AudiobookPlayerService extends StateNotifier<AudiobookPlayerState> {
     if (book == null || book.chapters[index].durationInSeconds != null) return;
     book.chapters[index].durationInSeconds = duration.inSeconds;
     await _isar.writeTxn(() => _isar.audiobooks.put(book));
-    if (mounted) state = state.copyWith(audiobook: book);
+    if (mounted) state = state.copyWith(audiobook: () => book);
   }
 
   Future<void> _saveProgress() async {
@@ -234,7 +237,8 @@ class AudiobookPlayerService extends StateNotifier<AudiobookPlayerState> {
   @override
   void dispose() {
     _debouncer.cancel();
-    _saveProgress();
+    // Intentionally not calling _saveProgress() on dispose
+    // because the app might be closing. Progress is saved periodically.
     _playerStateSubscription?.cancel();
     _positionSubscription?.cancel();
     _durationSubscription?.cancel();

@@ -1,4 +1,3 @@
-// lib/features/audiobook_player/presentation/mini_audio_player.dart
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -63,7 +62,7 @@ class MiniAudioPlayer extends ConsumerWidget {
 
                       const SizedBox(width: 8),
 
-                      // DEDICATED WIDGET for Play/Pause controls
+                      // DEDICATED WIDGET for Play/Pause/Close controls
                       const _MiniPlayerControls(),
                     ],
                   ),
@@ -90,9 +89,7 @@ class _MiniPlayerTitleAndChapter extends ConsumerWidget {
     final book = ref.watch(audiobookPlayerServiceProvider.select((s) => s.audiobook!));
     final chapterIndex = ref.watch(audiobookPlayerServiceProvider.select((s) => s.currentChapterIndex));
 
-    final currentChapterTitle = book.chapters.isNotEmpty && chapterIndex < book.chapters.length
-        ? book.chapters[chapterIndex].title ?? 'Chapter ${chapterIndex + 1}'
-        : 'No Chapters';
+    final currentChapterTitle = book.chapters.isNotEmpty && chapterIndex < book.chapters.length ? book.chapters[chapterIndex].title ?? 'Chapter ${chapterIndex + 1}' : 'No Chapters';
 
     return Column(
       mainAxisAlignment: MainAxisAlignment.center,
@@ -116,7 +113,7 @@ class _MiniPlayerTitleAndChapter extends ConsumerWidget {
   }
 }
 
-// --- DEDICATED WIDGET 2: Player Controls ---
+// --- DEDICATED WIDGET 2: Player Controls (UPDATED) ---
 // Rebuilds ONLY when the isPlaying state changes.
 class _MiniPlayerControls extends ConsumerWidget {
   const _MiniPlayerControls();
@@ -152,6 +149,15 @@ class _MiniPlayerControls extends ConsumerWidget {
           padding: EdgeInsets.zero,
           splashRadius: 20,
         ),
+        // --- NEW: Close Button ---
+        IconButton(
+          // Calls the new method you'll add to the service
+          onPressed: () => playerService.stopAndUnload(),
+          icon: const Icon(Icons.close, color: Colors.white),
+          iconSize: 28,
+          padding: EdgeInsets.zero,
+          splashRadius: 20,
+        ),
       ],
     );
   }
@@ -167,9 +173,7 @@ class _MiniPlayerProgressBar extends ConsumerWidget {
     final position = ref.watch(audiobookPlayerServiceProvider.select((s) => s.currentPosition));
     final duration = ref.watch(audiobookPlayerServiceProvider.select((s) => s.totalDuration));
 
-    final double progress = (position.inMilliseconds > 0 && duration.inMilliseconds > 0)
-        ? position.inMilliseconds / duration.inMilliseconds
-        : 0.0;
+    final double progress = (position.inMilliseconds > 0 && duration.inMilliseconds > 0) ? position.inMilliseconds / duration.inMilliseconds : 0.0;
 
     return LinearProgressIndicator(
       value: progress.clamp(0.0, 1.0),

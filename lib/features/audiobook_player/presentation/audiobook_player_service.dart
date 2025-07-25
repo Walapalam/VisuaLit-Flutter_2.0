@@ -82,6 +82,8 @@ class AudiobookPlayerService extends StateNotifier<AudiobookPlayerState> {
   StreamSubscription? _positionSubscription;
   StreamSubscription? _durationSubscription;
 
+  Stream<Duration> get positionStream => _audioPlayer.positionStream;
+
   AudiobookPlayerService(this._isar) : super(const AudiobookPlayerState()) {
     _listenToPlayerState();
   }

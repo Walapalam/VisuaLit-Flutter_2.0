@@ -8,6 +8,8 @@ class Chapter {
   String? filePath;
   int? durationInSeconds;
   int sortOrder = 0;
+  String? lrsJsonPath; // <--- ADD THIS LINE
+
 }
 
 @collection

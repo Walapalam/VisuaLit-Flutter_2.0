@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:visualit/features/audiobook_player/data/audiobook.dart';
 import 'package:go_router/go_router.dart';
 import 'audiobook_player_service.dart';
+import 'lrs_view.dart'; // <--- 1. IMPORT THE NEW LRS VIEW
 
 class AudiobookPlayerScreen extends ConsumerWidget {
   final int audiobookId;
@@ -326,10 +327,24 @@ class _InfoSheetContentState extends ConsumerState<InfoSheetContent> {
   @override
   Widget build(BuildContext context) {
     const Color accentGreen = Color(0xFF1DB954);
+    // <--- 2. GET PLAYER STATE AND BOOK INFO HERE --->
+    final playerState = ref.watch(audiobookPlayerServiceProvider);
+    final book = playerState.audiobook;
 
+    // Safely determine the JSON path for the currently playing chapter
+    String? currentChapterJsonPath;
+    if (book != null && playerState.currentChapterIndex < book.chapters.length) {
+      currentChapterJsonPath = book.chapters[playerState.currentChapterIndex].lrsJsonPath;
+    }
+
+    // <--- 3. DEFINE TAB CONTENTS WITH CONDITIONAL LRS VIEW --->
     final List<Widget> tabContents = [
       _buildChapterListView(accentGreen),
-      _buildPlaceholderContent('Read Content'),
+      // If a JSON path exists for the current chapter, show the LRS View.
+      // Otherwise, show a helpful placeholder message.
+      currentChapterJsonPath != null
+          ? LrsView(lrsJsonPath: currentChapterJsonPath)
+          : _buildPlaceholderContent('No script available for this chapter.'),
       _buildPlaceholderContent('Visualize Content'),
     ];
 
@@ -409,7 +424,7 @@ class _InfoSheetContentState extends ConsumerState<InfoSheetContent> {
   Widget _buildPlaceholderContent(String title) {
     return Center(
       child: Text(
-        '$title Coming Soon',
+        title, // Changed from '$title Coming Soon' to just title
         style: TextStyle(color: Colors.grey[600], fontSize: 16),
       ),
     );

@@ -1,6 +1,7 @@
 import 'dart:io';
 import 'dart:typed_data'; // Import this
 import 'package:file_picker/file_picker.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:permission_handler/permission_handler.dart';
 
 // A new class to hold our picked file data securely
@@ -85,8 +86,38 @@ class LocalLibraryService {
       return pickedFiles;
 
     } catch (e) {
-      print('LocalLibraryService: Error picking files: $e');
+      print('LocalLibraryService: Error picking EPUB files: $e');
       return [];
+    }
+  }
+
+  Future<String?> pickFile({List<String>? allowedExtensions}) async {
+    FilePickerResult? result = await FilePicker.platform.pickFiles(
+      type: FileType.custom,
+      allowedExtensions: allowedExtensions,
+    );
+
+    if (result != null && result.files.single.path != null) {
+      return result.files.single.path!;
+    }
+    return null; // User canceled or no file selected
+  }
+
+  // --- ADDED METHOD for AUDIOBOOKS ---
+  /// Opens the directory picker for selecting an audiobook folder.
+  /// This is the new, preferred method for the multi-chapter audiobook feature.
+  Future<String?> pickDirectory() async {
+    print('LocalLibraryService: Executing pickDirectory() for audiobooks...');
+    if (!await _requestPermission()) {
+      print('LocalLibraryService: Permission denied.');
+      return null;
+    }
+    try {
+      // Returns the path of the selected directory as a String.
+      return await FilePicker.platform.getDirectoryPath();
+    } catch (e) {
+      print('LocalLibraryService: Error picking directory: $e');
+      return null;
     }
   }
 
@@ -141,8 +172,7 @@ class LocalLibraryService {
   /// Returns a list of selected audio files, or an empty list if no files are selected
   /// or if permissions are denied.
   Future<List<File>> pickAudiobooks() async {
-    print('LocalLibraryService: Starting audiobook picker...');
-
+    print('LocalLibraryService: Executing legacy pickAudiobooks()...');
     if (!await _requestPermission()) {
       print('LocalLibraryService: Permission denied for audiobook picking');
       return [];

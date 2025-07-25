@@ -59,57 +59,61 @@ class AudiobookPlayerScreen extends ConsumerWidget {
             IconButton(icon: const Icon(Icons.more_vert, color: Colors.white), onPressed: () {}),
         ],
       ),
-      body: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 24.0),
-        child: Column(
-          children: [
-            AbsorbPointer(
-              absorbing: isScreenLocked,
-              child: Column(
-                children: [
-                  const SizedBox(height: 20),
-                  Container(
-                    height: MediaQuery.of(context).size.width * 0.8,
-                    width: MediaQuery.of(context).size.width * 0.8,
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(12),
-                      boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.5), blurRadius: 20, offset: const Offset(0, 10))],
+      body: SafeArea(
+        top: false, // AppBar handles the top safe area
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 24.0),
+          child: Column(
+            children: [
+              AbsorbPointer(
+                absorbing: isScreenLocked,
+                child: Column(
+                  children: [
+                    const SizedBox(height: 20),
+                    Container(
+                      height: MediaQuery.of(context).size.width * 0.8,
+                      width: MediaQuery.of(context).size.width * 0.8,
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(12),
+                        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.5), blurRadius: 20, offset: const Offset(0, 10))],
+                      ),
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(12.0),
+                        child: book.coverImageBytes != null
+                            ? Image.memory(
+                          Uint8List.fromList(book.coverImageBytes!),
+                          fit: BoxFit.cover,
+                          gaplessPlayback: true,
+                        )
+                            : Container(color: Colors.grey.shade800, child: const Icon(Icons.music_note, size: 100, color: Colors.white54)),
+                      ),
                     ),
-                    child: ClipRRect(
-                      borderRadius: BorderRadius.circular(12.0),
-                      child: book.coverImageBytes != null
-                          ? Image.memory(
-                        Uint8List.fromList(book.coverImageBytes!),
-                        fit: BoxFit.cover,
-                        gaplessPlayback: true,
-                      )
-                          : Container(color: Colors.grey.shade800, child: const Icon(Icons.music_note, size: 100, color: Colors.white54)),
-                    ),
-                  ),
-                  const SizedBox(height: 40),
-                  Text(book.displayTitle, style: textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold, color: Colors.white), textAlign: TextAlign.center),
-                  const SizedBox(height: 8),
-                  Text(book.author ?? "Unknown Artist", style: textTheme.bodyLarge?.copyWith(color: Colors.grey[400]), textAlign: TextAlign.center),
-                  const SizedBox(height: 20),
-                  const _ProgressSlider(),
-                ],
+                    const SizedBox(height: 40),
+                    Text(book.displayTitle, style: textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold, color: Colors.white), textAlign: TextAlign.center),
+                    const SizedBox(height: 8),
+                    Text(book.author ?? "Unknown Artist", style: textTheme.bodyLarge?.copyWith(color: Colors.grey[400]), textAlign: TextAlign.center),
+                    const SizedBox(height: 20),
+                    const _ProgressSlider(),
+                  ],
+                ),
               ),
-            ),
-            const SizedBox(height: 10),
-            const _PlayerControls(),
-            const Spacer(),
-            AbsorbPointer(
-              absorbing: isScreenLocked,
-              child: PlayerBottomTabs(
-                accentColor: accentGreen,
-                initialIndex: 0,
-                onChaptersTap: () => _showInfoSheet(context, ref, initialTabIndex: 0),
-                onReadTap: () => _showInfoSheet(context, ref, initialTabIndex: 1),
-                onVisualizeTap: () => _showInfoSheet(context, ref, initialTabIndex: 2),
+              // MOVED Spacer to push the controls and tabs down together
+              const Spacer(),
+              const _PlayerControls(),
+              // ADDED a fixed SizedBox to create a smaller, controlled gap
+              const SizedBox(height: 20),
+              AbsorbPointer(
+                absorbing: isScreenLocked,
+                child: PlayerBottomTabs(
+                  accentColor: accentGreen,
+                  initialIndex: 0,
+                  onChaptersTap: () => _showInfoSheet(context, ref, initialTabIndex: 0),
+                  onReadTap: () => _showInfoSheet(context, ref, initialTabIndex: 1),
+                  onVisualizeTap: () => _showInfoSheet(context, ref, initialTabIndex: 2),
+                ),
               ),
-            ),
-            const SizedBox(height: 20),
-          ],
+            ],
+          ),
         ),
       ),
     );

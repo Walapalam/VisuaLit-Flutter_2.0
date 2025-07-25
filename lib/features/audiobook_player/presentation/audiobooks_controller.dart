@@ -1,6 +1,8 @@
 // lib/features/audiobook_player/presentation/audiobooks_controller.dart
 
 import 'dart:io';
+// Add this import to use Uint8List
+import 'dart:typed_data';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:isar/isar.dart';
 import 'package:path/path.dart' as p;
@@ -35,6 +37,51 @@ class AudiobooksController extends StateNotifier<AsyncValue<List<Audiobook>>> {
     }
   }
 
+  /// Helper to find and read a cover image file from a directory.
+  Future<List<int>?> _findAndReadCoverImage(String path, {required bool isDirectory}) async {
+    final directoryPath = isDirectory ? path : p.dirname(path);
+    final directory = Directory(directoryPath);
+    if (!await directory.exists()) return null;
+
+    File? coverFile;
+
+    // 1. For single files, first check for an image with the same base name.
+    if (!isDirectory) {
+      final baseName = p.basenameWithoutExtension(path);
+      const extensions = ['.jpg', '.jpeg', '.png'];
+      for (final ext in extensions) {
+        final file = File(p.join(directoryPath, baseName + ext));
+        if (await file.exists()) {
+          coverFile = file;
+          break;
+        }
+      }
+    }
+
+    // 2. If not found, check for common cover names (e.g., cover.jpg).
+    if (coverFile == null) {
+      const commonNames = ['cover.jpg', 'cover.png', 'folder.jpg', 'folder.png', 'artwork.jpg', 'artwork.png'];
+      for (final name in commonNames) {
+        final file = File(p.join(directoryPath, name));
+        if (await file.exists()) {
+          coverFile = file;
+          break;
+        }
+      }
+    }
+
+    // 3. If a file was found, read its bytes.
+    if (coverFile != null) {
+      try {
+        return await coverFile.readAsBytes();
+      } catch (e) {
+        print("Error reading cover image file: ${coverFile.path}. Error: $e");
+        return null;
+      }
+    }
+    return null;
+  }
+
   /// Asks the service for a folder path and processes it.
   Future<void> addAudiobookFromFolder() async {
     final directoryPath = await _localLibraryService.pickDirectory();
@@ -60,27 +107,25 @@ class AudiobooksController extends StateNotifier<AsyncValue<List<Audiobook>>> {
       return;
     }
 
+    // --- NEW: Find and load cover image ---
+    final coverBytes = await _findAndReadCoverImage(directoryPath, isDirectory: true);
+
     final newBook = Audiobook()
       ..title = bookTitle
-      ..isSingleFile = false;
+      ..isSingleFile = false
+      ..coverImageBytes = coverBytes; // <-- Assign the cover image bytes
 
     int order = 0;
     for (final filePath in mp3Files) {
-      final chapterTitle = p.basenameWithoutExtension(filePath); // e.g., "chapter_1"
+      final chapterTitle = p.basenameWithoutExtension(filePath);
 
-      // --- THIS IS THE KEY LOGIC FOR LRS ---
-      // 1. It takes the full path of the mp3 file (e.g., ".../My Book/chapter_1.mp3")
-      // 2. It changes the extension to ".json" -> ".../My Book/chapter_1.json"
       final jsonPath = p.setExtension(filePath, '.json');
       final jsonFile = File(jsonPath);
 
-      // 3. It creates a new Chapter object.
       newBook.chapters.add(Chapter()
         ..filePath = filePath
         ..title = chapterTitle
         ..sortOrder = order++
-      // 4. It checks if the corresponding .json file actually exists.
-      //    If it exists, its path is saved; otherwise, lrsJsonPath is null.
         ..lrsJsonPath = await jsonFile.exists() ? jsonPath : null);
     }
 
@@ -96,11 +141,14 @@ class AudiobooksController extends StateNotifier<AsyncValue<List<Audiobook>>> {
     final bookTitle = p.basenameWithoutExtension(filePath);
     if (await _isar.audiobooks.where().titleEqualTo(bookTitle).findFirst() != null) return;
 
+    // --- NEW: Find and load cover image ---
+    final coverBytes = await _findAndReadCoverImage(filePath, isDirectory: false);
+
     final newBook = Audiobook()
       ..title = bookTitle
-      ..isSingleFile = true;
+      ..isSingleFile = true
+      ..coverImageBytes = coverBytes; // <-- Assign the cover image bytes
 
-    // For single files, we can also check for a matching JSON file.
     final jsonPath = p.setExtension(filePath, '.json');
     final jsonFile = File(jsonPath);
 

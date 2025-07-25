@@ -6,14 +6,120 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:visualit/features/audiobook_player/data/audiobook.dart';
 import 'package:go_router/go_router.dart';
 import 'audiobook_player_service.dart';
-import 'lrs_view.dart'; // <--- 1. IMPORT THE NEW LRS VIEW
+import 'lrs_view.dart';
 
+// --- MAIN WIDGET: Rebuilds only when the book or lock state changes ---
 class AudiobookPlayerScreen extends ConsumerWidget {
   final int audiobookId;
 
   const AudiobookPlayerScreen({super.key, required this.audiobookId});
 
-  /// Helper to format a Duration object into a "minutes:seconds" string.
+  /// Shows the info sheet with tabbed content, opening to the specified initial tab.
+  void _showInfoSheet(BuildContext context, WidgetRef ref, {required int initialTabIndex}) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: const Color(0xFF121212),
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(16.0))),
+      builder: (context) {
+        return InfoSheetContent(
+          initialTabIndex: initialTabIndex,
+          audiobookId: audiobookId,
+        );
+      },
+    );
+  }
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final book = ref.watch(audiobookPlayerServiceProvider.select((state) => state.audiobook));
+    final isScreenLocked = ref.watch(audiobookPlayerServiceProvider.select((state) => state.isScreenLocked));
+
+    final textTheme = Theme.of(context).textTheme;
+    const Color accentGreen = Color(0xFF1DB954);
+    const Color darkBackground = Color(0xFF121212);
+
+    if (book == null || book.id != audiobookId) {
+      return Scaffold(backgroundColor: darkBackground, body: const Center(child: CircularProgressIndicator()));
+    }
+
+    return Scaffold(
+      backgroundColor: darkBackground,
+      appBar: AppBar(
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        leading: IconButton(
+          onPressed: isScreenLocked ? null : () => context.pop(),
+          icon: const Icon(Icons.expand_more, color: Colors.white),
+        ),
+        title: const Text("Now Playing", style: TextStyle(color: Colors.white)),
+        centerTitle: true,
+        actions: [
+          if (!isScreenLocked)
+            IconButton(icon: const Icon(Icons.more_vert, color: Colors.white), onPressed: () {}),
+        ],
+      ),
+      body: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 24.0),
+        child: Column(
+          children: [
+            AbsorbPointer(
+              absorbing: isScreenLocked,
+              child: Column(
+                children: [
+                  const SizedBox(height: 20),
+                  Container(
+                    height: MediaQuery.of(context).size.width * 0.8,
+                    width: MediaQuery.of(context).size.width * 0.8,
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(12),
+                      boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.5), blurRadius: 20, offset: const Offset(0, 10))],
+                    ),
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(12.0),
+                      child: book.coverImageBytes != null
+                          ? Image.memory(
+                        Uint8List.fromList(book.coverImageBytes!),
+                        fit: BoxFit.cover,
+                        gaplessPlayback: true,
+                      )
+                          : Container(color: Colors.grey.shade800, child: const Icon(Icons.music_note, size: 100, color: Colors.white54)),
+                    ),
+                  ),
+                  const SizedBox(height: 40),
+                  Text(book.displayTitle, style: textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold, color: Colors.white), textAlign: TextAlign.center),
+                  const SizedBox(height: 8),
+                  Text(book.author ?? "Unknown Artist", style: textTheme.bodyLarge?.copyWith(color: Colors.grey[400]), textAlign: TextAlign.center),
+                  const SizedBox(height: 20),
+                  const _ProgressSlider(),
+                ],
+              ),
+            ),
+            const SizedBox(height: 10),
+            const _PlayerControls(),
+            const Spacer(),
+            AbsorbPointer(
+              absorbing: isScreenLocked,
+              child: PlayerBottomTabs(
+                accentColor: accentGreen,
+                initialIndex: 0,
+                onChaptersTap: () => _showInfoSheet(context, ref, initialTabIndex: 0),
+                onReadTap: () => _showInfoSheet(context, ref, initialTabIndex: 1),
+                onVisualizeTap: () => _showInfoSheet(context, ref, initialTabIndex: 2),
+              ),
+            ),
+            const SizedBox(height: 20),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// --- DEDICATED WIDGET 1: For the progress slider and timers ---
+class _ProgressSlider extends ConsumerWidget {
+  const _ProgressSlider();
+
   String _formatDuration(Duration d) {
     d = d.isNegative ? Duration.zero : d;
     final minutes = d.inMinutes.remainder(60).toString().padLeft(2, '0');
@@ -21,7 +127,45 @@ class AudiobookPlayerScreen extends ConsumerWidget {
     return "$minutes:$seconds";
   }
 
-  /// Shows the speed selection menu.
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final position = ref.watch(audiobookPlayerServiceProvider.select((s) => s.currentPosition));
+    final duration = ref.watch(audiobookPlayerServiceProvider.select((s) => s.totalDuration));
+    final playerService = ref.read(audiobookPlayerServiceProvider.notifier);
+
+    return Column(
+      children: [
+        SliderTheme(
+          data: SliderTheme.of(context).copyWith(trackHeight: 3.0, thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 7.0), overlayShape: const RoundSliderOverlayShape(overlayRadius: 14.0)),
+          child: Slider(
+            value: position.inSeconds.toDouble().clamp(0.0, duration.inSeconds.toDouble() > 0 ? duration.inSeconds.toDouble() : 0.0),
+            max: duration.inSeconds.toDouble() > 0 ? duration.inSeconds.toDouble() : 1.0,
+            min: 0,
+            activeColor: const Color(0xFF1DB954),
+            inactiveColor: Colors.grey.shade800,
+            thumbColor: Colors.white,
+            onChanged: (value) => playerService.seek(Duration(seconds: value.round())),
+          ),
+        ),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16.0),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(_formatDuration(position), style: TextStyle(color: Colors.grey[400])),
+              Text(_formatDuration(duration), style: TextStyle(color: Colors.grey[400])),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+// --- DEDICATED WIDGET 2: For the player controls ---
+class _PlayerControls extends ConsumerWidget {
+  const _PlayerControls();
+
   void _showSpeedSelectionMenu(BuildContext context, WidgetRef ref) {
     final playerService = ref.read(audiobookPlayerServiceProvider.notifier);
     final currentSpeed = ref.read(audiobookPlayerServiceProvider).playbackSpeed;
@@ -30,7 +174,7 @@ class AudiobookPlayerScreen extends ConsumerWidget {
 
     showModalBottomSheet(
       context: context,
-      backgroundColor: const Color(0xFF191919), // Darker background for the sheet
+      backgroundColor: const Color(0xFF191919),
       shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20.0))),
       builder: (BuildContext context) {
         return Padding(
@@ -60,153 +204,39 @@ class AudiobookPlayerScreen extends ConsumerWidget {
     );
   }
 
-  /// Shows the info sheet with tabbed content, opening to the specified initial tab.
-  void _showInfoSheet(BuildContext context, WidgetRef ref, {required int initialTabIndex}) {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: const Color(0xFF121212),
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(16.0))),
-      builder: (context) {
-        return InfoSheetContent(
-          initialTabIndex: initialTabIndex,
-          audiobookId: audiobookId,
-        );
-      },
-    );
-  }
-
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final playerState = ref.watch(audiobookPlayerServiceProvider);
     final playerService = ref.read(audiobookPlayerServiceProvider.notifier);
-    final textTheme = Theme.of(context).textTheme;
+    final isPlaying = ref.watch(audiobookPlayerServiceProvider.select((s) => s.isPlaying));
+    final isScreenLocked = ref.watch(audiobookPlayerServiceProvider.select((s) => s.isScreenLocked));
+    final playbackSpeed = ref.watch(audiobookPlayerServiceProvider.select((s) => s.playbackSpeed));
 
-    const Color accentGreen = Color(0xFF1DB954);
-    const Color darkBackground = Color(0xFF121212);
-
-    if (playerState.audiobook == null || playerState.audiobook!.id != audiobookId) {
-      return Scaffold(backgroundColor: darkBackground, body: const Center(child: CircularProgressIndicator()));
-    }
-
-    final book = playerState.audiobook!;
-
-    return Scaffold(
-      backgroundColor: darkBackground,
-      appBar: AppBar(
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        leading: IconButton(
-          onPressed: playerState.isScreenLocked ? null : () => context.pop(),
-          icon: const Icon(Icons.expand_more, color: Colors.white),
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: [
+        SizedBox(
+          width: 52, height: 52,
+          child: TextButton(
+            onPressed: isScreenLocked ? null : () => _showSpeedSelectionMenu(context, ref),
+            style: TextButton.styleFrom(foregroundColor: Colors.white, shape: const CircleBorder()),
+            child: Text("${playbackSpeed}x", style: const TextStyle(fontWeight: FontWeight.bold)),
+          ),
         ),
-        title: const Text("Now Playing", style: TextStyle(color: Colors.white)),
-        centerTitle: true,
-        actions: [
-          if (!playerState.isScreenLocked)
-            IconButton(icon: const Icon(Icons.more_vert, color: Colors.white), onPressed: () {}),
-        ],
-      ),
-      body: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 24.0),
-        child: Column(
-          children: [
-            AbsorbPointer(
-              absorbing: playerState.isScreenLocked,
-              child: Column(
-                children: [
-                  const SizedBox(height: 20),
-                  Container(
-                    height: MediaQuery.of(context).size.width * 0.8,
-                    width: MediaQuery.of(context).size.width * 0.8,
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(12),
-                      boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.5), blurRadius: 20, offset: const Offset(0, 10))],
-                    ),
-                    child: ClipRRect(
-                      borderRadius: BorderRadius.circular(12.0),
-                      child: book.coverImageBytes != null
-                          ? Image.memory(Uint8List.fromList(book.coverImageBytes!), fit: BoxFit.cover)
-                          : Container(color: Colors.grey.shade800, child: const Icon(Icons.music_note, size: 100, color: Colors.white54)),
-                    ),
-                  ),
-                  const SizedBox(height: 40),
-                  Text(book.displayTitle, style: textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold, color: Colors.white), textAlign: TextAlign.center),
-                  const SizedBox(height: 8),
-                  Text(book.author ?? "Unknown Artist", style: textTheme.bodyLarge?.copyWith(color: Colors.grey[400]), textAlign: TextAlign.center),
-                  const SizedBox(height: 20),
-                  Column(
-                    children: [
-                      SliderTheme(
-                        data: SliderTheme.of(context).copyWith(trackHeight: 3.0, thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 7.0), overlayShape: const RoundSliderOverlayShape(overlayRadius: 14.0)),
-                        child: Slider(
-                          value: playerState.currentPosition.inSeconds.toDouble().clamp(0.0, playerState.totalDuration.inSeconds.toDouble() > 0 ? playerState.totalDuration.inSeconds.toDouble() : 0.0),
-                          max: playerState.totalDuration.inSeconds.toDouble() > 0 ? playerState.totalDuration.inSeconds.toDouble() : 1.0,
-                          min: 0,
-                          activeColor: accentGreen,
-                          inactiveColor: Colors.grey.shade800,
-                          thumbColor: Colors.white,
-                          onChanged: (value) => playerService.seek(Duration(seconds: value.round())),
-                        ),
-                      ),
-                      Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 16.0),
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Text(_formatDuration(playerState.currentPosition), style: TextStyle(color: Colors.grey[400])),
-                            Text(_formatDuration(playerState.totalDuration), style: TextStyle(color: Colors.grey[400])),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 10),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-              crossAxisAlignment: CrossAxisAlignment.center,
-              children: [
-                SizedBox(
-                  width: 52, height: 52,
-                  child: TextButton(
-                    onPressed: playerState.isScreenLocked ? null : () => _showSpeedSelectionMenu(context, ref),
-                    style: TextButton.styleFrom(foregroundColor: Colors.white, shape: const CircleBorder()),
-                    child: Text("${playerState.playbackSpeed}x", style: const TextStyle(fontWeight: FontWeight.bold)),
-                  ),
-                ),
-                IconButton(onPressed: playerState.isScreenLocked ? null : playerService.skipToPrevious, icon: const Icon(Icons.skip_previous, size: 40), color: Colors.white),
-                IconButton(
-                  iconSize: 70,
-                  onPressed: playerState.isScreenLocked ? null : (playerState.isPlaying ? playerService.pause : playerService.play),
-                  icon: Icon(playerState.isPlaying ? Icons.pause_circle_filled : Icons.play_circle_filled),
-                  color: accentGreen,
-                ),
-                IconButton(onPressed: playerState.isScreenLocked ? null : playerService.skipToNext, icon: const Icon(Icons.skip_next, size: 40), color: Colors.white),
-                IconButton(
-                  icon: Icon(playerState.isScreenLocked ? Icons.lock : Icons.lock_outline, size: 28),
-                  color: Colors.white,
-                  onPressed: playerService.toggleScreenLock,
-                ),
-              ],
-            ),
-            const Spacer(),
-            AbsorbPointer(
-              absorbing: playerState.isScreenLocked,
-              child: PlayerBottomTabs(
-                accentColor: accentGreen,
-                initialIndex: 0,
-                onChaptersTap: () => _showInfoSheet(context, ref, initialTabIndex: 0),
-                onReadTap: () => _showInfoSheet(context, ref, initialTabIndex: 1),
-                onVisualizeTap: () => _showInfoSheet(context, ref, initialTabIndex: 2),
-              ),
-            ),
-            const SizedBox(height: 20),
-          ],
+        IconButton(onPressed: isScreenLocked ? null : playerService.skipToPrevious, icon: const Icon(Icons.skip_previous, size: 40), color: Colors.white),
+        IconButton(
+          iconSize: 70,
+          onPressed: isScreenLocked ? null : (isPlaying ? playerService.pause : playerService.play),
+          icon: Icon(isPlaying ? Icons.pause_circle_filled : Icons.play_circle_filled),
+          color: const Color(0xFF1DB954),
         ),
-      ),
+        IconButton(onPressed: isScreenLocked ? null : playerService.skipToNext, icon: const Icon(Icons.skip_next, size: 40), color: Colors.white),
+        IconButton(
+          icon: Icon(isScreenLocked ? Icons.lock : Icons.lock_outline, size: 28),
+          color: Colors.white,
+          onPressed: playerService.toggleScreenLock,
+        ),
+      ],
     );
   }
 }
@@ -242,8 +272,6 @@ class _PlayerBottomTabsState extends State<PlayerBottomTabs> {
   }
 
   void _onTabTapped(int index) {
-    // Note: We don't call setState here because the parent's action (opening the sheet)
-    // is the primary goal. The selected state is visual flair for the main screen.
     if (index == 0) { widget.onChaptersTap(); }
     else if (index == 1) { widget.onReadTap(); }
     else if (index == 2) { widget.onVisualizeTap(); }
@@ -269,7 +297,6 @@ class _PlayerBottomTabsState extends State<PlayerBottomTabs> {
               ),
             ),
             const SizedBox(height: 4),
-            // For the main screen, the underline is static and only for the first tab
             Container(
               height: 3,
               width: isSelected ? 30 : 0,
@@ -317,31 +344,21 @@ class _InfoSheetContentState extends ConsumerState<InfoSheetContent> {
     selectedTabIndex = widget.initialTabIndex;
   }
 
-  String _formatDuration(Duration d) {
-    d = d.isNegative ? Duration.zero : d;
-    final minutes = d.inMinutes.remainder(60).toString().padLeft(2, '0');
-    final seconds = d.inSeconds.remainder(60).toString().padLeft(2, '0');
-    return "$minutes:$seconds";
-  }
-
   @override
   Widget build(BuildContext context) {
     const Color accentGreen = Color(0xFF1DB954);
-    // <--- 2. GET PLAYER STATE AND BOOK INFO HERE --->
-    final playerState = ref.watch(audiobookPlayerServiceProvider);
-    final book = playerState.audiobook;
+    final book = ref.watch(audiobookPlayerServiceProvider.select((s) => s.audiobook));
+    final currentChapterIndex = ref.watch(audiobookPlayerServiceProvider.select((s) => s.currentChapterIndex));
 
-    // Safely determine the JSON path for the currently playing chapter
+    if (book == null) return const SizedBox.shrink();
+
     String? currentChapterJsonPath;
-    if (book != null && playerState.currentChapterIndex < book.chapters.length) {
-      currentChapterJsonPath = book.chapters[playerState.currentChapterIndex].lrsJsonPath;
+    if (currentChapterIndex < book.chapters.length) {
+      currentChapterJsonPath = book.chapters[currentChapterIndex].lrsJsonPath;
     }
 
-    // <--- 3. DEFINE TAB CONTENTS WITH CONDITIONAL LRS VIEW --->
     final List<Widget> tabContents = [
-      _buildChapterListView(accentGreen),
-      // If a JSON path exists for the current chapter, show the LRS View.
-      // Otherwise, show a helpful placeholder message.
+      _buildChapterListView(book),
       currentChapterJsonPath != null
           ? LrsView(lrsJsonPath: currentChapterJsonPath)
           : _buildPlaceholderContent('No script available for this chapter.'),
@@ -356,7 +373,6 @@ class _InfoSheetContentState extends ConsumerState<InfoSheetContent> {
             padding: const EdgeInsets.symmetric(vertical: 12.0),
             child: Container(width: 40, height: 5, decoration: BoxDecoration(color: Colors.grey[800], borderRadius: BorderRadius.circular(10))),
           ),
-          // Here, the tabs are interactive and manage their own state
           PlayerBottomTabsInSheet(
             initialIndex: selectedTabIndex,
             accentColor: accentGreen,
@@ -375,47 +391,14 @@ class _InfoSheetContentState extends ConsumerState<InfoSheetContent> {
     );
   }
 
-  Widget _buildChapterListView(Color accentColor) {
-    final playerState = ref.watch(audiobookPlayerServiceProvider);
-    final playerService = ref.read(audiobookPlayerServiceProvider.notifier);
-    final book = playerState.audiobook!;
-
+  Widget _buildChapterListView(Audiobook book) {
     return ListView.builder(
       padding: EdgeInsets.zero,
       itemCount: book.chapters.length,
       itemBuilder: (context, index) {
-        final Chapter chapter = book.chapters[index];
-        final bool isCurrentlyPlaying = playerState.currentChapterIndex == index;
-        final durationText = chapter.durationInSeconds != null ? _formatDuration(Duration(seconds: chapter.durationInSeconds!)) : '--:--';
-        final subtitleText = "${book.author ?? 'Unknown Author'} • $durationText";
-
-        return ListTile(
-          contentPadding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 6.0),
-          leading: SizedBox(
-            width: 50, height: 50,
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(4.0),
-              child: Stack(
-                alignment: Alignment.center,
-                children: [
-                  book.coverImageBytes != null
-                      ? Image.memory(Uint8List.fromList(book.coverImageBytes!), fit: BoxFit.cover, width: 50, height: 50)
-                      : Container(color: Colors.grey.shade800, child: const Icon(Icons.music_note, size: 24, color: Colors.white54)),
-                  if (isCurrentlyPlaying)
-                    Container(width: 50, height: 50, color: Colors.black.withOpacity(0.6), child: Icon(Icons.bar_chart_rounded, color: accentColor)),
-                ],
-              ),
-            ),
-          ),
-          title: Text(chapter.title ?? 'Chapter ${index + 1}', style: TextStyle(color: isCurrentlyPlaying ? accentColor : Colors.white, fontWeight: FontWeight.w500), maxLines: 1, overflow: TextOverflow.ellipsis),
-          subtitle: Text(subtitleText, style: TextStyle(color: Colors.grey[500], fontSize: 13)),
-          trailing: Icon(Icons.drag_handle, color: Colors.grey[700]),
-          onTap: () {
-            if (!isCurrentlyPlaying) {
-              playerService.jumpToChapter(index);
-            }
-            Navigator.pop(context);
-          },
+        return _ChapterListTile(
+          book: book,
+          index: index,
         );
       },
     );
@@ -424,15 +407,79 @@ class _InfoSheetContentState extends ConsumerState<InfoSheetContent> {
   Widget _buildPlaceholderContent(String title) {
     return Center(
       child: Text(
-        title, // Changed from '$title Coming Soon' to just title
+        title,
         style: TextStyle(color: Colors.grey[600], fontSize: 16),
       ),
     );
   }
 }
 
+// --- NEW DEDICATED AND OPTIMIZED WIDGET FOR A SINGLE CHAPTER TILE ---
+class _ChapterListTile extends ConsumerWidget {
+  final Audiobook book;
+  final int index;
 
-// A dedicated, simpler tab widget for use *inside* the bottom sheet
+  const _ChapterListTile({
+    required this.book,
+    required this.index,
+  });
+
+  String _formatDuration(Duration d) {
+    d = d.isNegative ? Duration.zero : d;
+    final minutes = d.inMinutes.remainder(60).toString().padLeft(2, '0');
+    final seconds = d.inSeconds.remainder(60).toString().padLeft(2, '0');
+    return "$minutes:$seconds";
+  }
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final playerService = ref.read(audiobookPlayerServiceProvider.notifier);
+
+    final bool isCurrentlyPlaying = ref.watch(audiobookPlayerServiceProvider.select(
+            (s) => s.currentChapterIndex == index
+    ));
+
+    final Chapter chapter = book.chapters[index];
+    const Color accentColor = Color(0xFF1DB954);
+
+    final durationText = chapter.durationInSeconds != null
+        ? _formatDuration(Duration(seconds: chapter.durationInSeconds!))
+        : '--:--';
+    final subtitleText = "${book.author ?? 'Unknown Author'} • $durationText";
+
+    return ListTile(
+      contentPadding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 6.0),
+      leading: SizedBox(
+        width: 50, height: 50,
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(4.0),
+          child: Stack(
+            alignment: Alignment.center,
+            children: [
+              book.coverImageBytes != null
+                  ? Image.memory(Uint8List.fromList(book.coverImageBytes!), fit: BoxFit.cover, width: 50, height: 50, gaplessPlayback: true)
+                  : Container(color: Colors.grey.shade800, child: const Icon(Icons.music_note, size: 24, color: Colors.white54)),
+              if (isCurrentlyPlaying)
+                Container(width: 50, height: 50, color: Colors.black.withOpacity(0.6), child: Icon(Icons.bar_chart_rounded, color: accentColor)),
+            ],
+          ),
+        ),
+      ),
+      title: Text(chapter.title ?? 'Chapter ${index + 1}', style: TextStyle(color: isCurrentlyPlaying ? accentColor : Colors.white, fontWeight: FontWeight.w500), maxLines: 1, overflow: TextOverflow.ellipsis),
+      subtitle: Text(subtitleText, style: TextStyle(color: Colors.grey[500], fontSize: 13)),
+      trailing: Icon(Icons.drag_handle, color: Colors.grey[700]),
+      onTap: () {
+        if (!isCurrentlyPlaying) {
+          playerService.jumpToChapter(index);
+        }
+        Navigator.pop(context);
+      },
+    );
+  }
+}
+
+
+// --- DEDICATED TAB WIDGET for use *inside* the bottom sheet ---
 class PlayerBottomTabsInSheet extends StatefulWidget {
   final int initialIndex;
   final Color accentColor;

@@ -261,11 +261,12 @@ class _ReadingScreenState extends ConsumerState<ReadingScreen> {
         ],
       ),
       body: GestureDetector(
-        onTap: _toggleUiVisibility,
+        behavior: HitTestBehavior.translucent, // Ensures taps are detected on empty spaces
+        onDoubleTap: _toggleUiVisibility, // Toggles the UI visibility on double-tap
         child: AbsorbPointer(
-          absorbing: _isLocked,
+          absorbing: _isLocked, // Prevents interaction when locked
           child: Stack(
-            children: [readerContent],
+            children: [readerContent], // Your reading content
           ),
         ),
       ),

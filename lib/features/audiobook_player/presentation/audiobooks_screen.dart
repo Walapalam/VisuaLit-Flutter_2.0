@@ -1,16 +1,41 @@
 // lib/features/audiobook_player/presentation/audiobooks_screen.dart
 import 'package:flutter/material.dart';
-// Add this import to use Uint8List
 import 'dart:typed_data';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:visualit/features/audiobook_player/data/audiobook.dart';
 import 'package:visualit/features/audiobook_player/presentation/audiobooks_controller.dart';
-// Import the new service
 import 'package:visualit/features/audiobook_player/presentation/audiobook_player_service.dart';
 
 class AudiobooksScreen extends ConsumerWidget {
   const AudiobooksScreen({super.key});
+
+  /// Shows a confirmation dialog before deleting an audiobook.
+  void _showDeleteConfirmationDialog(BuildContext context, WidgetRef ref, Audiobook book) {
+    showDialog(
+      context: context,
+      builder: (BuildContext dialogContext) {
+        return AlertDialog(
+          title: const Text('Delete Audiobook?'),
+          content: Text('Are you sure you want to delete "${book.displayTitle}"? This action cannot be undone.'),
+          actions: <Widget>[
+            TextButton(
+              child: const Text('Cancel'),
+              onPressed: () => Navigator.of(dialogContext).pop(),
+            ),
+            TextButton(
+              style: TextButton.styleFrom(foregroundColor: Colors.red),
+              child: const Text('Delete'),
+              onPressed: () {
+                ref.read(audiobooksControllerProvider.notifier).deleteAudiobook(book.id);
+                Navigator.of(dialogContext).pop();
+              },
+            ),
+          ],
+        );
+      },
+    );
+  }
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -67,62 +92,26 @@ class AudiobooksScreen extends ConsumerWidget {
           }
 
           return ListView(
-            padding: const EdgeInsets.all(8.0),
             children: [
-              if (multiFileAudiobooks.isNotEmpty)
+              if (multiFileAudiobooks.isNotEmpty) ...[
                 _buildSectionHeader('Multi-File Audiobooks'),
-              ...multiFileAudiobooks.map((book) => ListTile(
-                // --- MODIFIED: Use cover art or fallback icon ---
-                leading: SizedBox(
-                  width: 40,
-                  height: 40,
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(4.0),
-                    child: book.coverImageBytes != null
-                        ? Image.memory(
-                      Uint8List.fromList(book.coverImageBytes!),
-                      fit: BoxFit.cover,
-                    )
-                        : const Icon(Icons.folder_open, size: 40, color: Colors.orangeAccent),
-                  ),
+                _AudiobookCarousel(
+                  books: multiFileAudiobooks,
+                  fallbackIcon: const Icon(Icons.folder_open, size: 80, color: Colors.orangeAccent),
+                  onDelete: (book) => _showDeleteConfirmationDialog(context, ref, book),
                 ),
-                title: Text(book.displayTitle),
-                subtitle: Text("${book.chapters.length} Chapters"),
-                onTap: () {
-                  // Use the new service
-                  ref.read(audiobookPlayerServiceProvider.notifier).loadAndPlay(book);
-                  context.pushNamed('audiobookPlayer', pathParameters: {'audiobookId': book.id.toString()});
-                },
-              )),
-
+              ],
               if (multiFileAudiobooks.isNotEmpty && singleFileAudiobooks.isNotEmpty)
-                const Divider(height: 32, indent: 16, endIndent: 16),
+                const Divider(height: 48, indent: 16, endIndent: 16, thickness: 0.5),
 
-              if (singleFileAudiobooks.isNotEmpty)
+              if (singleFileAudiobooks.isNotEmpty) ...[
                 _buildSectionHeader('Single-File Audiobooks'),
-              ...singleFileAudiobooks.map((book) => ListTile(
-                // --- MODIFIED: Use cover art or fallback icon ---
-                leading: SizedBox(
-                  width: 40,
-                  height: 40,
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(4.0),
-                    child: book.coverImageBytes != null
-                        ? Image.memory(
-                      Uint8List.fromList(book.coverImageBytes!),
-                      fit: BoxFit.cover,
-                    )
-                        : const Icon(Icons.music_note, size: 40, color: Colors.tealAccent),
-                  ),
+                _AudiobookCarousel(
+                  books: singleFileAudiobooks,
+                  fallbackIcon: const Icon(Icons.music_note, size: 80, color: Colors.tealAccent),
+                  onDelete: (book) => _showDeleteConfirmationDialog(context, ref, book),
                 ),
-                title: Text(book.displayTitle),
-                subtitle: const Text("1 Chapter"),
-                onTap: () {
-                  // Use the new service
-                  ref.read(audiobookPlayerServiceProvider.notifier).loadAndPlay(book);
-                  context.pushNamed('audiobookPlayer', pathParameters: {'audiobookId': book.id.toString()});
-                },
-              )),
+              ],
             ],
           );
         },
@@ -132,9 +121,123 @@ class AudiobooksScreen extends ConsumerWidget {
 
   Widget _buildSectionHeader(String title) {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(16.0, 16.0, 16.0, 8.0),
+      padding: const EdgeInsets.fromLTRB(16.0, 16.0, 16.0, 12.0),
       child: Text(title, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.grey)),
     );
   }
+}
 
+class _AudiobookCarousel extends ConsumerWidget {
+  final List<Audiobook> books;
+  final Icon fallbackIcon;
+  final Function(Audiobook) onDelete;
+
+  const _AudiobookCarousel({
+    required this.books,
+    required this.fallbackIcon,
+    required this.onDelete,
+  });
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    const double cardHeight = 220;
+    const double cardWidth = 150;
+
+    return SizedBox(
+      height: cardHeight,
+      child: ListView.builder(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.symmetric(horizontal: 12.0),
+        itemCount: books.length,
+        itemBuilder: (context, index) {
+          final book = books[index];
+          return _AudiobookCard(
+            book: book,
+            width: cardWidth,
+            fallbackIcon: fallbackIcon,
+            onTap: () {
+              ref.read(audiobookPlayerServiceProvider.notifier).loadAndPlay(book);
+              context.pushNamed('audiobookPlayer', pathParameters: {'audiobookId': book.id.toString()});
+            },
+            onDelete: () => onDelete(book),
+          );
+        },
+      ),
+    );
+  }
+}
+
+// --- WIDGET: Card UI for a single audiobook (with long-press to delete) ---
+class _AudiobookCard extends StatelessWidget {
+  final Audiobook book;
+  final double width;
+  final Icon fallbackIcon;
+  final VoidCallback onTap;
+  final VoidCallback onDelete;
+
+  const _AudiobookCard({
+    required this.book,
+    required this.width,
+    required this.fallbackIcon,
+    required this.onTap,
+    required this.onDelete,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return SizedBox(
+      width: width,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 4.0),
+        // --- MODIFICATION IS HERE ---
+        // InkWell handles both tap and long press events.
+        child: InkWell(
+          onTap: onTap,         // A short tap plays the book.
+          onLongPress: onDelete,  // A long press now triggers the delete confirmation.
+          borderRadius: BorderRadius.circular(8.0),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              SizedBox(
+                height: 150,
+                width: double.infinity,
+                child: Card(
+                  clipBehavior: Clip.antiAlias,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8.0)),
+                  elevation: 4,
+                  // The Stack is now simpler as we've removed the button from the corner.
+                  child: book.coverImageBytes != null
+                      ? Image.memory(
+                    Uint8List.fromList(book.coverImageBytes!),
+                    fit: BoxFit.cover,
+                  )
+                      : Center(child: fallbackIcon),
+                ),
+              ),
+              const SizedBox(height: 8),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 4.0),
+                child: Text(
+                  book.displayTitle,
+                  style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.bold),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 4.0),
+                child: Text(
+                  "${book.chapters.length} Chapter${book.chapters.length == 1 ? '' : 's'}",
+                  style: theme.textTheme.bodySmall,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
 }

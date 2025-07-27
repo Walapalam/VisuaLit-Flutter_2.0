@@ -38,7 +38,7 @@ class ReadingPreferences {
     this.isLineGuideEnabled = false,
     this.fontFamily = 'Georgia',
     this.brightness = 1.0, // Full brightness by default
-    this.pageTurnStyle = PageTurnStyle.paged, // Paged turning by default
+    this.pageTurnStyle = PageTurnStyle.scroll, // Paged turning by default
     this.matchDeviceTheme = false,
     this.backgroundDimming = BackgroundDimming.medium,
   });

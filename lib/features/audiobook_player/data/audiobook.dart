@@ -3,7 +3,7 @@ import 'package:isar/isar.dart';
 part 'audiobook.g.dart'; // This will be regenerated
 
 @embedded
-class Chapter {
+class AudiobookChapter {
   String? title;
   String? filePath;
   int? durationInSeconds;
@@ -22,7 +22,7 @@ class Audiobook {
   String? author;
   List<byte>? coverImageBytes;
 
-  List<Chapter> chapters = [];
+  List<AudiobookChapter> chapters = [];
   bool isSingleFile = false;
 
   // --- NEW FIELDS FOR STATE PERSISTENCE ---

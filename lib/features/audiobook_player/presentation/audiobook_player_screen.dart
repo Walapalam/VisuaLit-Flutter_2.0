@@ -384,7 +384,7 @@ class _InfoSheetContentState extends ConsumerState<InfoSheetContent> {
       padding: EdgeInsets.zero,
       itemCount: book.chapters.length,
       itemBuilder: (context, index) {
-        final Chapter chapter = book.chapters[index];
+        final AudiobookChapter chapter = book.chapters[index];
         final bool isCurrentlyPlaying = playerState.currentChapterIndex == index;
         final durationText = chapter.durationInSeconds != null ? _formatDuration(Duration(seconds: chapter.durationInSeconds!)) : '--:--';
         final subtitleText = "${book.author ?? 'Unknown Author'} • $durationText";

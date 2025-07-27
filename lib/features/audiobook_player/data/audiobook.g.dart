@@ -26,7 +26,7 @@ const AudiobookSchema = CollectionSchema(
       id: 1,
       name: r'chapters',
       type: IsarType.objectList,
-      target: r'Chapter',
+      target: r'AudiobookChapter',
     ),
     r'coverImageBytes': PropertySchema(
       id: 2,
@@ -80,7 +80,7 @@ const AudiobookSchema = CollectionSchema(
     )
   },
   links: {},
-  embeddedSchemas: {r'Chapter': ChapterSchema},
+  embeddedSchemas: {r'AudiobookChapter': AudiobookChapterSchema},
   getId: _audiobookGetId,
   getLinks: _audiobookGetLinks,
   attach: _audiobookAttach,
@@ -101,10 +101,11 @@ int _audiobookEstimateSize(
   }
   bytesCount += 3 + object.chapters.length * 3;
   {
-    final offsets = allOffsets[Chapter]!;
+    final offsets = allOffsets[AudiobookChapter]!;
     for (var i = 0; i < object.chapters.length; i++) {
       final value = object.chapters[i];
-      bytesCount += ChapterSchema.estimateSize(value, offsets, allOffsets);
+      bytesCount +=
+          AudiobookChapterSchema.estimateSize(value, offsets, allOffsets);
     }
   }
   {
@@ -130,10 +131,10 @@ void _audiobookSerialize(
   Map<Type, List<int>> allOffsets,
 ) {
   writer.writeString(offsets[0], object.author);
-  writer.writeObjectList<Chapter>(
+  writer.writeObjectList<AudiobookChapter>(
     offsets[1],
     allOffsets,
-    ChapterSchema.serialize,
+    AudiobookChapterSchema.serialize,
     object.chapters,
   );
   writer.writeByteList(offsets[2], object.coverImageBytes);
@@ -152,11 +153,11 @@ Audiobook _audiobookDeserialize(
 ) {
   final object = Audiobook();
   object.author = reader.readStringOrNull(offsets[0]);
-  object.chapters = reader.readObjectList<Chapter>(
+  object.chapters = reader.readObjectList<AudiobookChapter>(
         offsets[1],
-        ChapterSchema.deserialize,
+        AudiobookChapterSchema.deserialize,
         allOffsets,
-        Chapter(),
+        AudiobookChapter(),
       ) ??
       [];
   object.coverImageBytes = reader.readByteList(offsets[2]);
@@ -178,11 +179,11 @@ P _audiobookDeserializeProp<P>(
     case 0:
       return (reader.readStringOrNull(offset)) as P;
     case 1:
-      return (reader.readObjectList<Chapter>(
+      return (reader.readObjectList<AudiobookChapter>(
             offset,
-            ChapterSchema.deserialize,
+            AudiobookChapterSchema.deserialize,
             allOffsets,
-            Chapter(),
+            AudiobookChapter(),
           ) ??
           []) as P;
     case 2:
@@ -1314,7 +1315,7 @@ extension AudiobookQueryFilter
 extension AudiobookQueryObject
     on QueryBuilder<Audiobook, Audiobook, QFilterCondition> {
   QueryBuilder<Audiobook, Audiobook, QAfterFilterCondition> chaptersElement(
-      FilterQuery<Chapter> q) {
+      FilterQuery<AudiobookChapter> q) {
     return QueryBuilder.apply(this, (query) {
       return query.object(q, r'chapters');
     });
@@ -1557,7 +1558,8 @@ extension AudiobookQueryProperty
     });
   }
 
-  QueryBuilder<Audiobook, List<Chapter>, QQueryOperations> chaptersProperty() {
+  QueryBuilder<Audiobook, List<AudiobookChapter>, QQueryOperations>
+      chaptersProperty() {
     return QueryBuilder.apply(this, (query) {
       return query.addPropertyName(r'chapters');
     });
@@ -1610,9 +1612,9 @@ extension AudiobookQueryProperty
 // coverage:ignore-file
 // ignore_for_file: duplicate_ignore, non_constant_identifier_names, constant_identifier_names, invalid_use_of_protected_member, unnecessary_cast, prefer_const_constructors, lines_longer_than_80_chars, require_trailing_commas, inference_failure_on_function_invocation, unnecessary_parenthesis, unnecessary_raw_strings, unnecessary_null_checks, join_return_with_assignment, prefer_final_locals, avoid_js_rounded_ints, avoid_positional_boolean_parameters, always_specify_types
 
-const ChapterSchema = Schema(
-  name: r'Chapter',
-  id: -7604549436611156012,
+const AudiobookChapterSchema = Schema(
+  name: r'AudiobookChapter',
+  id: -4615321332316326064,
   properties: {
     r'durationInSeconds': PropertySchema(
       id: 0,
@@ -1640,14 +1642,14 @@ const ChapterSchema = Schema(
       type: IsarType.string,
     )
   },
-  estimateSize: _chapterEstimateSize,
-  serialize: _chapterSerialize,
-  deserialize: _chapterDeserialize,
-  deserializeProp: _chapterDeserializeProp,
+  estimateSize: _audiobookChapterEstimateSize,
+  serialize: _audiobookChapterSerialize,
+  deserialize: _audiobookChapterDeserialize,
+  deserializeProp: _audiobookChapterDeserializeProp,
 );
 
-int _chapterEstimateSize(
-  Chapter object,
+int _audiobookChapterEstimateSize(
+  AudiobookChapter object,
   List<int> offsets,
   Map<Type, List<int>> allOffsets,
 ) {
@@ -1673,8 +1675,8 @@ int _chapterEstimateSize(
   return bytesCount;
 }
 
-void _chapterSerialize(
-  Chapter object,
+void _audiobookChapterSerialize(
+  AudiobookChapter object,
   IsarWriter writer,
   List<int> offsets,
   Map<Type, List<int>> allOffsets,
@@ -1686,13 +1688,13 @@ void _chapterSerialize(
   writer.writeString(offsets[4], object.title);
 }
 
-Chapter _chapterDeserialize(
+AudiobookChapter _audiobookChapterDeserialize(
   Id id,
   IsarReader reader,
   List<int> offsets,
   Map<Type, List<int>> allOffsets,
 ) {
-  final object = Chapter();
+  final object = AudiobookChapter();
   object.durationInSeconds = reader.readLongOrNull(offsets[0]);
   object.filePath = reader.readStringOrNull(offsets[1]);
   object.lrsJsonPath = reader.readStringOrNull(offsets[2]);
@@ -1701,7 +1703,7 @@ Chapter _chapterDeserialize(
   return object;
 }
 
-P _chapterDeserializeProp<P>(
+P _audiobookChapterDeserializeProp<P>(
   IsarReader reader,
   int propertyId,
   int offset,
@@ -1723,9 +1725,9 @@ P _chapterDeserializeProp<P>(
   }
 }
 
-extension ChapterQueryFilter
-    on QueryBuilder<Chapter, Chapter, QFilterCondition> {
-  QueryBuilder<Chapter, Chapter, QAfterFilterCondition>
+extension AudiobookChapterQueryFilter
+    on QueryBuilder<AudiobookChapter, AudiobookChapter, QFilterCondition> {
+  QueryBuilder<AudiobookChapter, AudiobookChapter, QAfterFilterCondition>
       durationInSecondsIsNull() {
     return QueryBuilder.apply(this, (query) {
       return query.addFilterCondition(const FilterCondition.isNull(
@@ -1734,7 +1736,7 @@ extension ChapterQueryFilter
     });
   }
 
-  QueryBuilder<Chapter, Chapter, QAfterFilterCondition>
+  QueryBuilder<AudiobookChapter, AudiobookChapter, QAfterFilterCondition>
       durationInSecondsIsNotNull() {
     return QueryBuilder.apply(this, (query) {
       return query.addFilterCondition(const FilterCondition.isNotNull(
@@ -1743,7 +1745,7 @@ extension ChapterQueryFilter
     });
   }
 
-  QueryBuilder<Chapter, Chapter, QAfterFilterCondition>
+  QueryBuilder<AudiobookChapter, AudiobookChapter, QAfterFilterCondition>
       durationInSecondsEqualTo(int? value) {
     return QueryBuilder.apply(this, (query) {
       return query.addFilterCondition(FilterCondition.equalTo(
@@ -1753,7 +1755,7 @@ extension ChapterQueryFilter
     });
   }
 
-  QueryBuilder<Chapter, Chapter, QAfterFilterCondition>
+  QueryBuilder<AudiobookChapter, AudiobookChapter, QAfterFilterCondition>
       durationInSecondsGreaterThan(
     int? value, {
     bool include = false,
@@ -1767,7 +1769,7 @@ extension ChapterQueryFilter
     });
   }
 
-  QueryBuilder<Chapter, Chapter, QAfterFilterCondition>
+  QueryBuilder<AudiobookChapter, AudiobookChapter, QAfterFilterCondition>
       durationInSecondsLessThan(
     int? value, {
     bool include = false,
@@ -1781,7 +1783,7 @@ extension ChapterQueryFilter
     });
   }
 
-  QueryBuilder<Chapter, Chapter, QAfterFilterCondition>
+  QueryBuilder<AudiobookChapter, AudiobookChapter, QAfterFilterCondition>
       durationInSecondsBetween(
     int? lower,
     int? upper, {
@@ -1799,7 +1801,8 @@ extension ChapterQueryFilter
     });
   }
 
-  QueryBuilder<Chapter, Chapter, QAfterFilterCondition> filePathIsNull() {
+  QueryBuilder<AudiobookChapter, AudiobookChapter, QAfterFilterCondition>
+      filePathIsNull() {
     return QueryBuilder.apply(this, (query) {
       return query.addFilterCondition(const FilterCondition.isNull(
         property: r'filePath',
@@ -1807,7 +1810,8 @@ extension ChapterQueryFilter
     });
   }
 
-  QueryBuilder<Chapter, Chapter, QAfterFilterCondition> filePathIsNotNull() {
+  QueryBuilder<AudiobookChapter, AudiobookChapter, QAfterFilterCondition>
+      filePathIsNotNull() {
     return QueryBuilder.apply(this, (query) {
       return query.addFilterCondition(const FilterCondition.isNotNull(
         property: r'filePath',
@@ -1815,7 +1819,8 @@ extension ChapterQueryFilter
     });
   }
 
-  QueryBuilder<Chapter, Chapter, QAfterFilterCondition> filePathEqualTo(
+  QueryBuilder<AudiobookChapter, AudiobookChapter, QAfterFilterCondition>
+      filePathEqualTo(
     String? value, {
     bool caseSensitive = true,
   }) {
@@ -1828,7 +1833,8 @@ extension ChapterQueryFilter
     });
   }
 
-  QueryBuilder<Chapter, Chapter, QAfterFilterCondition> filePathGreaterThan(
+  QueryBuilder<AudiobookChapter, AudiobookChapter, QAfterFilterCondition>
+      filePathGreaterThan(
     String? value, {
     bool include = false,
     bool caseSensitive = true,
@@ -1843,7 +1849,8 @@ extension ChapterQueryFilter
     });
   }
 
-  QueryBuilder<Chapter, Chapter, QAfterFilterCondition> filePathLessThan(
+  QueryBuilder<AudiobookChapter, AudiobookChapter, QAfterFilterCondition>
+      filePathLessThan(
     String? value, {
     bool include = false,
     bool caseSensitive = true,
@@ -1858,7 +1865,8 @@ extension ChapterQueryFilter
     });
   }
 
-  QueryBuilder<Chapter, Chapter, QAfterFilterCondition> filePathBetween(
+  QueryBuilder<AudiobookChapter, AudiobookChapter, QAfterFilterCondition>
+      filePathBetween(
     String? lower,
     String? upper, {
     bool includeLower = true,
@@ -1877,7 +1885,8 @@ extension ChapterQueryFilter
     });
   }
 
-  QueryBuilder<Chapter, Chapter, QAfterFilterCondition> filePathStartsWith(
+  QueryBuilder<AudiobookChapter, AudiobookChapter, QAfterFilterCondition>
+      filePathStartsWith(
     String value, {
     bool caseSensitive = true,
   }) {
@@ -1890,7 +1899,8 @@ extension ChapterQueryFilter
     });
   }
 
-  QueryBuilder<Chapter, Chapter, QAfterFilterCondition> filePathEndsWith(
+  QueryBuilder<AudiobookChapter, AudiobookChapter, QAfterFilterCondition>
+      filePathEndsWith(
     String value, {
     bool caseSensitive = true,
   }) {
@@ -1903,9 +1913,8 @@ extension ChapterQueryFilter
     });
   }
 
-  QueryBuilder<Chapter, Chapter, QAfterFilterCondition> filePathContains(
-      String value,
-      {bool caseSensitive = true}) {
+  QueryBuilder<AudiobookChapter, AudiobookChapter, QAfterFilterCondition>
+      filePathContains(String value, {bool caseSensitive = true}) {
     return QueryBuilder.apply(this, (query) {
       return query.addFilterCondition(FilterCondition.contains(
         property: r'filePath',
@@ -1915,9 +1924,8 @@ extension ChapterQueryFilter
     });
   }
 
-  QueryBuilder<Chapter, Chapter, QAfterFilterCondition> filePathMatches(
-      String pattern,
-      {bool caseSensitive = true}) {
+  QueryBuilder<AudiobookChapter, AudiobookChapter, QAfterFilterCondition>
+      filePathMatches(String pattern, {bool caseSensitive = true}) {
     return QueryBuilder.apply(this, (query) {
       return query.addFilterCondition(FilterCondition.matches(
         property: r'filePath',
@@ -1927,7 +1935,8 @@ extension ChapterQueryFilter
     });
   }
 
-  QueryBuilder<Chapter, Chapter, QAfterFilterCondition> filePathIsEmpty() {
+  QueryBuilder<AudiobookChapter, AudiobookChapter, QAfterFilterCondition>
+      filePathIsEmpty() {
     return QueryBuilder.apply(this, (query) {
       return query.addFilterCondition(FilterCondition.equalTo(
         property: r'filePath',
@@ -1936,7 +1945,8 @@ extension ChapterQueryFilter
     });
   }
 
-  QueryBuilder<Chapter, Chapter, QAfterFilterCondition> filePathIsNotEmpty() {
+  QueryBuilder<AudiobookChapter, AudiobookChapter, QAfterFilterCondition>
+      filePathIsNotEmpty() {
     return QueryBuilder.apply(this, (query) {
       return query.addFilterCondition(FilterCondition.greaterThan(
         property: r'filePath',
@@ -1945,7 +1955,8 @@ extension ChapterQueryFilter
     });
   }
 
-  QueryBuilder<Chapter, Chapter, QAfterFilterCondition> lrsJsonPathIsNull() {
+  QueryBuilder<AudiobookChapter, AudiobookChapter, QAfterFilterCondition>
+      lrsJsonPathIsNull() {
     return QueryBuilder.apply(this, (query) {
       return query.addFilterCondition(const FilterCondition.isNull(
         property: r'lrsJsonPath',
@@ -1953,7 +1964,8 @@ extension ChapterQueryFilter
     });
   }
 
-  QueryBuilder<Chapter, Chapter, QAfterFilterCondition> lrsJsonPathIsNotNull() {
+  QueryBuilder<AudiobookChapter, AudiobookChapter, QAfterFilterCondition>
+      lrsJsonPathIsNotNull() {
     return QueryBuilder.apply(this, (query) {
       return query.addFilterCondition(const FilterCondition.isNotNull(
         property: r'lrsJsonPath',
@@ -1961,7 +1973,8 @@ extension ChapterQueryFilter
     });
   }
 
-  QueryBuilder<Chapter, Chapter, QAfterFilterCondition> lrsJsonPathEqualTo(
+  QueryBuilder<AudiobookChapter, AudiobookChapter, QAfterFilterCondition>
+      lrsJsonPathEqualTo(
     String? value, {
     bool caseSensitive = true,
   }) {
@@ -1974,7 +1987,8 @@ extension ChapterQueryFilter
     });
   }
 
-  QueryBuilder<Chapter, Chapter, QAfterFilterCondition> lrsJsonPathGreaterThan(
+  QueryBuilder<AudiobookChapter, AudiobookChapter, QAfterFilterCondition>
+      lrsJsonPathGreaterThan(
     String? value, {
     bool include = false,
     bool caseSensitive = true,
@@ -1989,7 +2003,8 @@ extension ChapterQueryFilter
     });
   }
 
-  QueryBuilder<Chapter, Chapter, QAfterFilterCondition> lrsJsonPathLessThan(
+  QueryBuilder<AudiobookChapter, AudiobookChapter, QAfterFilterCondition>
+      lrsJsonPathLessThan(
     String? value, {
     bool include = false,
     bool caseSensitive = true,
@@ -2004,7 +2019,8 @@ extension ChapterQueryFilter
     });
   }
 
-  QueryBuilder<Chapter, Chapter, QAfterFilterCondition> lrsJsonPathBetween(
+  QueryBuilder<AudiobookChapter, AudiobookChapter, QAfterFilterCondition>
+      lrsJsonPathBetween(
     String? lower,
     String? upper, {
     bool includeLower = true,
@@ -2023,7 +2039,8 @@ extension ChapterQueryFilter
     });
   }
 
-  QueryBuilder<Chapter, Chapter, QAfterFilterCondition> lrsJsonPathStartsWith(
+  QueryBuilder<AudiobookChapter, AudiobookChapter, QAfterFilterCondition>
+      lrsJsonPathStartsWith(
     String value, {
     bool caseSensitive = true,
   }) {
@@ -2036,7 +2053,8 @@ extension ChapterQueryFilter
     });
   }
 
-  QueryBuilder<Chapter, Chapter, QAfterFilterCondition> lrsJsonPathEndsWith(
+  QueryBuilder<AudiobookChapter, AudiobookChapter, QAfterFilterCondition>
+      lrsJsonPathEndsWith(
     String value, {
     bool caseSensitive = true,
   }) {
@@ -2049,9 +2067,8 @@ extension ChapterQueryFilter
     });
   }
 
-  QueryBuilder<Chapter, Chapter, QAfterFilterCondition> lrsJsonPathContains(
-      String value,
-      {bool caseSensitive = true}) {
+  QueryBuilder<AudiobookChapter, AudiobookChapter, QAfterFilterCondition>
+      lrsJsonPathContains(String value, {bool caseSensitive = true}) {
     return QueryBuilder.apply(this, (query) {
       return query.addFilterCondition(FilterCondition.contains(
         property: r'lrsJsonPath',
@@ -2061,9 +2078,8 @@ extension ChapterQueryFilter
     });
   }
 
-  QueryBuilder<Chapter, Chapter, QAfterFilterCondition> lrsJsonPathMatches(
-      String pattern,
-      {bool caseSensitive = true}) {
+  QueryBuilder<AudiobookChapter, AudiobookChapter, QAfterFilterCondition>
+      lrsJsonPathMatches(String pattern, {bool caseSensitive = true}) {
     return QueryBuilder.apply(this, (query) {
       return query.addFilterCondition(FilterCondition.matches(
         property: r'lrsJsonPath',
@@ -2073,7 +2089,8 @@ extension ChapterQueryFilter
     });
   }
 
-  QueryBuilder<Chapter, Chapter, QAfterFilterCondition> lrsJsonPathIsEmpty() {
+  QueryBuilder<AudiobookChapter, AudiobookChapter, QAfterFilterCondition>
+      lrsJsonPathIsEmpty() {
     return QueryBuilder.apply(this, (query) {
       return query.addFilterCondition(FilterCondition.equalTo(
         property: r'lrsJsonPath',
@@ -2082,7 +2099,7 @@ extension ChapterQueryFilter
     });
   }
 
-  QueryBuilder<Chapter, Chapter, QAfterFilterCondition>
+  QueryBuilder<AudiobookChapter, AudiobookChapter, QAfterFilterCondition>
       lrsJsonPathIsNotEmpty() {
     return QueryBuilder.apply(this, (query) {
       return query.addFilterCondition(FilterCondition.greaterThan(
@@ -2092,8 +2109,8 @@ extension ChapterQueryFilter
     });
   }
 
-  QueryBuilder<Chapter, Chapter, QAfterFilterCondition> sortOrderEqualTo(
-      int value) {
+  QueryBuilder<AudiobookChapter, AudiobookChapter, QAfterFilterCondition>
+      sortOrderEqualTo(int value) {
     return QueryBuilder.apply(this, (query) {
       return query.addFilterCondition(FilterCondition.equalTo(
         property: r'sortOrder',
@@ -2102,7 +2119,8 @@ extension ChapterQueryFilter
     });
   }
 
-  QueryBuilder<Chapter, Chapter, QAfterFilterCondition> sortOrderGreaterThan(
+  QueryBuilder<AudiobookChapter, AudiobookChapter, QAfterFilterCondition>
+      sortOrderGreaterThan(
     int value, {
     bool include = false,
   }) {
@@ -2115,7 +2133,8 @@ extension ChapterQueryFilter
     });
   }
 
-  QueryBuilder<Chapter, Chapter, QAfterFilterCondition> sortOrderLessThan(
+  QueryBuilder<AudiobookChapter, AudiobookChapter, QAfterFilterCondition>
+      sortOrderLessThan(
     int value, {
     bool include = false,
   }) {
@@ -2128,7 +2147,8 @@ extension ChapterQueryFilter
     });
   }
 
-  QueryBuilder<Chapter, Chapter, QAfterFilterCondition> sortOrderBetween(
+  QueryBuilder<AudiobookChapter, AudiobookChapter, QAfterFilterCondition>
+      sortOrderBetween(
     int lower,
     int upper, {
     bool includeLower = true,
@@ -2145,7 +2165,8 @@ extension ChapterQueryFilter
     });
   }
 
-  QueryBuilder<Chapter, Chapter, QAfterFilterCondition> titleIsNull() {
+  QueryBuilder<AudiobookChapter, AudiobookChapter, QAfterFilterCondition>
+      titleIsNull() {
     return QueryBuilder.apply(this, (query) {
       return query.addFilterCondition(const FilterCondition.isNull(
         property: r'title',
@@ -2153,7 +2174,8 @@ extension ChapterQueryFilter
     });
   }
 
-  QueryBuilder<Chapter, Chapter, QAfterFilterCondition> titleIsNotNull() {
+  QueryBuilder<AudiobookChapter, AudiobookChapter, QAfterFilterCondition>
+      titleIsNotNull() {
     return QueryBuilder.apply(this, (query) {
       return query.addFilterCondition(const FilterCondition.isNotNull(
         property: r'title',
@@ -2161,7 +2183,8 @@ extension ChapterQueryFilter
     });
   }
 
-  QueryBuilder<Chapter, Chapter, QAfterFilterCondition> titleEqualTo(
+  QueryBuilder<AudiobookChapter, AudiobookChapter, QAfterFilterCondition>
+      titleEqualTo(
     String? value, {
     bool caseSensitive = true,
   }) {
@@ -2174,7 +2197,8 @@ extension ChapterQueryFilter
     });
   }
 
-  QueryBuilder<Chapter, Chapter, QAfterFilterCondition> titleGreaterThan(
+  QueryBuilder<AudiobookChapter, AudiobookChapter, QAfterFilterCondition>
+      titleGreaterThan(
     String? value, {
     bool include = false,
     bool caseSensitive = true,
@@ -2189,7 +2213,8 @@ extension ChapterQueryFilter
     });
   }
 
-  QueryBuilder<Chapter, Chapter, QAfterFilterCondition> titleLessThan(
+  QueryBuilder<AudiobookChapter, AudiobookChapter, QAfterFilterCondition>
+      titleLessThan(
     String? value, {
     bool include = false,
     bool caseSensitive = true,
@@ -2204,7 +2229,8 @@ extension ChapterQueryFilter
     });
   }
 
-  QueryBuilder<Chapter, Chapter, QAfterFilterCondition> titleBetween(
+  QueryBuilder<AudiobookChapter, AudiobookChapter, QAfterFilterCondition>
+      titleBetween(
     String? lower,
     String? upper, {
     bool includeLower = true,
@@ -2223,7 +2249,8 @@ extension ChapterQueryFilter
     });
   }
 
-  QueryBuilder<Chapter, Chapter, QAfterFilterCondition> titleStartsWith(
+  QueryBuilder<AudiobookChapter, AudiobookChapter, QAfterFilterCondition>
+      titleStartsWith(
     String value, {
     bool caseSensitive = true,
   }) {
@@ -2236,7 +2263,8 @@ extension ChapterQueryFilter
     });
   }
 
-  QueryBuilder<Chapter, Chapter, QAfterFilterCondition> titleEndsWith(
+  QueryBuilder<AudiobookChapter, AudiobookChapter, QAfterFilterCondition>
+      titleEndsWith(
     String value, {
     bool caseSensitive = true,
   }) {
@@ -2249,9 +2277,8 @@ extension ChapterQueryFilter
     });
   }
 
-  QueryBuilder<Chapter, Chapter, QAfterFilterCondition> titleContains(
-      String value,
-      {bool caseSensitive = true}) {
+  QueryBuilder<AudiobookChapter, AudiobookChapter, QAfterFilterCondition>
+      titleContains(String value, {bool caseSensitive = true}) {
     return QueryBuilder.apply(this, (query) {
       return query.addFilterCondition(FilterCondition.contains(
         property: r'title',
@@ -2261,9 +2288,8 @@ extension ChapterQueryFilter
     });
   }
 
-  QueryBuilder<Chapter, Chapter, QAfterFilterCondition> titleMatches(
-      String pattern,
-      {bool caseSensitive = true}) {
+  QueryBuilder<AudiobookChapter, AudiobookChapter, QAfterFilterCondition>
+      titleMatches(String pattern, {bool caseSensitive = true}) {
     return QueryBuilder.apply(this, (query) {
       return query.addFilterCondition(FilterCondition.matches(
         property: r'title',
@@ -2273,7 +2299,8 @@ extension ChapterQueryFilter
     });
   }
 
-  QueryBuilder<Chapter, Chapter, QAfterFilterCondition> titleIsEmpty() {
+  QueryBuilder<AudiobookChapter, AudiobookChapter, QAfterFilterCondition>
+      titleIsEmpty() {
     return QueryBuilder.apply(this, (query) {
       return query.addFilterCondition(FilterCondition.equalTo(
         property: r'title',
@@ -2282,7 +2309,8 @@ extension ChapterQueryFilter
     });
   }
 
-  QueryBuilder<Chapter, Chapter, QAfterFilterCondition> titleIsNotEmpty() {
+  QueryBuilder<AudiobookChapter, AudiobookChapter, QAfterFilterCondition>
+      titleIsNotEmpty() {
     return QueryBuilder.apply(this, (query) {
       return query.addFilterCondition(FilterCondition.greaterThan(
         property: r'title',
@@ -2292,5 +2320,5 @@ extension ChapterQueryFilter
   }
 }
 
-extension ChapterQueryObject
-    on QueryBuilder<Chapter, Chapter, QFilterCondition> {}
+extension AudiobookChapterQueryObject
+    on QueryBuilder<AudiobookChapter, AudiobookChapter, QFilterCondition> {}

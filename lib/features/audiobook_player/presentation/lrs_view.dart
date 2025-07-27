@@ -1,3 +1,5 @@
+// lib/features/audiobook_player/presentation/lrs_view.dart
+
 import 'dart:async';
 import 'dart:io';
 import 'dart:convert';
@@ -49,57 +51,82 @@ class LrsView extends ConsumerStatefulWidget {
 }
 
 class _LrsViewState extends ConsumerState<LrsView> {
+  // Static cache to hold loaded data and persist across widget rebuilds.
+  static final Map<String, Future<LrsData?>> _cache = {};
+
+  // This is the magic number to tweak if highlighting is consistently ahead or behind.
+  // - A POSITIVE value (e.g., 150) makes the highlight appear EARLIER.
+  // - A NEGATIVE value (e.g., -100) makes the highlight appear LATER.
+  static const Duration _syncOffset = Duration(milliseconds: 150);
+
   Future<LrsData?>? _lrsDataFuture;
   int _currentWordIndex = -1;
   StreamSubscription? _positionSubscription;
 
-  // Use a scroll controller to automatically scroll the view
   final ScrollController _scrollController = ScrollController();
-  // Store global keys for each word to find its position
-  late List<GlobalKey> _wordKeys;
-
+  late List<GlobalKey> _wordKeys = [];
 
   @override
   void initState() {
     super.initState();
-    _lrsDataFuture = _loadLrsData();
+    _lrsDataFuture = _getCachedLrsData();
+
+    // Populate keys when the future completes, whether from cache or file.
+    _lrsDataFuture?.then((lrsData) {
+      if (lrsData != null && mounted) {
+        setState(() {
+          _wordKeys = List.generate(lrsData.words.length, (_) => GlobalKey());
+        });
+      }
+    });
+
     _subscribeToPlayerPosition();
   }
 
-  Future<LrsData?> _loadLrsData() async {
+  /// Gets the LRS data from the cache or loads it from the file if not present.
+  Future<LrsData?> _getCachedLrsData() {
+    if (_cache.containsKey(widget.lrsJsonPath)) {
+      print("✅ Loading LRS data from cache for: ${widget.lrsJsonPath}");
+      return _cache[widget.lrsJsonPath]!;
+    } else {
+      print("⚙️ Loading LRS data from file for: ${widget.lrsJsonPath}");
+      final future = _loadLrsDataFromFile();
+      _cache[widget.lrsJsonPath] = future;
+      return future;
+    }
+  }
+
+  /// Handles the actual file I/O and JSON parsing.
+  Future<LrsData?> _loadLrsDataFromFile() async {
     try {
       final file = File(widget.lrsJsonPath);
       final jsonString = await file.readAsString();
       final decodedJson = jsonDecode(jsonString);
-      final lrsData = LrsData.fromJson(decodedJson);
-
-      // Initialize a GlobalKey for each word
-      _wordKeys = List.generate(lrsData.words.length, (_) => GlobalKey());
-      return lrsData;
+      return LrsData.fromJson(decodedJson);
     } catch (e) {
-      print("Error loading or parsing LRS JSON: $e");
+      print("❌ Error loading or parsing LRS JSON: $e");
       return null;
     }
   }
 
+  /// Subscribes to the player's position and updates the highlighted word.
   void _subscribeToPlayerPosition() {
-    final playerState = ref.read(audiobookPlayerServiceProvider);
-
-    // We listen to the positionStream directly for efficient updates
     _positionSubscription = ref.read(audiobookPlayerServiceProvider.notifier)
         .positionStream
         .listen((position) {
       _lrsDataFuture?.then((lrsData) {
         if (lrsData == null || !mounted) return;
 
-        final currentMillis = position.inMilliseconds;
+        // Apply the sync offset to the player's current position.
+        final adjustedMillis = position.inMilliseconds + _syncOffset.inMilliseconds;
 
-        // Find the index of the word currently being spoken
-        // This is a simple linear search. For very long chapters, this could be optimized.
-        final newIndex = lrsData.words.indexWhere(
-              (word) => currentMillis >= word.start && currentMillis <= word.end,
+        // Find the index of the LAST word that has already started.
+        // This is robust and handles silent gaps between words correctly.
+        final newIndex = lrsData.words.lastIndexWhere(
+              (word) => word.start <= adjustedMillis,
         );
 
+        // Only update state and scroll if the highlighted word has changed.
         if (newIndex != -1 && newIndex != _currentWordIndex) {
           setState(() {
             _currentWordIndex = newIndex;
@@ -110,8 +137,9 @@ class _LrsViewState extends ConsumerState<LrsView> {
     });
   }
 
+  /// Scrolls the list to ensure the currently highlighted word is visible.
   void _scrollToCurrentWord() {
-    if (_currentWordIndex < 0 || _currentWordIndex >= _wordKeys.length) return;
+    if (_wordKeys.isEmpty || _currentWordIndex < 0 || _currentWordIndex >= _wordKeys.length) return;
 
     final key = _wordKeys[_currentWordIndex];
     if (key.currentContext != null) {
@@ -119,7 +147,7 @@ class _LrsViewState extends ConsumerState<LrsView> {
         key.currentContext!,
         duration: const Duration(milliseconds: 350),
         curve: Curves.easeInOut,
-        alignment: 0.5, // Center the word in the viewport
+        alignment: 0.5, // Center the word in the viewport.
       );
     }
   }
@@ -136,24 +164,33 @@ class _LrsViewState extends ConsumerState<LrsView> {
     return FutureBuilder<LrsData?>(
       future: _lrsDataFuture,
       builder: (context, snapshot) {
+        // Handle loading state
         if (snapshot.connectionState == ConnectionState.waiting) {
           return const Center(child: CircularProgressIndicator());
         }
-        if (snapshot.hasError || snapshot.data == null) {
+
+        // Handle error or no data
+        if (snapshot.hasError || !snapshot.hasData || snapshot.data == null) {
           return const Center(child: Text("Could not load script.", style: TextStyle(color: Colors.white70)));
         }
 
         final lrsData = snapshot.data!;
 
+        // Handle the brief moment before the keys are initialized after data is loaded
+        if (_wordKeys.isEmpty || _wordKeys.length != lrsData.words.length) {
+          return const Center(child: CircularProgressIndicator());
+        }
+
+        // Build the main content view
         return SingleChildScrollView(
           controller: _scrollController,
           padding: const EdgeInsets.all(20.0),
-          child: Wrap( // Wrap allows text to flow to the next line naturally
-            spacing: 6.0, // Horizontal space between words
-            runSpacing: 4.0, // Vertical space between lines
+          child: Wrap(
+            spacing: 6.0,
+            runSpacing: 4.0,
             children: List.generate(lrsData.words.length, (index) {
               return _WordWidget(
-                key: _wordKeys[index], // Assign the key
+                key: _wordKeys[index],
                 text: lrsData.words[index].text,
                 isHighlighted: index == _currentWordIndex,
               );

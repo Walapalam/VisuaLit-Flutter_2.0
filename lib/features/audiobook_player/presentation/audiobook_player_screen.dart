@@ -443,7 +443,7 @@ class _ChapterListTile extends ConsumerWidget {
             (s) => s.currentChapterIndex == index
     ));
 
-    final Chapter chapter = book.chapters[index];
+    final AudiobookChapter chapter = book.chapters[index];
     const Color accentColor = Color(0xFF1DB954);
 
     final durationText = chapter.durationInSeconds != null

@@ -125,7 +125,7 @@ class AudiobooksController extends StateNotifier<AsyncValue<List<Audiobook>>> {
       final jsonPath = p.setExtension(filePath, '.json');
       final jsonFile = File(jsonPath);
 
-      newBook.chapters.add(Chapter()
+      newBook.chapters.add(AudiobookChapter()
         ..filePath = filePath
         ..title = chapterTitle
         ..sortOrder = order++
@@ -154,7 +154,7 @@ class AudiobooksController extends StateNotifier<AsyncValue<List<Audiobook>>> {
     final jsonPath = p.setExtension(filePath, '.json');
     final jsonFile = File(jsonPath);
 
-    newBook.chapters.add(Chapter()
+    newBook.chapters.add(AudiobookChapter()
       ..filePath = filePath
       ..title = "Full Audiobook"
       ..sortOrder = 0

@@ -5,7 +5,6 @@ import 'dart:convert';
 import 'package:go_router/go_router.dart';
 import 'package:visualit/features/Cart/presentation/CartNotifier.dart';
 
-
 final gutenbergBooksProvider = FutureProvider<List<dynamic>>((ref) async {
   final response = await http.get(Uri.parse('https://gutendex.com/books/'));
   if (response.statusCode == 200) {
@@ -89,95 +88,122 @@ class _MarketplaceScreenState extends ConsumerState<MarketplaceScreen> {
 
               return GestureDetector(
                 onTap: () {
-                  showDialog(
+                  showModalBottomSheet(
                     context: context,
+                    isScrollControlled: true,
+                    shape: const RoundedRectangleBorder(
+                      borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+                    ),
                     builder: (context) {
-                      return AlertDialog(
-                        content: ConstrainedBox(
-                          constraints: BoxConstraints(
-                            maxWidth: MediaQuery.of(context).size.width * 0.8,
-                            maxHeight: MediaQuery.of(context).size.height * 0.5,
-                          ),
-                          child: SingleChildScrollView(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                // Book Cover
-                                Center(
-                                  child: coverUrl != null
-                                      ? Image.network(
-                                    coverUrl,
-                                    fit: BoxFit.cover,
-                                    height: 150,
-                                    errorBuilder: (context, error, stackTrace) {
-                                      return Container(
-                                        color: Colors.grey[800],
-                                        height: 150,
-                                        child: const Center(
-                                          child: Icon(Icons.book, size: 40),
+                      final authors = (book['authors'] as List?)?.map((a) => a['name']).join(', ') ?? 'Unknown Author';
+                      final publisher = book['publisher'] ?? 'Unknown Publisher';
+                      final description = book['description'] ?? '';
+
+                      return FractionallySizedBox(
+                        heightFactor: 0.5,
+                        child: Padding(
+                          padding: const EdgeInsets.all(16.0),
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Expanded(
+                                child: SingleChildScrollView(
+                                  child: Row(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      // Book Cover
+                                      coverUrl != null
+                                          ? ClipRRect(
+                                        borderRadius: BorderRadius.circular(8),
+                                        child: Image.network(
+                                          coverUrl,
+                                          width: 100,
+                                          height: 150,
+                                          fit: BoxFit.cover,
                                         ),
+                                      )
+                                          : Container(
+                                        width: 100,
+                                        height: 150,
+                                        color: Colors.grey[800],
+                                        child: const Icon(Icons.book, size: 40),
+                                      ),
+                                      const SizedBox(width: 16),
+                                      // Book Details
+                                      Expanded(
+                                        child: Column(
+                                          mainAxisAlignment: MainAxisAlignment.center,
+                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                          children: [
+                                            Center(
+                                              child: Text(
+                                                book['title'] ?? 'No Title',
+                                                textAlign: TextAlign.center,
+                                                style: const TextStyle(
+                                                  fontSize: 18,
+                                                  fontWeight: FontWeight.bold,
+                                                ),
+                                              ),
+                                            ),
+                                            const SizedBox(height: 8),
+                                            Text(
+                                              'Author: $authors',
+                                              style: const TextStyle(fontSize: 14),
+                                            ),
+                                            const SizedBox(height: 4),
+                                            Text(
+                                              'Publisher: $publisher',
+                                              style: const TextStyle(fontSize: 14),
+                                            ),
+                                            if (description.isNotEmpty) ...[
+                                              const SizedBox(height: 12),
+                                              Text(
+                                                description,
+                                                style: const TextStyle(fontSize: 13),
+                                                maxLines: 5,
+                                                overflow: TextOverflow.ellipsis,
+                                              ),
+                                            ],
+                                          ],
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                              // Buttons at the bottom
+                              Row(
+                                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                                children: [
+                                  ElevatedButton(
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: Colors.white,
+                                      foregroundColor: Colors.black,
+                                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                                    ),
+                                    onPressed: () {
+                                      ref.read(cartProvider.notifier).addBook(book, context);
+                                      Navigator.of(context).pop();
+                                    },
+                                    child: const Text('Add to Cart'),
+                                  ),
+                                  ElevatedButton(
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: Colors.white,
+                                      foregroundColor: Colors.black,
+                                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                                    ),
+                                    onPressed: () {
+                                      Navigator.of(context).pop();
+                                      ScaffoldMessenger.of(context).showSnackBar(
+                                        SnackBar(content: Text('Purchased ${book['title']}')),
                                       );
                                     },
-                                  )
-                                      : Container(
-                                    color: Colors.grey[800],
-                                    height: 150,
-                                    child: const Center(
-                                      child: Icon(Icons.book, size: 40),
-                                    ),
+                                    child: const Text('Buy'),
                                   ),
-                                ),
-                                const SizedBox(height: 16),
-                                // Book Title
-                                Text(
-                                  book['title'] ?? 'No Title',
-                                  style: const TextStyle(
-                                    fontSize: 18,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                                const SizedBox(height: 16),
-                                // Buttons
-                                Row(
-                                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                                  children: [
-                                    ElevatedButton(
-                                      style: ElevatedButton.styleFrom(
-                                        backgroundColor: Colors.white,
-                                        foregroundColor: Colors.black,
-                                        padding: const EdgeInsets.symmetric(
-                                          horizontal: 16,
-                                          vertical: 12,
-                                        ),
-                                      ),
-                                      onPressed: () {
-                                        ref.read(cartProvider.notifier).addBook(book, context);
-                                        Navigator.of(context).pop();
-                                      },
-                                      child: const Text('Add to Cart'),
-                                    ),
-                                    ElevatedButton(
-                                      style: ElevatedButton.styleFrom(
-                                        backgroundColor: Colors.white,
-                                        foregroundColor: Colors.black,
-                                        padding: const EdgeInsets.symmetric(
-                                          horizontal: 16,
-                                          vertical: 12,
-                                        ),
-                                      ),
-                                      onPressed: () {
-                                        Navigator.of(context).pop();
-                                        ScaffoldMessenger.of(context).showSnackBar(
-                                          SnackBar(content: Text('Purchased ${book['title']}')),
-                                        );
-                                      },
-                                      child: const Text('Buy'),
-                                    ),
-                                  ],
-                                ),
-                              ],
-                            ),
+                                ],
+                              ),
+                            ],
                           ),
                         ),
                       );

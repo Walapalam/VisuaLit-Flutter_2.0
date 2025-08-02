@@ -48,7 +48,7 @@ class LibraryScreen extends ConsumerWidget {
             padding: const EdgeInsets.all(12),
             gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
               crossAxisCount: 3,
-              childAspectRatio: 2 / 3,
+              childAspectRatio: 2 / 3.5, // Make cards longer (was 2/3)
               crossAxisSpacing: 10,
               mainAxisSpacing: 10,
             ),
@@ -157,46 +157,48 @@ class LibraryScreen extends ConsumerWidget {
                   elevation: 4,
                   child: Column(
                     children: [
-                      Stack(
-                        children: [
-                          Positioned.fill(
-                            child: book.coverImageBytes != null
-                                ? Image.memory(
-                              Uint8List.fromList(book.coverImageBytes!),
-                              fit: BoxFit.cover,
-                              width: double.infinity,
-                              errorBuilder: (context, error, stackTrace) {
-                                return Container(
-                                  color: Colors.grey[800],
-                                  child: const Center(
-                                      child: Icon(Icons.book, size: 40)),
-                                );
-                              },
-                            )
-                                : Container(
-                              color: Colors.grey[800],
-                              child: const Center(
-                                  child: Icon(Icons.book, size: 40)),
+                      SizedBox(
+                        height: 120, // Set a fixed height for the cover image area
+                        width: double.infinity,
+                        child: Stack(
+                          children: [
+                            Positioned.fill(
+                              child: book.coverImageBytes != null
+                                  ? Image.memory(
+                                      Uint8List.fromList(book.coverImageBytes!),
+                                      fit: BoxFit.cover,
+                                      width: double.infinity,
+                                      errorBuilder: (context, error, stackTrace) {
+                                        return Container(
+                                          color: Colors.grey[800],
+                                          child: const Center(child: Icon(Icons.book, size: 40)),
+                                        );
+                                      },
+                                    )
+                                  : Container(
+                                      color: Colors.grey[800],
+                                      child: const Center(child: Icon(Icons.book, size: 40)),
+                                    ),
                             ),
-                          ),
-                          if (book.status == ProcessingStatus.error)
-                            Positioned(
-                              top: 0,
-                              right: 0,
-                              child: Container(
-                                padding: const EdgeInsets.all(4),
-                                decoration: BoxDecoration(
-                                  color: book.failedPermanently ? Colors.black : Colors.red,
-                                  shape: BoxShape.circle,
-                                ),
-                                child: Icon(
-                                  book.failedPermanently ? Icons.block : Icons.error_outline,
-                                  color: Colors.white,
-                                  size: 16,
+                            if (book.status == ProcessingStatus.error)
+                              Positioned(
+                                top: 0,
+                                right: 0,
+                                child: Container(
+                                  padding: const EdgeInsets.all(4),
+                                  decoration: BoxDecoration(
+                                    color: book.failedPermanently ? Colors.black : Colors.red,
+                                    shape: BoxShape.circle,
+                                  ),
+                                  child: Icon(
+                                    book.failedPermanently ? Icons.block : Icons.error_outline,
+                                    color: Colors.white,
+                                    size: 16,
+                                  ),
                                 ),
                               ),
-                            ),
-                        ],
+                          ],
+                        ),
                       ),
                       Padding(
                         padding: const EdgeInsets.all(8.0),

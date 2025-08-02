@@ -1,9 +1,10 @@
-
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:visualit/features/audiobook_player/presentation/audiobooks_screen.dart';
 import 'package:visualit/features/auth/presentation/auth_controller.dart';
 import 'package:visualit/features/auth/presentation/login_screen.dart';
+import 'package:visualit/features/auth/presentation/signup_screen.dart';
 import 'package:visualit/features/auth/presentation/onboarding_screen.dart';
 import 'package:visualit/features/auth/presentation/signup_screen.dart';
 import 'package:visualit/features/auth/presentation/splash_screen.dart';
@@ -17,6 +18,7 @@ import 'package:visualit/features/reader/presentation/reading_screen.dart';
 import 'package:visualit/features/audiobook_player/presentation/audiobook_player_screen.dart';
 import 'package:visualit/main.dart';
 
+import '../../features/audiobook_player/presentation/audiobook_player_screen.dart';
 import '../../features/auth/presentation/splash_screen.dart';
 import '../../features/reader/presentation/reading_screen.dart';
 import 'package:visualit/features/marketplace/presentation/marketplace_screen.dart';

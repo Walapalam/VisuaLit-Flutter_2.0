@@ -243,6 +243,7 @@ class BookOverviewDialog extends ConsumerWidget {
 
     return SizedBox(
       width: 150,
+      height: 220,
       child: LiquidGlassContainer(
         padding: const EdgeInsets.all(8.0),
         backgroundColor: Colors.white.withOpacity(0.1),

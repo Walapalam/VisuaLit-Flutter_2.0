@@ -18,6 +18,37 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   bool _obscurePassword = true;
 
   @override
+  void initState() {
+    super.initState();
+
+    // More specific listener to prevent errors being missed
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      ref.listenManual(authControllerProvider, (previous, current) {
+        // Only show error if we have an error message and we're not in loading state
+        if (current.errorMessage != null &&
+            current.status == AuthStatus.unauthenticated &&
+            mounted) {
+          // Add a slight delay to ensure UI is ready
+          Future.delayed(Duration(milliseconds: 100), () {
+            if (mounted) {
+              ScaffoldMessenger.of(context).clearSnackBars();
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text(current.errorMessage!),
+                  backgroundColor: Colors.red,
+                  duration: Duration(seconds: 3),
+                  behavior: SnackBarBehavior.floating,
+                  margin: EdgeInsets.all(8),
+                ),
+              );
+            }
+          });
+        }
+      });
+    });
+  }
+
+  @override
   void dispose() {
     _emailController.dispose();
     _passwordController.dispose();
@@ -35,14 +66,6 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 
   @override
   Widget build(BuildContext context) {
-    ref.listen<AuthState>(authControllerProvider, (previous, next) {
-      if (next.errorMessage != null && mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(next.errorMessage!), backgroundColor: Colors.red),
-        );
-      }
-    });
-
     final authState = ref.watch(authControllerProvider);
     final isLoading = authState.status == AuthStatus.loading;
 

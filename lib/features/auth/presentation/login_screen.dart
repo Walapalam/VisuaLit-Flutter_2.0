@@ -35,15 +35,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 
   @override
   Widget build(BuildContext context) {
-    ref.listen<AuthState>(authControllerProvider, (previous, next) {
-      if (next.errorMessage != null && mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(next.errorMessage!), backgroundColor: Colors.red),
-        );
-      }
-    });
-
     final authState = ref.watch(authControllerProvider);
+    debugPrint('Auth status: ${authState.status}');
+
     final isLoading = authState.status == AuthStatus.loading;
 
     return Scaffold(
@@ -127,23 +121,38 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                     },
                   ),
                   const SizedBox(height: 8),
-                  Align(
-                    alignment: Alignment.centerRight,
-                    child: TextButton(
-                      onPressed: isLoading
-                          ? null
-                          : () {
-                        // TODO: Implement forgot password functionality
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('Forgot password feature coming soon!')),
-                        );
-                      },
-                      child: const Text(
-                        'Forgot Password?',
-                        style: TextStyle(color: AppTheme.primaryGreen),
+                  Row(
+                    children: [
+                      if (authState.status == AuthStatus.invalidLogin && authState.errorMessage != null)
+                        Flexible(
+                          child: Padding(
+                            padding: const EdgeInsets.only(left: 5,right: 0.0),
+                            child: Text(
+                              "Email or password is incorrect.",
+                              style: const TextStyle(color: Colors.red, fontSize: 10),
+                              softWrap: true,
+                              overflow: TextOverflow.ellipsis,
+                              maxLines: 2,
+                            ),
+                          ),
+                        ),
+                      const Spacer(),
+                      TextButton(
+                        onPressed: isLoading
+                            ? null
+                            : () {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text('Forgot password feature coming soon!')),
+                          );
+                        },
+                        child: const Text(
+                          'Forgot Password?',
+                          style: TextStyle(color: AppTheme.primaryGreen),
+                        ),
                       ),
-                    ),
+                    ],
                   ),
+                  // ... rest of your code ...
                   const SizedBox(height: 16),
                   ElevatedButton(
                     style: ElevatedButton.styleFrom(

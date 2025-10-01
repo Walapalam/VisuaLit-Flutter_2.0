@@ -11,11 +11,11 @@ final authControllerProvider = StateNotifierProvider<AuthController, AuthState>(
   return AuthController(authRepository: authRepository, ref: ref);
 });
 
-enum AuthStatus { initial, loading, authenticated, guest, offlineGuest, unauthenticated }
+enum AuthStatus { initial, loading, authenticated, guest, offlineGuest, unauthenticated, invalidLogin }
 
 class AuthState {
   final AuthStatus status;
-  final User? user; // Use Firebase User
+  final User? user;
   final String? errorMessage;
 
   AuthState({
@@ -93,11 +93,25 @@ class AuthController extends StateNotifier<AuthState> {
       await _authRepository.login(email: email, password: password);
       log('[AuthController] login() success');
       await initialize();
-    } on AppwriteException catch (e) {
+    } on FirebaseAuthException catch (e) {
+      log('[AuthController] login() failed: $e');
+      String message;
+      if (e.code == 'wrong-password') {
+        message = 'Incorrect password. Please try again.';
+      } else if (e.code == 'user-not-found') {
+        message = 'No user found for that email.';
+      } else {
+        message = e.message ?? 'Login failed. Please try again.';
+      }
+      state = state.copyWith(
+        status: AuthStatus.invalidLogin,
+        errorMessage: message,
+      );
+    } catch (e) {
       log('[AuthController] login() failed: $e');
       state = state.copyWith(
-        status: AuthStatus.unauthenticated,
-        errorMessage: parseAppwriteException(e),
+        status: AuthStatus.invalidLogin,
+        errorMessage: 'Login failed. Please try again.',
       );
     }
   }

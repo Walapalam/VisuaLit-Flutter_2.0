@@ -127,6 +127,11 @@ final goRouterProvider = Provider<GoRouter>((ref) {
         return '/home';
       }*/
 
+      // If invalidLogin, stay on /login
+      if (status == AuthStatus.invalidLogin && location != '/login') {
+        return '/login';
+      }
+
       if ((status == AuthStatus.authenticated || status == AuthStatus.guest) &&
           publicRoutes.contains(location)) {
         return '/home';

@@ -128,12 +128,11 @@ class AppDrawer extends ConsumerWidget {
           ),
           const Divider(color: AppTheme.grey),
           // Conditionally show Login or Logout based on auth state.
-          if (authState.status == AuthStatus.authenticated)
+          if (authState.status == AuthStatus.authenticated || authState.status == AuthStatus.guest)
             ListTile(
               leading: const Icon(Icons.logout),
               title: const Text('Logout'),
               onTap: () {
-                // Close the drawer first, then log out.
                 Navigator.of(context).pop();
                 ref.read(authControllerProvider.notifier).logout();
               },
@@ -143,7 +142,6 @@ class AppDrawer extends ConsumerWidget {
               leading: const Icon(Icons.login),
               title: const Text('Login'),
               onTap: () {
-                // This will be handled by the router redirect, just close the drawer.
                 Navigator.of(context).pop();
                 context.goNamed('login', extra: true);
               },

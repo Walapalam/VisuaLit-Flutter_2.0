@@ -120,7 +120,18 @@ final goRouterProvider = Provider<GoRouter>((ref) {
         return '/splash';
       }
 
+      /*
       // If authenticated or guest, redirect to home from public routes
+      if ((status == AuthStatus.authenticated || status == AuthStatus.guest || status == AuthStatus.offlineGuest) &&
+          publicRoutes.contains(location)) {
+        return '/home';
+      }*/
+
+      // If invalidLogin, stay on /login
+      if (status == AuthStatus.invalidLogin && location != '/login' && location != '/onboarding') {
+        return '/login';
+      }
+
       if ((status == AuthStatus.authenticated || status == AuthStatus.guest) &&
           publicRoutes.contains(location)) {
         return '/home';

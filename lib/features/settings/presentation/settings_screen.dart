@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
                 import 'package:visualit/core/services/sync_service.dart';
                 import 'package:visualit/core/theme/theme_controller.dart';
                 import 'package:visualit/shared_widgets/sync_status_indicator.dart';
+                import 'package:visualit/core/services/connectivity_provider.dart';
 
                 class SettingsScreen extends ConsumerWidget {
                   const SettingsScreen({super.key});
@@ -62,7 +63,7 @@ import 'package:flutter/material.dart';
                                 if ((authState.status == AuthStatus.authenticated || authState.status == AuthStatus.guest) && user != null)
                                   ..._buildAuthenticatedAccountItems(context, ref, user)
                                 else
-                                  _buildGuestAccountItem(context),
+                                  _buildGuestAccountItem(context, ref),
                               ],
                             ),
 
@@ -193,14 +194,26 @@ import 'package:flutter/material.dart';
                     ];
                   }
 
-                  Widget _buildGuestAccountItem(BuildContext context) {
+                  Widget _buildGuestAccountItem(BuildContext context, WidgetRef ref) {
+                    final isOnline = ref.watch(isOnlineProvider);
                     return ListTile(
                       leading: const Icon(Icons.no_accounts, color: Colors.grey),
                       title: const Text('You are browsing as a guest'),
                       subtitle: const Text('Log in to sync your data across devices'),
                       trailing: TextButton(
                         child: const Text('Sign In'),
-                        onPressed: () => context.goNamed('login'),
+                        onPressed: () {
+                          if (isOnline) {
+                            context.goNamed('login');
+                          } else {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text('Login is not possible without internet connection.'),
+                                backgroundColor: Colors.red,
+                              ),
+                            );
+                          }
+                        },
                       ),
                       contentPadding: const EdgeInsets.symmetric(horizontal: 16.0),
                     );

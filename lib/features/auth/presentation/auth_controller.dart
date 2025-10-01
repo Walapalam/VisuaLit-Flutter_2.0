@@ -1,8 +1,8 @@
 import 'package:appwrite/appwrite.dart';
-import 'package:appwrite/models.dart' as models;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:visualit/core/utils/error_parser.dart';
 import 'package:visualit/features/auth/data/auth_repository.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
 final authControllerProvider = StateNotifierProvider<AuthController, AuthState>((ref) {
   final authRepository = ref.watch(authRepositoryProvider);
@@ -13,7 +13,7 @@ enum AuthStatus { initial, loading, authenticated, guest, unauthenticated }
 
 class AuthState {
   final AuthStatus status;
-  final models.User? user;
+  final User? user; // Use Firebase User
   final String? errorMessage;
 
   AuthState({
@@ -24,7 +24,7 @@ class AuthState {
 
   AuthState copyWith({
     AuthStatus? status,
-    models.User? user,
+    User? user,
     bool clearUser = false,
     String? errorMessage,
     bool clearError = false,
@@ -49,7 +49,7 @@ class AuthController extends StateNotifier<AuthState> {
     try {
       final user = await _authRepository.getCurrentUser();
       if (user != null) {
-        final status = user.email.isEmpty ? AuthStatus.guest : AuthStatus.authenticated;
+        final status = (user.email?.isEmpty ?? true) ? AuthStatus.guest : AuthStatus.authenticated;
         state = state.copyWith(status: status, user: user);
       } else {
         state = state.copyWith(status: AuthStatus.unauthenticated, clearUser: true);

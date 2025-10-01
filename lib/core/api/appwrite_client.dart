@@ -3,6 +3,7 @@
 import 'package:appwrite/appwrite.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
 // This file sets up the Appwrite client and provides its services
 // to the rest of the app using Riverpod.
@@ -36,6 +37,11 @@ final appwriteAccountProvider = Provider<Account>((ref) {
   // Watch the appwriteClientProvider. If it changes, this provider will rebuild.
   final client = ref.watch(appwriteClientProvider);
   return Account(client);
+});
+
+// New Firebase Auth provider
+final firebaseAuthProvider = Provider<FirebaseAuth>((ref) {
+  return FirebaseAuth.instance;
 });
 
 // Provider for the Appwrite Databases service.

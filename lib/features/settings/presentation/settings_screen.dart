@@ -172,8 +172,8 @@ import 'package:flutter/material.dart';
                     return [
                       ListTile(
                         leading: const CircleAvatar(child: Icon(Icons.person)),
-                        title: Text(user.name, style: const TextStyle(fontWeight: FontWeight.bold)),
-                        subtitle: Text(user.email),
+                        title: Text(user.displayName ?? 'No Name', style: const TextStyle(fontWeight: FontWeight.bold)),
+                        subtitle: Text(user.email ?? 'No Email'),
                         contentPadding: const EdgeInsets.symmetric(horizontal: 16.0),
                       ),
                       const Divider(height: 1),
@@ -181,7 +181,7 @@ import 'package:flutter/material.dart';
                         context,
                         'Account Settings',
                         Icons.manage_accounts_outlined,
-                        () => Navigator.pushNamed(context, '/account-settings'),
+                            () => Navigator.pushNamed(context, '/account-settings'),
                       ),
                       const Divider(height: 1),
                       ListTile(

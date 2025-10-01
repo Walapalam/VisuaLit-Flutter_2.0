@@ -3,7 +3,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:visualit/core/theme/app_theme.dart';
 import 'package:visualit/features/auth/presentation/auth_controller.dart';
 import 'package:go_router/go_router.dart';
-import 'package:visualit/core/theme/app_theme.dart';
 
 class AppDrawer extends ConsumerWidget {
   const AppDrawer({super.key});
@@ -22,17 +21,14 @@ class AppDrawer extends ConsumerWidget {
           // A pre-styled header for displaying user info.
           UserAccountsDrawerHeader(
             accountName: Text(
-              user?.name ?? 'Guest User',
+              user?.displayName ?? 'Guest User',
               style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18, color: AppTheme.white),
             ),
             accountEmail: Text(user?.email ?? 'Sign in for full features'),
-            decoration: const BoxDecoration(
-              color: AppTheme.black,
-            ),
             currentAccountPicture: CircleAvatar(
               backgroundColor: AppTheme.primaryGreen,
               child: Text(
-                user?.name.isNotEmpty == true ? user!.name[0].toUpperCase() : 'G',
+                user?.displayName?.isNotEmpty == true ? user!.displayName![0].toUpperCase() : 'G',
                 style: const TextStyle(fontSize: 40.0, color: AppTheme.black),
               ),
             ),

@@ -4,6 +4,7 @@
 
 list(APPEND FLUTTER_PLUGIN_LIST
   desktop_webview_window
+  firebase_auth
   firebase_core
   isar_flutter_libs
   permission_handler_windows

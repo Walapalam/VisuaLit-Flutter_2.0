@@ -128,7 +128,7 @@ final goRouterProvider = Provider<GoRouter>((ref) {
       }*/
 
       // If invalidLogin, stay on /login
-      if (status == AuthStatus.invalidLogin && location != '/login') {
+      if (status == AuthStatus.invalidLogin && location != '/login' && location != '/onboarding') {
         return '/login';
       }
 

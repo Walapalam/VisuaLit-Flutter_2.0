@@ -121,7 +121,7 @@ final goRouterProvider = Provider<GoRouter>((ref) {
       }
 
       // If authenticated or guest, redirect to home from public routes
-      if ((status == AuthStatus.authenticated || status == AuthStatus.guest) &&
+      if ((status == AuthStatus.authenticated || status == AuthStatus.guest || status == AuthStatus.offlineGuest) &&
           publicRoutes.contains(location)) {
         return '/home';
       }

@@ -1,3 +1,5 @@
+import java.util.Properties
+
 plugins {
     id("com.android.application")
     // START: FlutterFire Configuration
@@ -7,6 +9,14 @@ plugins {
     id("dev.flutter.flutter-gradle-plugin")
     // Add the Crashlytics Gradle plugin
     id("com.google.firebase.crashlytics")
+}
+
+// Load properties from key.properties file
+val keystorePropertiesFile = rootProject.file("key.properties")
+val keystoreProperties = Properties() // CORRECTED: No need for 'java.util' after importing
+if (keystorePropertiesFile.exists()) {
+    // CORRECTED: Fixed the typo from 'keystreamPropertiesFile' to 'keystorePropertiesFile'
+    keystoreProperties.load(keystorePropertiesFile.inputStream())
 }
 
 android {
@@ -33,9 +43,24 @@ android {
         multiDexEnabled = true
     }
 
+    signingConfigs {
+        create("release") {
+            if (keystoreProperties.containsKey("storeFile")) {
+                storeFile = file(keystoreProperties["storeFile"] as String)
+                storePassword = keystoreProperties["storePassword"] as String
+                keyAlias = keystoreProperties["keyAlias"] as String
+                keyPassword = keystoreProperties["keyPassword"] as String
+            }
+        }
+    }
+
     buildTypes {
-        release {
-            signingConfig = signingConfigs.getByName("debug")
+        getByName("release") {
+            isMinifyEnabled = true // Recommended for release builds
+            isShrinkResources = true // Recommended for release builds
+            proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
+
+            signingConfig = signingConfigs.getByName("release")
         }
     }
 }

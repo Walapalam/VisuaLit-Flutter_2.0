@@ -1,3 +1,4 @@
+
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:visualit/core/utils/error_parser.dart';
@@ -5,12 +6,21 @@ import 'package:visualit/features/auth/data/auth_repository.dart';
 import 'package:flutter/foundation.dart'; // Add this import for debugPrint
 
 
+import 'dart:developer';
+import 'package:appwrite/appwrite.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:visualit/core/utils/error_parser.dart';
+import 'package:visualit/features/auth/data/auth_repository.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:visualit/core/services/connectivity_provider.dart';
+
+
 final authControllerProvider = StateNotifierProvider<AuthController, AuthState>((ref) {
   final authRepository = ref.watch(authRepositoryProvider);
-  return AuthController(authRepository: authRepository);
+  return AuthController(authRepository: authRepository, ref: ref);
 });
 
-enum AuthStatus { initial, loading, authenticated, guest, unauthenticated }
+enum AuthStatus { initial, loading, authenticated, guest, offlineGuest, unauthenticated, invalidLogin }
 
 class AuthState {
   final AuthStatus status;
@@ -45,22 +55,37 @@ class AuthState {
 
 class AuthController extends StateNotifier<AuthState> {
   final AuthRepository _authRepository;
+  final Ref _ref;
 
-  AuthController({required AuthRepository authRepository})
+  AuthController({required AuthRepository authRepository, required Ref ref})
       : _authRepository = authRepository,
+        _ref = ref,
         super(AuthState());
 
   Future<void> initialize() async {
+    log('[AuthController] initialize() called');
     state = state.copyWith(status: AuthStatus.loading);
+    final isOnline = _ref.read(isOnlineProvider);
+    log('[AuthController] isOnline: $isOnline');
+
+    if (!isOnline) {
+      log('[AuthController] No internet, setting offlineGuest');
+      state = state.copyWith(status: AuthStatus.offlineGuest, user: null);
+      return;
+    }
+
     try {
       final user = await _authRepository.getCurrentUser();
+      log('[AuthController] getCurrentUser: $user');
       if (user != null) {
         final status = user.isAnonymous ? AuthStatus.guest : AuthStatus.authenticated;
         state = state.copyWith(status: status, user: user);
       } else {
+        log('[AuthController] No user found, unauthenticated');
         state = state.copyWith(status: AuthStatus.unauthenticated, clearUser: true);
       }
     } catch (e) {
+      log('[AuthController] Exception in initialize: $e');
       state = state.copyWith(
         status: AuthStatus.unauthenticated,
         clearUser: true,
@@ -70,10 +95,12 @@ class AuthController extends StateNotifier<AuthState> {
   }
 
   void _startLoading() {
+    log('[AuthController] _startLoading()');
     state = state.copyWith(status: AuthStatus.loading, clearError: true);
   }
 
   Future<void> login(String email, String password) async {
+    log('[AuthController] login() called with email: $email');
     _startLoading();
     try {
       final userCredential = await _authRepository.login(email: email, password: password);
@@ -115,6 +142,7 @@ class AuthController extends StateNotifier<AuthState> {
   }
 
   Future<void> signUp(String name, String email, String password) async {
+    log('[AuthController] signUp() called with email: $email');
     _startLoading();
     try {
       debugPrint("Attempting signup for: $email");
@@ -161,9 +189,11 @@ class AuthController extends StateNotifier<AuthState> {
   }
 
   Future<void> logout() async {
+    log('[AuthController] logout() called');
     _startLoading();
     try {
       await _authRepository.logout();
+      log('[AuthController] logout() success');
       state = state.copyWith(status: AuthStatus.unauthenticated, clearUser: true);
     } catch (e) {
       state = state.copyWith(
@@ -173,6 +203,7 @@ class AuthController extends StateNotifier<AuthState> {
   }
 
   Future<void> signInAsGuest() async {
+    log('[AuthController] signInAsGuest() called');
     _startLoading();
     try {
       final userCredential = await _authRepository.signInAnonymously();
@@ -189,6 +220,7 @@ class AuthController extends StateNotifier<AuthState> {
   }
 
   Future<void> signInWithGoogle() async {
+    log('[AuthController] signInWithGoogle() called');
     _startLoading();
     try {
       final userCredential = await _authRepository.signInWithGoogle();

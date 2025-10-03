@@ -15,6 +15,9 @@ import 'package:html/parser.dart' as html_parser;
 import 'package:html/dom.dart' as dom;
 import 'package:path/path.dart' as p;
 import 'package:visualit/core/models/book.dart';
+import 'package:path_provider/path_provider.dart';
+import 'dart:async';
+import 'dart:io';
 
 
 final localLibraryServiceProvider = Provider<LocalLibraryService>((ref) {
@@ -36,14 +39,62 @@ class LibraryController extends StateNotifier<AsyncValue<List<db.Book>>> {
   final Isar _isar;
   final BackgroundTaskQueue _backgroundTaskQueue; // Retained as per your original file
 
-  LibraryController(this._localLibraryService, this._isar, this._backgroundTaskQueue) : super(const AsyncValue.loading()) {
+  Timer? _folderWatcherTimer;
+  List<String> _lastSeenFiles = [];
+
+  LibraryController(this._localLibraryService, this._isar, this._backgroundTaskQueue)
+      : super(const AsyncValue.loading()) {
     print("✅ [LibraryController] Initialized.");
     loadBooksFromDb();
+    _startFolderWatcher();
 
-    // Listen to task status changes
     _backgroundTaskQueue.taskStream.listen((_) {
-      loadBooksFromDb(); // Reload books when tasks change status
+      loadBooksFromDb();
     });
+  }
+
+  @override
+  void dispose() {
+    _folderWatcherTimer?.cancel();
+    super.dispose();
+  }
+
+  void _startFolderWatcher() {
+    _folderWatcherTimer?.cancel();
+    _folderWatcherTimer = Timer.periodic(const Duration(seconds: 5), (_) async {
+      final files = await _getEpubFilesInVisuaLit();
+      final filePaths = files.map((f) => f.path).toList()..sort();
+      if (filePaths.toString() != _lastSeenFiles.toString()) {
+        _lastSeenFiles = filePaths;
+        await loadBooksFromDb();
+      }
+    });
+  }
+
+  Future<List<File>> _getEpubFilesInVisuaLit() async {
+    Directory? visuaLitDir;
+    if (Platform.isAndroid) {
+      visuaLitDir = Directory('/storage/emulated/0/Download/VisuaLit');
+    } else {
+      final downloads = await getDownloadsDirectory();
+      if (downloads == null) return [];
+      visuaLitDir = Directory('${downloads.path}/VisuaLit');
+    }
+    if (!await visuaLitDir.exists()) return [];
+    return visuaLitDir
+        .listSync()
+        .whereType<File>()
+        .where((f) => f.path.toLowerCase().endsWith('.epub'))
+        .toList();
+  }
+
+  /// Manually triggers a re-scan of the VisuaLit folder for new EPUB files.
+  Future<void> rescanVisuaLitFolder() async {
+    final files = await _getEpubFilesInVisuaLit();
+    // You may want to filter out files already in the DB to avoid duplicates.
+    await _processFiles(
+        await Future.wait(files.map((f) async => PickedFileData(path: f.path, bytes: await f.readAsBytes())))
+    );
   }
 
   Future<void> loadBooksFromDb() async {

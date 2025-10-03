@@ -25,9 +25,6 @@ class AppDrawer extends ConsumerWidget {
               style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18, color: AppTheme.white),
             ),
             accountEmail: Text(user?.email ?? 'Sign in for full features'),
-            decoration: const BoxDecoration(
-              color: AppTheme.black,
-            ),
             currentAccountPicture: CircleAvatar(
               backgroundColor: AppTheme.primaryGreen,
               child: Text(
@@ -57,7 +54,6 @@ class AppDrawer extends ConsumerWidget {
               leading: const Icon(Icons.logout),
               title: const Text('Logout'),
               onTap: () {
-                // Close the drawer first, then log out.
                 Navigator.of(context).pop();
                 ref.read(authControllerProvider.notifier).logout();
               },

@@ -10,10 +10,20 @@ class OnboardingScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     ref.listen<AuthState>(authControllerProvider, (previous, next) {
-      if (next.errorMessage != null) {
+      // Only show error messages if we're unauthenticated with an error
+      if (next.errorMessage != null && next.status == AuthStatus.unauthenticated) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(next.errorMessage!), backgroundColor: Colors.red),
+          SnackBar(
+            content: Text(next.errorMessage!),
+            backgroundColor: Colors.red,
+            behavior: SnackBarBehavior.floating,
+          ),
         );
+      }
+
+      // Navigate to home when guest sign-in is successful
+      if (previous?.status != AuthStatus.guest && next.status == AuthStatus.guest) {
+        context.goNamed('home');
       }
     });
 
@@ -38,7 +48,7 @@ class OnboardingScreen extends ConsumerWidget {
                 mainAxisAlignment: MainAxisAlignment.center,
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  Image.asset('assets/images/AppLogo.png', height: 100), // Ensure this asset exists
+                  Image.asset('assets/images/AppLogo.png', height: 100),
                   const SizedBox(height: 24),
                   Text(
                     'VisuaLit',

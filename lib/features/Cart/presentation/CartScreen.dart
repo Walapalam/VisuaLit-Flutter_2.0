@@ -5,6 +5,9 @@ import 'package:visualit/features/Cart/presentation/CartNotifier.dart';
 import 'package:visualit/features/library/presentation/library_controller.dart';
 import 'package:go_router/go_router.dart';
 import 'package:http/http.dart' as http;
+import 'dart:io';
+import 'package:path_provider/path_provider.dart';
+import 'package:permission_handler/permission_handler.dart';
 
 
 class CartScreen extends ConsumerStatefulWidget {
@@ -17,17 +20,29 @@ class CartScreen extends ConsumerStatefulWidget {
 class _CartScreenState extends ConsumerState<CartScreen> {
   final Set<int> downloadingIds = {};
 
+  Future<bool> _isBookDownloaded(String title) async {
+    Directory? downloadsDir;
+    if (Platform.isAndroid) {
+      downloadsDir = Directory('/storage/emulated/0/Download');
+    } else {
+      downloadsDir = await getDownloadsDirectory();
+    }
+    if (downloadsDir == null) return false;
+    final visuaLitDir = Directory('${downloadsDir.path}/VisuaLit');
+    final file = File('${visuaLitDir.path}/$title.epub');
+    return file.exists();
+  }
+
   @override
   Widget build(BuildContext context) {
     final cartBooks = ref.watch(cartProvider);
-    final libraryController = ref.read(libraryControllerProvider.notifier);
 
     return Scaffold(
       appBar: AppBar(
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
           onPressed: () {
-            context.goNamed('marketplace'); // Replace '/home' with your actual route to the marketplace
+            context.goNamed('marketplace');
           },
         ),
         title: const Text('Cart'),
@@ -44,6 +59,7 @@ class _CartScreenState extends ConsumerState<CartScreen> {
         itemBuilder: (context, index) {
           final book = cartBooks[index];
           final bookId = book['id'];
+          final bookTitle = book['title'] ?? 'book';
 
           return ListTile(
             leading: book['formats']['image/jpeg'] != null
@@ -54,88 +70,111 @@ class _CartScreenState extends ConsumerState<CartScreen> {
               fit: BoxFit.cover,
             )
                 : const Icon(Icons.book),
-            title: Text(book['title'] ?? 'No Title'),
-            trailing: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                downloadingIds.contains(bookId)
-                    ? const SizedBox(
-                  width: 24,
-                  height: 24,
-                  child: CircularProgressIndicator(strokeWidth: 2),
-                )
-                    : IconButton(
-                  icon: const Icon(Icons.download, color: Colors.blue),
-                  onPressed: () async {
-                    setState(() => downloadingIds.add(bookId)); // Show loading indicator
-                    try {
-                      // Get the download URL for the EPUB file
-                      final downloadUrl = book['formats']['application/epub+zip'];
-                      if (downloadUrl == null) {
-                        throw Exception('Download URL not available');
-                      }
+            title: Text(bookTitle),
+            trailing: FutureBuilder<bool>(
+              future: _isBookDownloaded(bookTitle),
+              builder: (context, snapshot) {
+                final isDownloaded = snapshot.data ?? false;
+                return Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    if (!isDownloaded)
+                      downloadingIds.contains(bookId)
+                          ? const SizedBox(
+                        width: 24,
+                        height: 24,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                          : IconButton(
+                        icon: const Icon(Icons.download, color: Colors.blue),
+                        onPressed: () async {
+                          setState(() => downloadingIds.add(bookId));
+                          try {
+                            final downloadUrl = book['formats']['application/epub+zip'];
+                            if (downloadUrl == null) {
+                              throw Exception('Download URL not available');
+                            }
 
-                      // Download the EPUB file
-                      final response = await http.get(Uri.parse(downloadUrl));
-                      if (response.statusCode == 200) {
-                        // Save the book to the library
-                        final bookData = {
-                          'id': book['id'],
-                          'title': book['title'],
-                          'authors': book['authors'],
-                          'fileBytes': response.bodyBytes,
-                        };
-                        await libraryController.addBookFromCart(bookData);
+                            final status = await Permission.storage.request();
+                            if (!status.isGranted) {
+                              throw Exception('Storage permission denied');
+                            }
 
-                        // Show success message
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(content: Text('${book['title']} added to Library')),
-                        );
-                      } else {
-                        throw Exception('Failed to download the book');
-                      }
-                    } catch (e) {
-                      // Show error message
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(content: Text('Error downloading ${book['title']}: $e')),
-                      );
-                    } finally {
-                      setState(() => downloadingIds.remove(bookId)); // Hide loading indicator
-                    }
-                  },
-                ),
-                IconButton(
-                  icon: const Icon(Icons.delete, color: Colors.red),
-                  onPressed: () {
-                    showDialog(
-                      context: context,
-                      builder: (context) => AlertDialog(
-                        title: const Text('Delete Book'),
-                        content: const Text('Are you sure you want to delete this book from the cart?'),
-                        actions: [
-                          TextButton(
-                            onPressed: () => Navigator.of(context).pop(),
-                            style: TextButton.styleFrom(
-                              foregroundColor: Colors.white,
-                            ),
-                            child: const Text('Cancel'),
-                          ),
-                          TextButton(
-                            onPressed: () {
-                              ref.read(cartProvider.notifier).removeBook(book);
-                              Navigator.of(context).pop();
-                            },
-                            style: TextButton.styleFrom(
-                              foregroundColor: Colors.white,
-                            ),
-                            child: const Text('Delete'),
-                          ),
-                        ],
+                            Directory? downloadsDir;
+                            if (Platform.isAndroid) {
+                              downloadsDir = Directory('/storage/emulated/0/Download');
+                            } else {
+                              downloadsDir = await getDownloadsDirectory();
+                            }
+                            if (downloadsDir == null) throw Exception('Cannot access Downloads folder');
+
+                            final visuaLitDir = Directory('${downloadsDir.path}/VisuaLit');
+                            if (!await visuaLitDir.exists()) {
+                              await visuaLitDir.create(recursive: true);
+                            }
+
+                            final fileName = '$bookTitle.epub';
+                            final filePath = '${visuaLitDir.path}/$fileName';
+                            final file = File(filePath);
+
+                            final response = await http.get(Uri.parse(downloadUrl));
+                            if (response.statusCode == 200) {
+                              await file.writeAsBytes(response.bodyBytes);
+
+                              if (!mounted) return;
+
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(content: Text('$bookTitle saved to VisuaLit folder in Downloads')),
+                              );
+                              setState(() {}); // Refresh UI to hide download button
+                            } else {
+                              throw Exception('Failed to download the book');
+                            }
+                          } catch (e) {
+                            if (mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(content: Text('Error downloading $bookTitle: $e')),
+                              );
+                            }
+                          } finally {
+                            if (mounted) setState(() => downloadingIds.remove(bookId));
+                          }
+                        },
                       ),
-                    );
-                  },
-                ),
-              ],
+                    IconButton(
+                      icon: const Icon(Icons.delete, color: Colors.red),
+                      onPressed: () {
+                        showDialog(
+                          context: context,
+                          builder: (context) => AlertDialog(
+                            title: const Text('Delete Book'),
+                            content: const Text('Are you sure you want to delete this book from the cart?'),
+                            actions: [
+                              TextButton(
+                                onPressed: () => Navigator.of(context).pop(),
+                                style: TextButton.styleFrom(
+                                  foregroundColor: Colors.white,
+                                ),
+                                child: const Text('Cancel'),
+                              ),
+                              TextButton(
+                                onPressed: () {
+                                  ref.read(cartProvider.notifier).removeBook(book);
+                                  Navigator.of(context).pop();
+                                },
+                                style: TextButton.styleFrom(
+                                  foregroundColor: Colors.white,
+                                ),
+                                child: const Text('Delete'),
+                              ),
+                            ],
+                          ),
+                        );
+                      },
+                    ),
+                  ],
+                );
+              },
             ),
           );
         },

@@ -7,6 +7,7 @@ import 'package:visualit/core/services/sync_service.dart';
 import 'package:visualit/core/theme/app_theme.dart';
 import 'package:visualit/core/theme/theme_controller.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'features/auth/presentation/auth_controller.dart';
 import 'firebase_options.dart';
 
 Future<void> main() async {
@@ -15,7 +16,15 @@ Future<void> main() async {
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
   );
-  runApp(const ProviderScope(child: MyApp()));
+
+  // Initialize authentication state
+  final container = ProviderContainer();
+  await container.read(authControllerProvider.notifier).initialize();
+
+  runApp(ProviderScope(
+    parent: container,
+    child: const MyApp(),
+  ));
 }
 
 class MyApp extends ConsumerWidget {

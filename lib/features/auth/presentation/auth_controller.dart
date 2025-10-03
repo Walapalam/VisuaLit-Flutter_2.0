@@ -1,3 +1,11 @@
+
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:visualit/core/utils/error_parser.dart';
+import 'package:visualit/features/auth/data/auth_repository.dart';
+import 'package:flutter/foundation.dart'; // Add this import for debugPrint
+
+
 import 'dart:developer';
 import 'package:appwrite/appwrite.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -5,6 +13,7 @@ import 'package:visualit/core/utils/error_parser.dart';
 import 'package:visualit/features/auth/data/auth_repository.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:visualit/core/services/connectivity_provider.dart';
+
 
 final authControllerProvider = StateNotifierProvider<AuthController, AuthState>((ref) {
   final authRepository = ref.watch(authRepositoryProvider);
@@ -24,6 +33,7 @@ class AuthState {
     this.errorMessage,
   });
 
+
   AuthState copyWith({
     AuthStatus? status,
     User? user,
@@ -38,6 +48,10 @@ class AuthState {
     );
   }
 }
+
+
+
+
 
 class AuthController extends StateNotifier<AuthState> {
   final AuthRepository _authRepository;
@@ -64,8 +78,7 @@ class AuthController extends StateNotifier<AuthState> {
       final user = await _authRepository.getCurrentUser();
       log('[AuthController] getCurrentUser: $user');
       if (user != null) {
-        final status = (user.email?.isEmpty ?? true) ? AuthStatus.guest : AuthStatus.authenticated;
-        log('[AuthController] User found, status: $status');
+        final status = user.isAnonymous ? AuthStatus.guest : AuthStatus.authenticated;
         state = state.copyWith(status: status, user: user);
       } else {
         log('[AuthController] No user found, unauthenticated');
@@ -90,28 +103,40 @@ class AuthController extends StateNotifier<AuthState> {
     log('[AuthController] login() called with email: $email');
     _startLoading();
     try {
-      await _authRepository.login(email: email, password: password);
-      log('[AuthController] login() success');
-      await initialize();
-    } on FirebaseAuthException catch (e) {
-      log('[AuthController] login() failed: $e');
-      String message;
-      if (e.code == 'wrong-password') {
-        message = 'Incorrect password. Please try again.';
-      } else if (e.code == 'user-not-found') {
-        message = 'No user found for that email.';
-      } else {
-        message = e.message ?? 'Login failed. Please try again.';
-      }
+      final userCredential = await _authRepository.login(email: email, password: password);
       state = state.copyWith(
-        status: AuthStatus.invalidLogin,
-        errorMessage: message,
+        status: AuthStatus.authenticated,
+        user: userCredential.user,
+        errorMessage: null, // Clear any previous errors
+      );
+    } on FirebaseAuthException catch (e) {
+      debugPrint('Firebase Auth Error: ${e.code}');
+      // Handle specific error codes
+      String errorMessage;
+      switch (e.code) {
+        case 'user-not-found':
+          errorMessage = 'No user found with this email address.';
+          break;
+        case 'wrong-password':
+          errorMessage = 'Incorrect password. Please try again.';
+          break;
+        case 'invalid-credential':
+          errorMessage = 'Invalid login credentials.';
+          break;
+        default:
+          errorMessage = e.message ?? 'Authentication failed. Please try again.';
+      }
+
+      // IMPORTANT: Set both status and error message
+      state = state.copyWith(
+        status: AuthStatus.unauthenticated,
+        errorMessage: errorMessage,
       );
     } catch (e) {
-      log('[AuthController] login() failed: $e');
+      debugPrint('Login error: $e');
       state = state.copyWith(
-        status: AuthStatus.invalidLogin,
-        errorMessage: 'Login failed. Please try again.',
+        status: AuthStatus.unauthenticated,
+        errorMessage: 'An unexpected error occurred.',
       );
     }
   }
@@ -120,14 +145,45 @@ class AuthController extends StateNotifier<AuthState> {
     log('[AuthController] signUp() called with email: $email');
     _startLoading();
     try {
-      await _authRepository.signUp(name: name, email: email, password: password);
-      log('[AuthController] signUp() success, proceeding to login');
-      await login(email, password);
-    } on AppwriteException catch (e) {
-      log('[AuthController] signUp() failed: $e');
+      debugPrint("Attempting signup for: $email");
+      final userCredential = await _authRepository.signUp(name: name, email: email, password: password);
+      debugPrint("Signup successful for user: ${userCredential.user?.uid}");
+
+      state = state.copyWith(
+        status: AuthStatus.authenticated,
+        user: userCredential.user,
+        clearError: true,
+      );
+    } on FirebaseAuthException catch (e) {
+      String errorMessage;
+      switch (e.code) {
+        case 'email-already-in-use':
+          errorMessage = 'An account already exists with this email address.';
+          break;
+        case 'invalid-email':
+          errorMessage = 'Please enter a valid email address.';
+          break;
+        case 'weak-password':
+          errorMessage = 'Password is too weak. Please use a stronger password.';
+          break;
+        case 'operation-not-allowed':
+          errorMessage = 'Account creation is disabled. Please contact support.';
+          break;
+        default:
+          errorMessage = e.message ?? 'Registration failed. Please try again.';
+      }
+
+      debugPrint("Signup error: ${e.code} - $errorMessage");
+
       state = state.copyWith(
         status: AuthStatus.unauthenticated,
-        errorMessage: parseAppwriteException(e),
+        errorMessage: errorMessage,
+      );
+    } catch (e) {
+      debugPrint("Unexpected signup error: $e");
+      state = state.copyWith(
+        status: AuthStatus.unauthenticated,
+        errorMessage: 'An unexpected error occurred during registration.',
       );
     }
   }
@@ -139,11 +195,9 @@ class AuthController extends StateNotifier<AuthState> {
       await _authRepository.logout();
       log('[AuthController] logout() success');
       state = state.copyWith(status: AuthStatus.unauthenticated, clearUser: true);
-    } on AppwriteException catch (e) {
-      log('[AuthController] logout() failed: $e');
+    } catch (e) {
       state = state.copyWith(
-        status: AuthStatus.authenticated,
-        errorMessage: parseAppwriteException(e),
+        errorMessage: 'Failed to logout',
       );
     }
   }
@@ -151,23 +205,17 @@ class AuthController extends StateNotifier<AuthState> {
   Future<void> signInAsGuest() async {
     log('[AuthController] signInAsGuest() called');
     _startLoading();
-    final isOnline = _ref.read(isOnlineProvider);
-    log('[AuthController] isOnline: $isOnline');
-    if (isOnline) {
-      try {
-        await _authRepository.createAnonymousSession();
-        log('[AuthController] createAnonymousSession() success');
-        await initialize();
-      } catch (e) {
-        log('[AuthController] createAnonymousSession() failed: $e');
-        state = state.copyWith(
-          status: AuthStatus.unauthenticated,
-          errorMessage: 'Failed to sign in as guest',
-        );
-      }
-    } else {
-      log('[AuthController] Offline guest mode');
-      state = state.copyWith(status: AuthStatus.offlineGuest, user: null);
+    try {
+      final userCredential = await _authRepository.signInAnonymously();
+      state = state.copyWith(
+        status: AuthStatus.guest,
+        user: userCredential.user,
+      );
+    } on FirebaseAuthException catch (e) {
+      state = state.copyWith(
+        status: AuthStatus.unauthenticated,
+        errorMessage: e.message ?? 'Anonymous sign-in failed',
+      );
     }
   }
 
@@ -175,15 +223,15 @@ class AuthController extends StateNotifier<AuthState> {
     log('[AuthController] signInWithGoogle() called');
     _startLoading();
     try {
-      await _authRepository.signInWithGoogle();
-      log('[AuthController] signInWithGoogle() success');
-      await Future.delayed(const Duration(seconds: 1));
-      await initialize();
-    } on AppwriteException catch (e) {
-      log('[AuthController] signInWithGoogle() failed: $e');
+      final userCredential = await _authRepository.signInWithGoogle();
+      state = state.copyWith(
+        status: AuthStatus.authenticated,
+        user: userCredential.user,
+      );
+    } on FirebaseAuthException catch (e) {
       state = state.copyWith(
         status: AuthStatus.unauthenticated,
-        errorMessage: parseAppwriteException(e),
+        errorMessage: e.message ?? 'Google sign-in failed',
       );
     }
   }

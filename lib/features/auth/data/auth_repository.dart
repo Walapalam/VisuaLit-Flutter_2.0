@@ -1,16 +1,34 @@
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:appwrite/appwrite.dart';
+import 'package:appwrite/models.dart' as appwrite_models;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:google_sign_in/google_sign_in.dart';
 import 'package:visualit/core/api/appwrite_client.dart';
+import 'package:flutter/foundation.dart'; // Add this import for debugPrint
+
+
+final firebaseAuthProvider = Provider<FirebaseAuth>((ref) {
+  return FirebaseAuth.instance;
+});
 
 final authRepositoryProvider = Provider<AuthRepository>((ref) {
   final firebaseAuth = ref.read(firebaseAuthProvider);
-  return AuthRepository(firebaseAuth: firebaseAuth);
+  final appwriteAccount = ref.read(appwriteAccountProvider);
+  return AuthRepository(
+    firebaseAuth: firebaseAuth,
+    appwriteAccount: appwriteAccount,
+  );
 });
 
 class AuthRepository {
   final FirebaseAuth _firebaseAuth;
+  final Account _appwriteAccount;
 
-  AuthRepository({required FirebaseAuth firebaseAuth}) : _firebaseAuth = firebaseAuth;
+  AuthRepository({
+    required FirebaseAuth firebaseAuth,
+    required Account appwriteAccount,
+  })  : _firebaseAuth = firebaseAuth,
+        _appwriteAccount = appwriteAccount;
 
   Future<User?> getCurrentUser() async {
     return _firebaseAuth.currentUser;
@@ -20,10 +38,18 @@ class AuthRepository {
     required String email,
     required String password,
   }) async {
-    return await _firebaseAuth.signInWithEmailAndPassword(
-      email: email,
-      password: password,
-    );
+    debugPrint("Auth repository: Attempting login for: $email");
+    try {
+      final result = await _firebaseAuth.signInWithEmailAndPassword(
+        email: email,
+        password: password,
+      );
+      debugPrint("Auth repository: Login successful for user: ${result.user?.uid}");
+      return result;
+    } catch (e) {
+      debugPrint("Auth repository: Login error: $e");
+      rethrow;
+    }
   }
 
   Future<UserCredential> signUp({
@@ -31,91 +57,58 @@ class AuthRepository {
     required String email,
     required String password,
   }) async {
-    final credential = await _firebaseAuth.createUserWithEmailAndPassword(
+    // Create Firebase account
+    final userCredential = await _firebaseAuth.createUserWithEmailAndPassword(
       email: email,
       password: password,
     );
-    // Optionally update display name
-    await credential.user?.updateDisplayName(name);
-    return credential;
+
+    // Update Firebase user profile with name
+    await userCredential.user?.updateDisplayName(name);
+
+    return userCredential;
   }
 
   Future<void> logout() async {
     await _firebaseAuth.signOut();
   }
 
-  // Firebase does not support anonymous session in the same way, but you can use signInAnonymously
-  Future<UserCredential> createAnonymousSession() async {
+  Future<UserCredential> signInAnonymously() async {
     return await _firebaseAuth.signInAnonymously();
   }
 
-  // Google sign-in requires additional setup with google_sign_in package
-  Future<UserCredential?> signInWithGoogle() async {
-    // Implement using google_sign_in package
-    // Placeholder for now
-    throw UnimplementedError('Google sign-in not implemented');
+  Future<UserCredential> signInWithGoogle() async {
+    // Trigger the authentication flow
+    final GoogleSignInAccount? googleUser = await GoogleSignIn().signIn();
+
+    // Obtain the auth details from the request
+    final GoogleSignInAuthentication? googleAuth = await googleUser?.authentication;
+
+    // Create a new credential
+    final credential = GoogleAuthProvider.credential(
+      accessToken: googleAuth?.accessToken,
+      idToken: googleAuth?.idToken,
+    );
+
+    // Sign in to Firebase with the Google credential
+    return await _firebaseAuth.signInWithCredential(credential);
   }
-}
-/*
-import 'package:appwrite/appwrite.dart';
-import 'package:appwrite/models.dart' as models;
-import 'package:appwrite/enums.dart'; // Add this import
-import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:visualit/core/api/appwrite_client.dart';
 
-final authRepositoryProvider = Provider<AuthRepository>((ref) {
-  final account = ref.read(appwriteAccountProvider);
-  return AuthRepository(account: account);
-});
-
-class AuthRepository {
-  final Account _account;
-
-  AuthRepository({required Account account}) : _account = account;
-
-  Future<models.User?> getCurrentUser() async {
+  // Helper method to get Appwrite token if needed for storage operations
+  Future<String?> getAppwriteToken() async {
     try {
-      return await _account.get();
-    } on AppwriteException {
+      // For Appwrite storage access, we can use API keys or JWT tokens
+      // instead of trying to create sessions with user IDs
+
+      // Option 1: Create an anonymous session
+      final session = await _appwriteAccount.createAnonymousSession();
+      return session.$id;
+
+      // Option 2: If you have API keys configured:
+      // return "your-api-key"; // Replace with actual API key for storage
+    } catch (e) {
       return null;
     }
-  }
-
-  Future<models.Session> login({
-    required String email,
-    required String password,
-  }) async {
-    return await _account.createEmailPasswordSession(
-      email: email,
-      password: password,
-    );
-  }
-
-  Future<models.User> signUp({
-    required String name,
-    required String email,
-    required String password,
-  }) async {
-    return await _account.create(
-      userId: ID.unique(),
-      email: email,
-      password: password,
-      name: name,
-    );
-  }
-
-  Future<void> logout() async {
-    await _account.deleteSession(sessionId: 'current');
-  }
-
-  Future<models.Session> createAnonymousSession() async {
-    return await _account.createAnonymousSession();
-  }
-
-  Future<void> signInWithGoogle() async {
-    await _account.createOAuth2Session(
-      provider: OAuthProvider.google, // Use enum instead of string
-    );
   }
 }
  */

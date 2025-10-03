@@ -73,14 +73,13 @@ final goRouterProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/storage-settings',
         name: 'storageSettings',
-        builder: (context, state) => const StorageSettingsScreen(),),
-
+        builder: (context, state) => const StorageSettingsScreen(),
+      ),
       GoRoute(
         path: '/cart',
         name: 'cart',
         builder: (context, state) => const CartScreen(),
       ),
-      // TODO: Add '/preferences' route here when built
 
       // Main application shell route
       StatefulShellRoute.indexedStack(
@@ -103,50 +102,58 @@ final goRouterProvider = Provider<GoRouter>((ref) {
               ),
             ],
           ),
-
           StatefulShellBranch(routes: [
             GoRoute(path: '/settings', name: 'settings', builder: (context, state) => const SettingsScreen()),
           ]),
         ],
       ),
     ],
-    redirect: (context, state) async {
+    redirect: (context, state) {
       final status = authState.status;
       final location = state.matchedLocation;
       final publicRoutes = ['/splash', '/onboarding', '/login', '/signup'];
+      final hasError = authState.errorMessage != null;
 
-      // Stay on splash until initialization is complete (including loading state)
-      if ((status == AuthStatus.initial || status == AuthStatus.loading) && location != '/splash') {
-        return '/splash';
+
+      // For debugging
+      debugPrint('AUTH STATUS: $status, LOCATION: $location');
+
+      // Stay on splash while loading
+      if (status == AuthStatus.initial || status == AuthStatus.loading) {
+        return location == '/splash' ? null : '/splash';
       }
 
-      /*
-      // If authenticated or guest, redirect to home from public routes
-      if ((status == AuthStatus.authenticated || status == AuthStatus.guest || status == AuthStatus.offlineGuest) &&
-          publicRoutes.contains(location)) {
-        return '/home';
-      }*/
-
-      // If invalidLogin, stay on /login
-      if (status == AuthStatus.invalidLogin && location != '/login' && location != '/onboarding') {
-        return '/login';
+      // IMPORTANT: Check error condition BEFORE checking unauthenticated status
+      // Don't redirect during auth attempts with errors - this must come first
+      if ((location == '/login' || location == '/signup') &&
+          hasError &&
+          status == AuthStatus.unauthenticated) {
+        debugPrint('Staying on login/signup due to auth error');
+        return null; // Stay on current page when there's an auth error
       }
 
+      // Authenticated users should go to home if on public routes
       if ((status == AuthStatus.authenticated || status == AuthStatus.guest) &&
           publicRoutes.contains(location)) {
         return '/home';
       }
 
-      // If unauthenticated and not on a public route, redirect to onboarding
-      if (status == AuthStatus.unauthenticated && !publicRoutes.contains(location)) {
+      // Unauthenticated users should go to onboarding if not on public routes
+      if (status == AuthStatus.unauthenticated &&
+          !publicRoutes.contains(location)) {
         return '/onboarding';
       }
 
-      // If on splash and initialization is complete, redirect based on status
+      // From splash, redirect based on auth status
       if (location == '/splash' && status != AuthStatus.initial && status != AuthStatus.loading) {
-        return status == AuthStatus.unauthenticated ? '/onboarding' : '/home';
+        if (status == AuthStatus.unauthenticated) {
+          return '/onboarding';
+        } else {
+          return '/home';
+        }
       }
 
+      // No redirect needed
       return null;
     },
   );

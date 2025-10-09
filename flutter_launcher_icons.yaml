@@ -1,0 +1,41 @@
+flutter:
+  uses-material-design: true
+
+  fonts:
+    - family: OpenDyslexic
+      fonts:
+        - asset: assets/fonts/OpenDyslexic-Regular.otf
+    - family: Dyslexie
+      fonts:
+        - asset: assets/fonts/Dyslexie.ttf
+    - family: Jersey20
+      fonts:
+        - asset: assets/fonts/Jersey20-Regular.ttf
+
+  assets:
+    - .env
+    - assets/images/
+    - assets/fonts/
+    - assets/images/AppLogo.png
+    - assets/images/AppLogo_Dark.png
+
+dev_dependencies:
+  flutter_launcher_icons: "^0.11.0"
+
+flutter_launcher_icons:
+  android: "launcher_icon"
+  ios: true
+  image_path: "assets/images/AppLogo_Dark.png"
+  min_sdk_android: 21 # android min sdk min:16, default 21
+  web:
+    generate: true
+    image_path: "assets/images/AppLogo_Dark.png"
+    background_color: "#hexcode"
+    theme_color: "#hexcode"
+  windows:
+    generate: true
+    image_path: "assets/images/AppLogo_Dark.png"
+    icon_size: 48 # min:48, max:256, default: 48
+  macos:
+    generate: true
+    image_path: "assets/images/AppLogo_Dark.png"

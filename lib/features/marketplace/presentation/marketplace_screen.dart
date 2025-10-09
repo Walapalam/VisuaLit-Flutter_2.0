@@ -6,6 +6,7 @@ import 'package:go_router/go_router.dart';
 import 'package:visualit/features/Cart/presentation/CartNotifier.dart';
 
 import '../../library/data/local_library_service.dart';
+import '../../library/presentation/library_controller.dart';
 
 
 // State class for marketplace
@@ -238,41 +239,59 @@ class MarketplaceScreen extends ConsumerWidget {
                                             vertical: 12,
                                           ),
                                         ),
-                                        onPressed: () async{
-                                          Navigator.of(context).pop();
-                                          ScaffoldMessenger.of(
-                                              context)
-                                              .showSnackBar(SnackBar(
-                                              content: Text('Downloading ${book['title']}...'))
-                                          );
+                                        onPressed: () async {
+                                          // Save context reference before async operations
+                                          final scaffoldMessenger = ScaffoldMessenger.of(context);
+                                          Navigator.of(context).pop(); // Close dialog
+
                                           try {
                                             final localLibraryService = LocalLibraryService();
-                                            final coverUrl = book['formats']['image/jpeg'];
 
-                                            // Download the book cover as example (replace with actual book file)
-                                            if (coverUrl != null) {
-                                              final response = await http.get(Uri.parse(coverUrl));
-                                              if (response.statusCode == 200) {
-                                                final fileName = '${book['title']?.replaceAll(RegExp(r'[^\w\s-]'), '')}.epub';
-                                                final success = await localLibraryService.downloadBook(
-                                                  fileData: response.bodyBytes,
-                                                  fileName: fileName,
+                                            // Get EPUB format
+                                            final epubUrl = book['formats']['application/epub+zip'];
+
+                                            if (epubUrl == null) {
+                                              scaffoldMessenger.showSnackBar(
+                                                const SnackBar(content: Text('EPUB format not available')),
+                                              );
+                                              return;
+                                            }
+
+                                            scaffoldMessenger.showSnackBar(
+                                              SnackBar(content: Text('Downloading ${book['title']}...')),
+                                            );
+
+                                            // Download file
+                                            final response = await http.get(Uri.parse(epubUrl));
+
+                                            if (response.statusCode == 200) {
+                                              final fileName = '${book['title']?.replaceAll(RegExp(r'[^\w\s-]'), '')}.epub';
+
+                                              final success = await localLibraryService.downloadBook(
+                                                fileData: response.bodyBytes,
+                                                fileName: fileName,
+                                              );
+
+                                              if (success) {
+                                                scaffoldMessenger.showSnackBar(
+                                                  SnackBar(
+                                                    content: Text('Downloaded ${book['title']} successfully!'),
+                                                    duration: const Duration(seconds: 3),
+                                                  ),
                                                 );
 
-                                                if (success) {
-                                                  ScaffoldMessenger.of(context).showSnackBar(
-                                                      SnackBar(content: Text('Downloaded ${book['title']} successfully!'))
-                                                  );
-                                                } else {
-                                                  ScaffoldMessenger.of(context).showSnackBar(
-                                                      SnackBar(content: Text('Failed to download ${book['title']}'))
-                                                  );
-                                                }
+                                                // Trigger library rescan to show the book
+                                                ref.read(libraryControllerProvider.notifier).rescanVisuaLitFolder();
+                                              } else {
+                                                scaffoldMessenger.showSnackBar(
+                                                  const SnackBar(content: Text('Failed to download book')),
+                                                );
                                               }
                                             }
                                           } catch (e) {
-                                            ScaffoldMessenger.of(context).showSnackBar(
-                                                SnackBar(content: Text('Error: $e'))
+                                            print('Download error: $e');
+                                            scaffoldMessenger.showSnackBar(
+                                              SnackBar(content: Text('Error: $e')),
                                             );
                                           }
                                         },

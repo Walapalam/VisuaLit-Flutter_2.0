@@ -1,216 +1,177 @@
 import 'dart:io';
-import 'dart:typed_data'; // Import this
+import 'dart:typed_data';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:media_store_plus/media_store_plus.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:path/path.dart' as p;
 
-
-
-// A new class to hold our picked file data securely
 class PickedFileData {
   final String path;
   final Uint8List bytes;
-
   PickedFileData({required this.path, required this.bytes});
 }
 
-
 class LocalLibraryService {
 
-  final mediaStorePlugin = MediaStore();
-  /// Requests necessary storage permissions for mobile platforms.
-  ///
-  /// Returns `true` if permission is granted, otherwise `false`.
-  Future<bool> _requestPermission() async {
-    print('LocalLibraryService: Requesting storage permission...');
+  final _mediaStorePlugin = MediaStore();
+  bool _mediaStoreInitialized = false;
 
-    // Permissions are generally only required on mobile platforms.
-    if (!Platform.isAndroid && !Platform.isIOS) {
-      print('LocalLibraryService: Running on desktop platform, skipping permission request');
-      return true;
-    }
 
-    print('LocalLibraryService: Running on mobile platform (${Platform.operatingSystem}), requesting storage permission');
+  /// Initialize MediaStore once when needed
+  Future<void> _ensureMediaStoreInitialized() async {
+    if (_mediaStoreInitialized || !Platform.isAndroid) return;
 
-    final status = await Permission.storage.request();
-    print('LocalLibraryService: Permission status: ${status.toString()}');
-
-    if (status.isGranted) {
-      print('LocalLibraryService: Storage permission granted');
-      return true;
-    }
-
-    // If permission is permanently denied, guide the user to app settings.
-    if (status.isPermanentlyDenied) {
-      print('LocalLibraryService: Permission permanently denied, opening app settings');
-      await openAppSettings();
-    } else {
-      print('LocalLibraryService: Permission denied');
-    }
-
-    return false;
+    await MediaStore.ensureInitialized();
+    MediaStore.appFolder = 'VisuaLit';
+    _mediaStoreInitialized = true;
+    print('LocalLibraryService: MediaStore initialized with appFolder: VisuaLit');
   }
 
-  /// Opens the platform's file picker to select one or more EPUB files.
-  ///
-  /// This method handles storage permissions and returns a list of selected [PickedFileData] objects.
-  /// It returns an empty list if no files are selected or if permissions are denied.
+  /// Downloads a book using media_store_plus (for marketplace purchases)
+  /// Saves to Downloads/VisuaLit/ folder
+  Future<bool> downloadBook({
+    required Uint8List fileData,
+    required String fileName,
+    String mimeType = 'application/epub+zip',
+  }) async {
+    print('LocalLibraryService: Downloading book: $fileName');
+
+    try {
+      if (Platform.isAndroid) {
+        // ✅ CRITICAL FIX: Initialize MediaStore AND set appFolder
+        await _ensureMediaStoreInitialized();
+
+        // Set the app folder to VisuaLit (this is required)
+        MediaStore.appFolder = 'VisuaLit';
+        print('LocalLibraryService: MediaStore initialized with appFolder: VisuaLit');
+
+        // Create temp file
+        final tempDir = await getTemporaryDirectory();
+        final tempFile = File('${tempDir.path}/$fileName');
+        await tempFile.writeAsBytes(fileData);
+        print('LocalLibraryService: Wrote temp file: ${tempFile.path}');
+
+        // Save using MediaStore
+        final savedFile = await _mediaStorePlugin.saveFile(
+          tempFilePath: tempFile.path,
+          dirType: DirType.download,
+          dirName: DirName.download,
+        );
+
+        // Clean up temp file
+        await tempFile.delete();
+
+        print('LocalLibraryService: Book saved to: ${savedFile?.uri}');
+        return savedFile != null;
+      } else {
+        // For iOS/Windows, use traditional file I/O
+        final appDocDir = await getApplicationDocumentsDirectory();
+        final visuaLitDir = Directory('${appDocDir.path}/VisuaLit');
+
+        if (!await visuaLitDir.exists()) {
+          await visuaLitDir.create(recursive: true);
+        }
+
+        final file = File('${visuaLitDir.path}/$fileName');
+        await file.writeAsBytes(fileData);
+
+        print('LocalLibraryService: Book saved to: ${file.path}');
+        return true;
+      }
+    } catch (e, stackTrace) {
+      print('LocalLibraryService: Error downloading book: $e\n$stackTrace');
+      return false;
+    }
+  }
+
+  /// Picks files using file_picker (for user uploads)
   Future<List<PickedFileData>> pickFiles() async {
     print('LocalLibraryService: Starting file picker...');
 
-    if (!await _requestPermission()) {
-      print('LocalLibraryService: Permission denied, returning empty list');
+    if (!await _requestStoragePermission()) {
+      print('LocalLibraryService: Permission denied');
       return [];
     }
 
     try {
-      // Ask for the file bytes directly
       final result = await FilePicker.platform.pickFiles(
-        allowMultiple: true,
         type: FileType.custom,
         allowedExtensions: ['epub'],
-        withData: true, // This is the crucial change!
+        allowMultiple: true,
       );
 
-      if (result == null) {
-        print('LocalLibraryService: User cancelled file selection');
+      if (result == null || result.files.isEmpty) {
+        print('LocalLibraryService: No files selected');
         return [];
       }
 
       final List<PickedFileData> pickedFiles = [];
       for (final file in result.files) {
         if (file.path != null && file.bytes != null) {
-          print('LocalLibraryService: Successfully read ${file.bytes!.lengthInBytes} bytes from ${file.name}');
-          pickedFiles.add(PickedFileData(path: file.path!, bytes: file.bytes!));
-        } else {
-          print('LocalLibraryService: Warning - picked file ${file.name} was missing path or data.');
+          pickedFiles.add(PickedFileData(
+            path: file.path!,
+            bytes: file.bytes!,
+          ));
         }
       }
 
+      print('LocalLibraryService: Selected ${pickedFiles.length} file(s)');
       return pickedFiles;
-
     } catch (e) {
-      print('LocalLibraryService: Error picking EPUB files: $e');
+      print('LocalLibraryService: Error picking files: $e');
       return [];
     }
   }
 
-  Future<String?> pickFile({List<String>? allowedExtensions}) async {
-    FilePickerResult? result = await FilePicker.platform.pickFiles(
-      type: FileType.custom,
-      allowedExtensions: allowedExtensions,
-    );
-
-    if (result != null && result.files.single.path != null) {
-      return result.files.single.path!;
-    }
-    return null; // User canceled or no file selected
-  }
-
-  // --- ADDED METHOD for AUDIOBOOKS ---
-  /// Opens the directory picker for selecting an audiobook folder.
-  /// This is the new, preferred method for the multi-chapter audiobook feature.
-  Future<String?> pickDirectory() async {
-    print('LocalLibraryService: Executing pickDirectory() for audiobooks...');
-    if (!await _requestPermission()) {
-      print('LocalLibraryService: Permission denied.');
-      return null;
-    }
-    try {
-      // Returns the path of the selected directory as a String.
-      return await FilePicker.platform.getDirectoryPath();
-    } catch (e) {
-      print('LocalLibraryService: Error picking directory: $e');
-      return null;
-    }
-  }
-
-
-  /// Opens the platform's directory picker and scans for all EPUB files within.
-  ///
-  /// This method recursively finds all files with the '.epub' extension
-  /// in the selected directory and its subdirectories.
+  /// Scans the VisuaLit folder for existing books
   Future<List<PickedFileData>> scanAndLoadBooks() async {
-    print('LocalLibraryService: Starting directory scan...');
+    print('LocalLibraryService: Scanning VisuaLit folder...');
 
-    if (!await _requestPermission()) {
-      print('LocalLibraryService: Permission denied, returning empty list');
+    Directory? visuaLitDir;
+    if (Platform.isAndroid) {
+      visuaLitDir = Directory('/storage/emulated/0/Download/VisuaLit');
+    } else if (Platform.isIOS) {
+      final appDocDir = await getApplicationDocumentsDirectory();
+      visuaLitDir = Directory('${appDocDir.path}/VisuaLit');
+    } else {
+      final downloads = await _getDownloadsDirectory();
+      if (downloads == null) return [];
+      visuaLitDir = Directory('${downloads.path}/VisuaLit');
+    }
+
+    if (!await visuaLitDir.exists()) {
+      print('LocalLibraryService: VisuaLit folder does not exist');
       return [];
     }
 
     try {
-      final directoryPath = await FilePicker.platform.getDirectoryPath();
-      if (directoryPath == null) {
-        print('LocalLibraryService: User cancelled directory selection');
-        return [];
-      }
-
-      final dir = Directory(directoryPath);
-      if (!await dir.exists()) {
-        print('LocalLibraryService: Selected directory does not exist');
-        return [];
-      }
-
-      final List<PickedFileData> pickedFiles = [];
-      await for (final entity in dir.list(recursive: true)) {
-        if (entity is File && entity.path.toLowerCase().endsWith('.epub')) {
-          try {
-            final bytes = await entity.readAsBytes();
-            pickedFiles.add(PickedFileData(path: entity.path, bytes: bytes));
-            print('LocalLibraryService: Scanned and read ${bytes.lengthInBytes} bytes from ${entity.path}');
-          } catch (e) {
-            print('LocalLibraryService: Error reading scanned file ${entity.path}: $e');
-          }
-        }
-      }
-      return pickedFiles;
-
-    } catch(e) {
-      print('LocalLibraryService: Error scanning directory: $e');
-      return [];
-    }
-  }
-
-  /// Opens the platform's file picker to select one or more MP3 files.
-  ///
-  /// Returns a list of selected audio files, or an empty list if no files are selected
-  /// or if permissions are denied.
-  Future<List<File>> pickAudiobooks() async {
-    print('LocalLibraryService: Executing legacy pickAudiobooks()...');
-    if (!await _requestPermission()) {
-      print('LocalLibraryService: Permission denied for audiobook picking');
-      return [];
-    }
-
-    try {
-      final result = await FilePicker.platform.pickFiles(
-        allowMultiple: true,
-        type: FileType.custom,
-        allowedExtensions: ['mp3'], // Restrict to MP3 files
-      );
-
-      if (result == null) {
-        print('LocalLibraryService: No audiobooks selected');
-        return [];
-      }
-
-      final files = result.paths
-          .where((path) => path != null)
-          .map((path) => File(path!))
+      final files = visuaLitDir
+          .listSync()
+          .whereType<File>()
+          .where((f) => f.path.toLowerCase().endsWith('.epub'))
           .toList();
 
-      print('LocalLibraryService: Selected ${files.length} audiobooks');
-      return files;
+      final List<PickedFileData> loadedFiles = [];
+      for (final file in files) {
+        try {
+          final bytes = await file.readAsBytes();
+          loadedFiles.add(PickedFileData(path: file.path, bytes: bytes));
+        } catch (e) {
+          print('LocalLibraryService: Error reading file ${file.path}: $e');
+        }
+      }
+
+      print('LocalLibraryService: Found ${loadedFiles.length} books');
+      return loadedFiles;
     } catch (e) {
-      print('LocalLibraryService: Error picking audiobooks: $e');
+      print('LocalLibraryService: Error scanning folder: $e');
       return [];
     }
   }
 
-  /// Loads a file from the given path and returns a PickedFileData object.
-  ///
-  /// This is useful for retrying processing of a book that previously failed.
+  /// Loads a single file from path (for retry functionality)
   Future<PickedFileData?> loadFileFromPath(String filePath) async {
     print('LocalLibraryService: Loading file from path: $filePath');
 
@@ -222,84 +183,69 @@ class LocalLibraryService {
       }
 
       final bytes = await file.readAsBytes();
-      print('LocalLibraryService: Successfully read ${bytes.lengthInBytes} bytes from $filePath');
       return PickedFileData(path: filePath, bytes: bytes);
     } catch (e) {
-      print('LocalLibraryService: Error loading file from path: $e');
+      print('LocalLibraryService: Error loading file: $e');
       return null;
     }
   }
 
-  /// Requests permissions for file operations
-  Future<bool> _requestMediaStorePermission() async {
-    print('LocalLibraryService: Requesting media store permission...');
+  /// Requests storage permission using permission_handler
+  Future<bool> _requestStoragePermission() async {
+    print('LocalLibraryService: Requesting storage permission...');
 
-    if (!Platform.isAndroid) {
-      print('LocalLibraryService: Not Android, using fallback permission');
-      return await _requestPermission();
+    if (!Platform.isAndroid && !Platform.isIOS) {
+      print('LocalLibraryService: Not mobile platform, skipping permission');
+      return true;
     }
 
-    try {
-      // For Android, just use the regular permission system
-      return await _requestPermission();
-    } catch (e) {
-      print('LocalLibraryService: Error checking permission: $e');
-      return false;
+    final status = await Permission.storage.request();
+    print('LocalLibraryService: Permission status: $status');
+
+    if (status.isGranted) {
+      print('LocalLibraryService: Storage permission granted');
+      return true;
     }
+
+    if (status.isPermanentlyDenied) {
+      print('LocalLibraryService: Permission permanently denied');
+      await openAppSettings();
+    }
+
+    return false;
   }
 
-  /// Downloads a book file to the device's Downloads directory
-  /// Uses media_store_plus for Android 10+ scoped storage
-  Future<bool> downloadBook({
-    required Uint8List fileData,
-    required String fileName,
-    String mimeType = 'application/epub+zip',
-  }) async {
-    print('LocalLibraryService: Downloading book: $fileName');
-
-    if (!await _requestMediaStorePermission()) {
-      print('LocalLibraryService: Permission denied for download');
-      return false;
+  // Helper to get downloads directory
+  Future<Directory?> _getDownloadsDirectory() async {
+    if (Platform.isWindows) {
+      return Directory('${Platform.environment['USERPROFILE']}\\Downloads');
+    } else if (Platform.isAndroid) {
+      return Directory('/storage/emulated/0/Download');
     }
-
-    try {
-      if (Platform.isAndroid) {
-        final uri = await mediaStorePlugin.saveFile(
-          tempFilePath: fileName,
-          dirType: DirType.download,
-          dirName: DirName.download,
-        );
-
-        if (uri != null) {
-          // Write the bytes to the saved file
-          final file = File(fileName);
-          await file.writeAsBytes(fileData);
-          print('LocalLibraryService: Book saved successfully at: $uri');
-          return true;
-        } else {
-          print('LocalLibraryService: Failed to save book');
-          return false;
-        }
-      } else {
-        // For iOS/Desktop, use traditional file system
-        final downloadsDir = Platform.isWindows
-            ? Directory('${Platform.environment['USERPROFILE']}\\Downloads')
-            : Directory('/storage/emulated/0/Download');
-
-        final bookDir = Directory('${downloadsDir.path}/VisualIT/Books');
-        if (!await bookDir.exists()) {
-          await bookDir.create(recursive: true);
-        }
-
-        final file = File('${bookDir.path}/$fileName');
-        await file.writeAsBytes(fileData);
-        print('LocalLibraryService: Book saved at: ${file.path}');
-        return true;
-      }
-    } catch (e) {
-      print('LocalLibraryService: Error downloading book: $e');
-      return false;
-    }
+    return null;
   }
 
+  // Legacy methods for audiobooks (kept for compatibility)
+  Future<String?> pickFile({List<String>? allowedExtensions}) async {
+    final result = await FilePicker.platform.pickFiles(
+      type: FileType.custom,
+      allowedExtensions: allowedExtensions,
+    );
+    return result?.files.single.path;
+  }
+
+  Future<String?> pickDirectory() async {
+    if (!await _requestStoragePermission()) return null;
+    return await FilePicker.platform.getDirectoryPath();
+  }
+
+  Future<List<File>> pickAudiobooks() async {
+    if (!await _requestStoragePermission()) return [];
+    final result = await FilePicker.platform.pickFiles(
+      type: FileType.custom,
+      allowedExtensions: ['mp3'],
+      allowMultiple: true,
+    );
+    return result?.paths.whereType<String>().map((path) => File(path)).toList() ?? [];
+  }
 }

@@ -5,6 +5,9 @@ import 'dart:convert';
 import 'package:go_router/go_router.dart';
 import 'package:visualit/features/Cart/presentation/CartNotifier.dart';
 
+import '../../library/data/local_library_service.dart';
+
+
 // State class for marketplace
 class MarketplaceState {
   final List<dynamic> books;
@@ -235,13 +238,43 @@ class MarketplaceScreen extends ConsumerWidget {
                                             vertical: 12,
                                           ),
                                         ),
-                                        onPressed: () {
+                                        onPressed: () async{
                                           Navigator.of(context).pop();
                                           ScaffoldMessenger.of(
                                               context)
                                               .showSnackBar(SnackBar(
-                                              content: Text(
-                                                  'Purchased ${book['title']}')));
+                                              content: Text('Downloading ${book['title']}...'))
+                                          );
+                                          try {
+                                            final localLibraryService = LocalLibraryService();
+                                            final coverUrl = book['formats']['image/jpeg'];
+
+                                            // Download the book cover as example (replace with actual book file)
+                                            if (coverUrl != null) {
+                                              final response = await http.get(Uri.parse(coverUrl));
+                                              if (response.statusCode == 200) {
+                                                final fileName = '${book['title']?.replaceAll(RegExp(r'[^\w\s-]'), '')}.epub';
+                                                final success = await localLibraryService.downloadBook(
+                                                  fileData: response.bodyBytes,
+                                                  fileName: fileName,
+                                                );
+
+                                                if (success) {
+                                                  ScaffoldMessenger.of(context).showSnackBar(
+                                                      SnackBar(content: Text('Downloaded ${book['title']} successfully!'))
+                                                  );
+                                                } else {
+                                                  ScaffoldMessenger.of(context).showSnackBar(
+                                                      SnackBar(content: Text('Failed to download ${book['title']}'))
+                                                  );
+                                                }
+                                              }
+                                            }
+                                          } catch (e) {
+                                            ScaffoldMessenger.of(context).showSnackBar(
+                                                SnackBar(content: Text('Error: $e'))
+                                            );
+                                          }
                                         },
                                         child: const Text('Buy'),
                                       ),

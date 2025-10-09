@@ -42,7 +42,7 @@ dependencies:
   firebase_core: ^4.1.1
   firebase_auth: ^6.1.0
   connectivity_plus: ^7.0.0
-
+  media_store_plus: ^0.1.1
 dev_dependencies:
   flutter_test:
     sdk: flutter

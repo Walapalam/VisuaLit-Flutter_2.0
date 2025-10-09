@@ -3,6 +3,9 @@ import 'dart:typed_data'; // Import this
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:permission_handler/permission_handler.dart';
+import 'package:media_store_plus/media_store_plus.dart';
+
+
 
 // A new class to hold our picked file data securely
 class PickedFileData {
@@ -14,6 +17,8 @@ class PickedFileData {
 
 
 class LocalLibraryService {
+
+  final mediaStorePlugin = MediaStore();
   /// Requests necessary storage permissions for mobile platforms.
   ///
   /// Returns `true` if permission is granted, otherwise `false`.
@@ -224,4 +229,77 @@ class LocalLibraryService {
       return null;
     }
   }
+
+  /// Requests permissions for file operations
+  Future<bool> _requestMediaStorePermission() async {
+    print('LocalLibraryService: Requesting media store permission...');
+
+    if (!Platform.isAndroid) {
+      print('LocalLibraryService: Not Android, using fallback permission');
+      return await _requestPermission();
+    }
+
+    try {
+      // For Android, just use the regular permission system
+      return await _requestPermission();
+    } catch (e) {
+      print('LocalLibraryService: Error checking permission: $e');
+      return false;
+    }
+  }
+
+  /// Downloads a book file to the device's Downloads directory
+  /// Uses media_store_plus for Android 10+ scoped storage
+  Future<bool> downloadBook({
+    required Uint8List fileData,
+    required String fileName,
+    String mimeType = 'application/epub+zip',
+  }) async {
+    print('LocalLibraryService: Downloading book: $fileName');
+
+    if (!await _requestMediaStorePermission()) {
+      print('LocalLibraryService: Permission denied for download');
+      return false;
+    }
+
+    try {
+      if (Platform.isAndroid) {
+        final uri = await mediaStorePlugin.saveFile(
+          tempFilePath: fileName,
+          dirType: DirType.download,
+          dirName: DirName.download,
+        );
+
+        if (uri != null) {
+          // Write the bytes to the saved file
+          final file = File(fileName);
+          await file.writeAsBytes(fileData);
+          print('LocalLibraryService: Book saved successfully at: $uri');
+          return true;
+        } else {
+          print('LocalLibraryService: Failed to save book');
+          return false;
+        }
+      } else {
+        // For iOS/Desktop, use traditional file system
+        final downloadsDir = Platform.isWindows
+            ? Directory('${Platform.environment['USERPROFILE']}\\Downloads')
+            : Directory('/storage/emulated/0/Download');
+
+        final bookDir = Directory('${downloadsDir.path}/VisualIT/Books');
+        if (!await bookDir.exists()) {
+          await bookDir.create(recursive: true);
+        }
+
+        final file = File('${bookDir.path}/$fileName');
+        await file.writeAsBytes(fileData);
+        print('LocalLibraryService: Book saved at: ${file.path}');
+        return true;
+      }
+    } catch (e) {
+      print('LocalLibraryService: Error downloading book: $e');
+      return false;
+    }
+  }
+
 }

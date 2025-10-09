@@ -53,6 +53,7 @@ dev_dependencies:
   riverpod_generator: ^2.4.0  # Downgraded as suggested
   mockito: ^5.4.4
   uuid: ^4.3.3
+  flutter_launcher_icons: ^0.11.0
 
 flutter:
   uses-material-design: true
@@ -73,4 +74,21 @@ flutter:
     - assets/images/
     - assets/fonts/
     - assets/images/AppLogo.png
-    - assets/images/AppLogo_Dark.png
+
+flutter_icons:
+  android: "launcher_icon"
+  ios: true
+  image_path: "assets/images/AppLogo_NoBg.png"
+  min_sdk_android: 21 # android min sdk min:16, default 21
+  web:
+    generate: true
+    image_path: "assets/images/AppLogo_NoBg.png"
+    background_color: "#hexcode"
+    theme_color: "#hexcode"
+  windows:
+    generate: true
+    image_path: "assets/images/AppLogo_NoBg.png"
+    icon_size: 48 # min:48, max:256, default: 48
+  macos:
+    generate: true
+    image_path: "assets/images/AppLogo_NoBg.png"

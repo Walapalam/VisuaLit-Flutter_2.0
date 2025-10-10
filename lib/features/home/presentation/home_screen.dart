@@ -7,6 +7,7 @@ import 'package:visualit/features/library/presentation/library_controller.dart';
 import 'package:visualit/features/reader/data/book_data.dart' as db;
 import 'package:visualit/shared_widgets/book_card.dart';
 import '../../../core/providers/isar_provider.dart';
+import 'package:visualit/core/providers/user_provider.dart';
 
 class HomeScreen extends ConsumerWidget {
   const HomeScreen({super.key});
@@ -14,6 +15,7 @@ class HomeScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final isarAsync = ref.watch(isarDBProvider);
+    final userAsyncValue = ref.watch(userProvider);
 
     return isarAsync.when(
       loading: () => const Center(child: CircularProgressIndicator()),
@@ -62,6 +64,32 @@ class HomeScreen extends ConsumerWidget {
                           currentStreak: 5,
                           longestStreak: 12,
                           totalDays: 30,
+                        ),
+                        const SizedBox(height: 24),
+                        userAsyncValue.when(
+                          data: (user) {
+                            if (user != null) {
+                              final isPremium = user.isPremium;
+                              return Column(
+                                children: [
+                                  Text('Premium: ${isPremium ? 'Yes' : 'No'}'),
+                                  Text('Credits: ${user.credits}'),
+                                  const SizedBox(height: 12),
+                                  ElevatedButton(
+                                    onPressed: isPremium
+                                        ? () {
+                                      // TODO: Navigate to premium feature
+                                    }
+                                        : null,
+                                    child: const Text('Access Premium Feature'),
+                                  ),
+                                ],
+                              );
+                            }
+                            return const Text('User not logged in.');
+                          },
+                          loading: () => const CircularProgressIndicator(),
+                          error: (error, stack) => Text('Error: $error'),
                         ),
                         const SizedBox(height: 24),
                         _BookShelf(

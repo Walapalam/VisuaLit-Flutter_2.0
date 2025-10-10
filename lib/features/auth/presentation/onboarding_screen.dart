@@ -38,7 +38,7 @@ class OnboardingScreen extends ConsumerWidget {
                 mainAxisAlignment: MainAxisAlignment.center,
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  Image.asset('assets/images/AppLogo.png', height: 100), // Ensure this asset exists
+                  Image.asset('assets/images/AppLogo_Dark_NoGB.png', height: 100), // Ensure this asset exists
                   const SizedBox(height: 24),
                   Text(
                     'VisuaLit',

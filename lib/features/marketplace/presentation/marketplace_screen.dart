@@ -4,319 +4,379 @@ import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'package:go_router/go_router.dart';
 import 'package:visualit/features/Cart/presentation/CartNotifier.dart';
+import 'package:visualit/core/utils/responsive_helper.dart';
+import 'package:visualit/core/theme/theme_extensions.dart';
+import 'package:visualit/core/providers/isar_provider.dart';
+import 'package:visualit/core/theme/app_theme.dart';
+import 'package:visualit/features/marketplace/presentation/marketplace_notifier.dart';
+import 'marketplace_providers.dart';
 
-// State class for marketplace
-class MarketplaceState {
-  final List<dynamic> books;
-  final String? nextUrl;
-  final bool isLoading;
-  final String searchQuery;
-
-  MarketplaceState({
-    required this.books,
-    required this.nextUrl,
-    required this.isLoading,
-    required this.searchQuery,
-  });
-
-  MarketplaceState copyWith({
-    List<dynamic>? books,
-    String? nextUrl,
-    bool? isLoading,
-    String? searchQuery,
-  }) {
-    return MarketplaceState(
-      books: books ?? this.books,
-      nextUrl: nextUrl ?? this.nextUrl,
-      isLoading: isLoading ?? this.isLoading,
-      searchQuery: searchQuery ?? this.searchQuery,
-    );
-  }
-}
-
-// Notifier for marketplace state
-class MarketplaceNotifier extends StateNotifier<MarketplaceState> {
-  MarketplaceNotifier()
-      : super(MarketplaceState(
-    books: [],
-    nextUrl: 'https://gutendex.com/books/',
-    isLoading: false,
-    searchQuery: '',
-  )) {
-    loadBooks(reset: true);
-  }
-
-  Future<void> loadBooks({bool reset = false}) async {
-    if (state.isLoading || state.nextUrl == null) return;
-    state = state.copyWith(isLoading: true);
-
-    final url = reset
-        ? 'https://gutendex.com/books/?search=${Uri.encodeComponent(state.searchQuery)}'
-        : state.nextUrl!;
-
-    try {
-      final response = await http.get(Uri.parse(url));
-      if (response.statusCode == 200) {
-        final data = json.decode(response.body);
-        final newBooks = List<dynamic>.from(data['results']);
-        state = state.copyWith(
-          books: reset ? newBooks : [...state.books, ...newBooks],
-          nextUrl: data['next'],
-          isLoading: false,
-        );
-      } else {
-        state = state.copyWith(isLoading: false, nextUrl: null);
-      }
-    } catch (_) {
-      state = state.copyWith(isLoading: false, nextUrl: null);
-    }
-  }
-
-  void searchBooks(String query) {
-    state = state.copyWith(searchQuery: query, nextUrl: 'https://gutendex.com/books/?search=${Uri.encodeComponent(query)}');
-    loadBooks(reset: true);
-  }
-}
-
-// Riverpod provider
-final marketplaceProvider =
-StateNotifierProvider<MarketplaceNotifier, MarketplaceState>(
-      (ref) => MarketplaceNotifier(),
-);
-
-class MarketplaceScreen extends ConsumerWidget {
+class MarketplaceScreen extends ConsumerStatefulWidget {
   const MarketplaceScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<MarketplaceScreen> createState() => _MarketplaceScreenState();
+}
+
+class _MarketplaceScreenState extends ConsumerState<MarketplaceScreen> {
+  final TextEditingController _searchController = TextEditingController();
+  final ScrollController _scrollController = ScrollController();
+
+  @override
+  void initState() {
+    super.initState();
+    _scrollController.addListener(_onScroll);
+  }
+
+  void _onScroll() {
+    if (_scrollController.position.pixels >= _scrollController.position.maxScrollExtent * 0.8) {
+      ref.read(marketplaceProvider.notifier).loadBooks();
+    }
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final state = ref.watch(marketplaceProvider);
     final notifier = ref.read(marketplaceProvider.notifier);
 
     return Scaffold(
-      appBar: AppBar(
-        title: Container(
-          height: 40,
-          decoration: BoxDecoration(
-            color: Colors.black,
-            borderRadius: BorderRadius.circular(8),
-            border: Border.all(color: Colors.white, width: 1),
-          ),
-          child: Row(
-            children: [
-              Expanded(
-                child: TextField(
-                  decoration: const InputDecoration(
-                    hintText: 'Search books...',
-                    hintStyle: TextStyle(color: Colors.white),
-                    border: InputBorder.none,
-                    contentPadding: EdgeInsets.symmetric(horizontal: 8),
+      backgroundColor: Theme.of(context).colorScheme.background,
+      body: SafeArea(
+        child: CustomScrollView(
+          controller: _scrollController,
+          slivers: [
+            // Search Bar
+            SliverAppBar(
+              floating: true,
+              snap: true,
+              backgroundColor: Theme.of(context).colorScheme.background,
+              title: TextField(
+                controller: _searchController,
+                decoration: InputDecoration(
+                  hintText: 'Search books...',
+                  filled: true,
+                  fillColor: Theme.of(context).colorScheme.surface,
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(30),
+                    borderSide: BorderSide.none,
                   ),
-                  style: const TextStyle(color: Colors.white),
-                  onChanged: (value) {
-                    notifier.searchBooks(value.toLowerCase());
-                  },
+                  prefixIcon: const Icon(Icons.search),
                 ),
+                onSubmitted: (query) => notifier.searchBooks(query),
               ),
-              IconButton(
-                icon: const Icon(Icons.shopping_cart, color: Colors.white),
-                onPressed: () {
-                  context.go('/cart');
-                },
-              ),
-            ],
-          ),
-        ),
-      ),
-      body: Column(
-        children: [
-          Expanded(
-            child: state.isLoading && state.books.isEmpty
-                ? const Center(child: CircularProgressIndicator())
-                : state.books.isEmpty
-                ? const Center(child: Text('No books found'))
-                : GridView.builder(
-              padding: const EdgeInsets.all(8),
-              gridDelegate:
-              const SliverGridDelegateWithFixedCrossAxisCount(
-                crossAxisCount: 3,
-                childAspectRatio: 2 / 3,
-                crossAxisSpacing: 8,
-                mainAxisSpacing: 8,
-              ),
-              itemCount: state.books.length,
-              itemBuilder: (context, index) {
-                final book = state.books[index];
-                final coverUrl = book['formats']['image/jpeg'];
+            ),
 
-                return GestureDetector(
-                  onTap: () {
-                    showDialog(
-                      context: context,
-                      builder: (context) {
-                        return AlertDialog(
-                          content: ConstrainedBox(
-                            constraints: BoxConstraints(
-                              maxWidth:
-                              MediaQuery.of(context).size.width *
-                                  0.8,
-                              maxHeight:
-                              MediaQuery.of(context).size.height *
-                                  0.5,
-                            ),
-                            child: SingleChildScrollView(
-                              child: Column(
-                                crossAxisAlignment:
-                                CrossAxisAlignment.start,
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Center(
-                                    child: coverUrl != null
-                                        ? RetryNetworkImage(
-                                      url: coverUrl,
-                                      fit: BoxFit.cover,
-                                      height: 150,
-                                    )
-                                        : Container(
-                                      color: Colors.grey[800],
-                                      height: 150,
-                                      child: const Center(
-                                        child: Icon(Icons.book,
-                                            size: 40),
-                                      ),
-                                    ),
-                                  ),
-                                  const SizedBox(height: 16),
-                                  Text(
-                                    book['title'] ?? 'No Title',
-                                    style: const TextStyle(
-                                      fontSize: 18,
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 16),
-                                  Row(
-                                    mainAxisAlignment:
-                                    MainAxisAlignment.spaceEvenly,
-                                    children: [
-                                      ElevatedButton(
-                                        style:
-                                        ElevatedButton.styleFrom(
-                                          backgroundColor:
-                                          Colors.white,
-                                          foregroundColor:
-                                          Colors.black,
-                                          padding: const EdgeInsets
-                                              .symmetric(
-                                            horizontal: 16,
-                                            vertical: 12,
-                                          ),
-                                        ),
-                                        onPressed: () {
-                                          ref
-                                              .read(cartProvider
-                                              .notifier)
-                                              .addBook(
-                                              book, context);
-                                          Navigator.of(context).pop();
-                                        },
-                                        child:
-                                        const Text('Add to Cart'),
-                                      ),
-                                      ElevatedButton(
-                                        style:
-                                        ElevatedButton.styleFrom(
-                                          backgroundColor:
-                                          Colors.white,
-                                          foregroundColor:
-                                          Colors.black,
-                                          padding: const EdgeInsets
-                                              .symmetric(
-                                            horizontal: 16,
-                                            vertical: 12,
-                                          ),
-                                        ),
-                                        onPressed: () {
-                                          Navigator.of(context).pop();
-                                          ScaffoldMessenger.of(
-                                              context)
-                                              .showSnackBar(SnackBar(
-                                              content: Text(
-                                                  'Purchased ${book['title']}')));
-                                        },
-                                        child: const Text('Buy'),
-                                      ),
-                                    ],
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ),
-                        );
-                      },
-                    );
-                  },
-                  child: Card(
-                    elevation: 4,
-                    child: Column(
-                      children: [
-                        Expanded(
-                          child: coverUrl != null
-                              ? RetryNetworkImage(
-                            url: coverUrl,
-                            fit: BoxFit.cover,
-                            width: double.infinity,
-                          )
-                              : Container(
-                            color: Colors.grey[800],
-                            child: const Center(
-                              child: Icon(Icons.book, size: 40),
-                            ),
-                          ),
-                        ),
-                        Padding(
-                          padding: const EdgeInsets.all(4.0),
-                          child: Text(
-                            book['title'] ?? 'Loading...',
-                            maxLines: 2,
-                            textAlign: TextAlign.center,
-                            overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(fontSize: 12),
-                          ),
-                        ),
-                      ],
-                    ),
+            // Hero Banner (if not searching)
+            if (state.searchQuery.isEmpty)
+              SliverToBoxAdapter(child: _HeroBanner()),
+
+            // Bestsellers Section (if not searching)
+            if (state.searchQuery.isEmpty)
+              SliverToBoxAdapter(child: _BestsellersSection()),
+
+            // Categories Section (if not searching)
+            if (state.searchQuery.isEmpty)
+              SliverToBoxAdapter(child: _CategoriesSection()),
+
+            // Search Results Grid (if searching)
+            if (state.searchQuery.isNotEmpty)
+              SliverPadding(
+                padding: EdgeInsets.all(context.isMobile ? AppSpacing.md : AppSpacing.lg),
+                sliver: SliverGrid(
+                  gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                    crossAxisCount: context.gridColumns,
+                    childAspectRatio: context.cardAspectRatio,
+                    crossAxisSpacing: AppSpacing.md,
+                    mainAxisSpacing: AppSpacing.md,
                   ),
-                );
-              },
-            ),
-          ),
-          if (state.nextUrl != null)
-            Padding(
-              padding: const EdgeInsets.all(8.0),
-              child: ElevatedButton(
-                onPressed: state.isLoading
-                    ? null
-                    : () => notifier.loadBooks(),
-                child: state.isLoading
-                    ? const SizedBox(
-                  width: 16,
-                  height: 16,
-                  child: CircularProgressIndicator(strokeWidth: 2),
-                )
-                    : Text(
-                  'Load More',
-                  style: TextStyle(
-                    color: Theme.of(context).colorScheme.secondary, // or your custom green
+                  delegate: SliverChildBuilderDelegate(
+                        (context, index) => _BookCard(book: state.books[index]),
+                    childCount: state.books.length,
                   ),
                 ),
               ),
-            ),
-        ],
+
+            // Loading Indicator
+            if (state.isLoading)
+              const SliverToBoxAdapter(
+                child: Center(child: Padding(
+                  padding: EdgeInsets.all(16.0),
+                  child: CircularProgressIndicator(),
+                )),
+              ),
+          ],
+        ),
       ),
     );
   }
 }
 
+// Hero Banner Widget
+class _HeroBanner extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: EdgeInsets.all(context.isMobile ? AppSpacing.md : AppSpacing.lg),
+      height: context.isMobile ? 160 : 200,
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          colors: [AppTheme.primaryGreen, Colors.teal],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Text(
+              'Discover Free Books',
+              style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                color: Colors.white,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Thousands of classics from Project Gutenberg',
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                color: Colors.white70,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// Bestsellers Section
+class _BestsellersSection extends ConsumerWidget {
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    return FutureBuilder<List<dynamic>>(
+      future: ref.read(marketplaceProvider.notifier).getBestsellers(),
+      builder: (context, snapshot) {
+        if (!snapshot.hasData || snapshot.data!.isEmpty) return const SizedBox.shrink();
+
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Padding(
+              padding: EdgeInsets.symmetric(horizontal: context.isMobile ? AppSpacing.md : AppSpacing.lg),
+              child: Text('Bestsellers', style: Theme.of(context).textTheme.headlineMedium),
+            ),
+            const SizedBox(height: 12),
+            SizedBox(
+              height: context.bookShelfHeight,
+              child: ListView.builder(
+                scrollDirection: Axis.horizontal,
+                padding: EdgeInsets.symmetric(horizontal: context.isMobile ? AppSpacing.md : AppSpacing.lg),
+                itemCount: snapshot.data!.length,
+                itemBuilder: (context, index) => _HorizontalBookCard(book: snapshot.data![index]),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+}
+
+// Categories Section
+class _CategoriesSection extends ConsumerWidget {
+  final List<Map<String, String>> categories = [
+    {'name': 'Fiction', 'subject': 'fiction'},
+    {'name': 'Science', 'subject': 'science'},
+    {'name': 'History', 'subject': 'history'},
+    {'name': 'Philosophy', 'subject': 'philosophy'},
+  ];
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        ...categories.map((category) => _CategoryRow(
+          title: category['name']!,
+          subject: category['subject']!,
+        )),
+      ],
+    );
+  }
+}
+
+// Category Row Widget
+class _CategoryRow extends ConsumerWidget {
+  final String title;
+  final String subject;
+
+  const _CategoryRow({required this.title, required this.subject});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    return FutureBuilder<List<dynamic>>(
+      future: ref.read(marketplaceProvider.notifier).getBooksBySubject(subject),
+      builder: (context, snapshot) {
+        if (!snapshot.hasData || snapshot.data!.isEmpty) return const SizedBox.shrink();
+
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Padding(
+              padding: EdgeInsets.symmetric(horizontal: context.isMobile ? AppSpacing.md : AppSpacing.lg, vertical: AppSpacing.md),
+              child: Text(title, style: Theme.of(context).textTheme.headlineMedium),
+            ),
+            SizedBox(
+              height: context.bookShelfHeight,
+              child: ListView.builder(
+                scrollDirection: Axis.horizontal,
+                padding: EdgeInsets.symmetric(horizontal: context.isMobile ? AppSpacing.md : AppSpacing.lg),
+                itemCount: snapshot.data!.length,
+                itemBuilder: (context, index) => _HorizontalBookCard(book: snapshot.data![index]),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+}
+
+// Horizontal Book Card (for shelves)
+class _HorizontalBookCard extends ConsumerWidget {
+  final Map<String, dynamic> book;
+
+  const _HorizontalBookCard({required this.book});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final coverUrl = book['formats']['image/jpeg'];
+
+    return GestureDetector(
+      onTap: () => _showBookDialog(context, ref, book),
+      child: Container(
+        width: 120,
+        margin: const EdgeInsets.only(right: 12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(8),
+                child: coverUrl != null
+                    ? RetryNetworkImage(url: coverUrl, fit: BoxFit.cover, width: double.infinity)
+                    : Container(color: Theme.of(context).colorScheme.surface, child: const Icon(Icons.book, size: 40)),
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              book['title'] ?? 'Unknown',
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// Grid Book Card
+class _BookCard extends ConsumerWidget {
+  final Map<String, dynamic> book;
+
+  const _BookCard({required this.book});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final coverUrl = book['formats']['image/jpeg'];
+
+    return GestureDetector(
+      onTap: () => _showBookDialog(context, ref, book),
+      child: Card(
+        elevation: 4,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Expanded(
+              child: coverUrl != null
+                  ? RetryNetworkImage(url: coverUrl, fit: BoxFit.cover)
+                  : Container(color: Theme.of(context).colorScheme.surface, child: const Icon(Icons.book)),
+            ),
+            Padding(
+              padding: const EdgeInsets.all(8.0),
+              child: Text(
+                book['title'] ?? 'Unknown',
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// Book Detail Dialog
+void _showBookDialog(BuildContext context, WidgetRef ref, Map<String, dynamic> book) {
+  final coverUrl = book['formats']['image/jpeg'];
+
+  showDialog(
+    context: context,
+    builder: (context) {
+      return AlertDialog(
+        backgroundColor: Theme.of(context).colorScheme.surface,
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (coverUrl != null)
+                RetryNetworkImage(url: coverUrl, height: 300, fit: BoxFit.contain),
+              const SizedBox(height: 16),
+              Text(book['title'] ?? 'Unknown', style: Theme.of(context).textTheme.headlineMedium),
+              const SizedBox(height: 8),
+              Text(
+                book['authors'] != null && book['authors'].isNotEmpty
+                    ? book['authors'][0]['name']
+                    : 'Unknown Author',
+                style: Theme.of(context).textTheme.bodyMedium,
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('Close'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              ref.read(cartProvider.notifier).addBook(book, context);
+              Navigator.of(context).pop();
+            },
+            child: const Text('Add to Cart'),
+          ),
+        ],
+      );
+    },
+  );
+}
+
+// Retry Network Image Widget
 class RetryNetworkImage extends StatefulWidget {
   final String url;
   final int maxRetries;
@@ -356,7 +416,7 @@ class _RetryNetworkImageState extends State<RetryNetworkImage> {
           return const SizedBox.shrink();
         }
         return Container(
-          color: Colors.grey[800],
+          color: Theme.of(context).colorScheme.surface,
           height: widget.height,
           width: widget.width,
           child: const Center(child: Icon(Icons.broken_image, size: 40)),

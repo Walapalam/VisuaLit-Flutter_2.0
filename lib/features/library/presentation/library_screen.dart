@@ -4,6 +4,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:visualit/features/library/presentation/library_controller.dart';
+import 'package:visualit/core/theme/theme_extensions.dart';
+import 'package:visualit/core/utils/responsive_helper.dart';
+
 
 import '../../reader/data/book_data.dart';
 
@@ -51,11 +54,11 @@ class LibraryScreen extends ConsumerWidget {
           }
           return GridView.builder(
             padding: const EdgeInsets.all(12),
-            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-              crossAxisCount: 3,
-              childAspectRatio: 2 / 3.5, // Make cards longer (was 2/3)
-              crossAxisSpacing: 10,
-              mainAxisSpacing: 10,
+            gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: context.gridColumns,
+              childAspectRatio: context.cardAspectRatio,
+              crossAxisSpacing: ResponsiveHelper.getItemSpacing(context),
+              mainAxisSpacing: ResponsiveHelper.getItemSpacing(context),
             ),
             itemCount: books.length,
             itemBuilder: (context, index) {
@@ -162,28 +165,26 @@ class LibraryScreen extends ConsumerWidget {
                   elevation: 4,
                   child: Column(
                     children: [
-                      SizedBox(
-                        height: 120, // Set a fixed height for the cover image area
-                        width: double.infinity,
+                      Expanded(  // ✅ Add Expanded here
                         child: Stack(
                           children: [
                             Positioned.fill(
                               child: book.coverImageBytes != null
                                   ? Image.memory(
-                                      Uint8List.fromList(book.coverImageBytes!),
-                                      fit: BoxFit.cover,
-                                      width: double.infinity,
-                                      errorBuilder: (context, error, stackTrace) {
-                                        return Container(
-                                          color: Colors.grey[800],
-                                          child: const Center(child: Icon(Icons.book, size: 40)),
-                                        );
-                                      },
-                                    )
+                                Uint8List.fromList(book.coverImageBytes!),
+                                fit: BoxFit.cover,
+                                width: double.infinity,
+                                errorBuilder: (context, error, stackTrace) {
+                                  return Container(
+                                    color: Colors.grey[800],
+                                    child: const Center(child: Icon(Icons.book, size: 40)),
+                                  );
+                                },
+                              )
                                   : Container(
-                                      color: Colors.grey[800],
-                                      child: const Center(child: Icon(Icons.book, size: 40)),
-                                    ),
+                                color: Colors.grey[800],
+                                child: const Center(child: Icon(Icons.book, size: 40)),
+                              ),
                             ),
                             if (book.status == ProcessingStatus.error)
                               Positioned(
@@ -216,12 +217,18 @@ class LibraryScreen extends ConsumerWidget {
                         ),
                       ),
                       if (book.status == ProcessingStatus.processing)
-                        const LinearProgressIndicator(),
+                        const SizedBox(
+                          height: 4,  // ✅ Fixed height for progress bar
+                          child: LinearProgressIndicator(),
+                        ),
                       if (book.status == ProcessingStatus.partiallyReady)
-                        LinearProgressIndicator(
-                          value: book.processingProgress,
-                          backgroundColor: Colors.grey[300],
-                          valueColor: AlwaysStoppedAnimation<Color>(Colors.green),
+                        SizedBox(
+                          height: 4,  // ✅ Fixed height for progress bar
+                          child: LinearProgressIndicator(
+                            value: book.processingProgress,
+                            backgroundColor: Colors.grey[300],
+                            valueColor: const AlwaysStoppedAnimation<Color>(Colors.green),
+                          ),
                         ),
                     ],
                   ),

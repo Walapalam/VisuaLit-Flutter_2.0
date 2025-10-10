@@ -8,6 +8,7 @@ import 'package:http/http.dart' as http;
 import 'dart:io';
 import 'package:path_provider/path_provider.dart';
 import 'package:permission_handler/permission_handler.dart';
+import 'package:visualit/core/theme/theme_extensions.dart';
 
 
 class CartScreen extends ConsumerStatefulWidget {
@@ -47,7 +48,9 @@ class _CartScreenState extends ConsumerState<CartScreen> {
         ),
         title: const Text('Cart'),
       ),
-      body: cartBooks.isEmpty
+      body: Padding(
+        padding: context.screenPadding,
+        child:cartBooks.isEmpty
           ? const Center(
         child: Text(
           'No books in the cart',
@@ -178,6 +181,7 @@ class _CartScreenState extends ConsumerState<CartScreen> {
             ),
           );
         },
+      ),
       ),
     );
   }

@@ -1,6 +1,8 @@
+// lib/features/auth/data/auth_repository.dart
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:visualit/core/api/appwrite_client.dart';
+
+final firebaseAuthProvider = Provider<FirebaseAuth>((ref) => FirebaseAuth.instance);
 
 final authRepositoryProvider = Provider<AuthRepository>((ref) {
   final firebaseAuth = ref.read(firebaseAuthProvider);
@@ -35,24 +37,33 @@ class AuthRepository {
       email: email,
       password: password,
     );
-    // Optionally update display name
     await credential.user?.updateDisplayName(name);
     return credential;
+  }
+
+  Future<void> sendEmailVerification() async {
+    final user = _firebaseAuth.currentUser;
+    if (user != null && !user.emailVerified) {
+      await user.sendEmailVerification();
+    }
+  }
+
+  Future<bool> checkEmailVerified() async {
+    final user = _firebaseAuth.currentUser;
+    if (user == null) return false;
+    await user.reload();
+    return _firebaseAuth.currentUser?.emailVerified ?? false;
   }
 
   Future<void> logout() async {
     await _firebaseAuth.signOut();
   }
 
-  // Firebase does not support anonymous session in the same way, but you can use signInAnonymously
   Future<UserCredential> createAnonymousSession() async {
     return await _firebaseAuth.signInAnonymously();
   }
 
-  // Google sign-in requires additional setup with google_sign_in package
   Future<UserCredential?> signInWithGoogle() async {
-    // Implement using google_sign_in package
-    // Placeholder for now
     throw UnimplementedError('Google sign-in not implemented');
   }
 }

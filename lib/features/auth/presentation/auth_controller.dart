@@ -81,6 +81,21 @@ class AuthController extends StateNotifier<AuthState> {
     }
   }
 
+  Future<void> signUpWithoutStateUpdate(String name, String email, String password) async {
+    log('[AuthController] signUpWithoutStateUpdate() called');
+    await _authRepository.signUp(name: name, email: email, password: password);
+  }
+
+  Future<void> sendVerificationEmail() async {
+    log('[AuthController] sendVerificationEmail() called');
+    await _authRepository.sendEmailVerification();
+  }
+
+  Future<bool> checkEmailVerified() async {
+    log('[AuthController] checkEmailVerified() called');
+    return await _authRepository.checkEmailVerified();
+  }
+
   void _startLoading() {
     log('[AuthController] _startLoading()');
     state = state.copyWith(status: AuthStatus.loading, clearError: true);

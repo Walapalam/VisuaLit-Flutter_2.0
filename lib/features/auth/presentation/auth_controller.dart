@@ -202,13 +202,18 @@ class AuthController extends StateNotifier<AuthState> {
     try {
       await _authRepository.signInWithGoogle();
       log('[AuthController] signInWithGoogle() success');
-      await Future.delayed(const Duration(seconds: 1));
       await initialize();
-    } on AppwriteException catch (e) {
+    } on FirebaseAuthException catch (e) {
       log('[AuthController] signInWithGoogle() failed: $e');
       state = state.copyWith(
         status: AuthStatus.unauthenticated,
-        errorMessage: parseAppwriteException(e),
+        errorMessage: e.message ?? 'Google sign-in failed',
+      );
+    } catch (e) {
+      log('[AuthController] signInWithGoogle() failed: $e');
+      state = state.copyWith(
+        status: AuthStatus.unauthenticated,
+        errorMessage: e.toString(),
       );
     }
   }

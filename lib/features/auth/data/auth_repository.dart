@@ -1,6 +1,7 @@
 // lib/features/auth/data/auth_repository.dart
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:google_sign_in/google_sign_in.dart';
 
 final firebaseAuthProvider = Provider<FirebaseAuth>((ref) => FirebaseAuth.instance);
 
@@ -11,6 +12,7 @@ final authRepositoryProvider = Provider<AuthRepository>((ref) {
 
 class AuthRepository {
   final FirebaseAuth _firebaseAuth;
+  final GoogleSignIn _googleSignIn = GoogleSignIn();
 
   AuthRepository({required FirebaseAuth firebaseAuth}) : _firebaseAuth = firebaseAuth;
 
@@ -61,15 +63,31 @@ class AuthRepository {
   }
 
   Future<void> logout() async {
-    await _firebaseAuth.signOut();
+    await Future.wait([
+      _firebaseAuth.signOut(),
+      _googleSignIn.signOut(),
+    ]);
   }
 
   Future<UserCredential> createAnonymousSession() async {
     return await _firebaseAuth.signInAnonymously();
   }
 
-  Future<UserCredential?> signInWithGoogle() async {
-    throw UnimplementedError('Google sign-in not implemented');
+  Future<UserCredential> signInWithGoogle() async {
+    final GoogleSignInAccount? googleUser = await _googleSignIn.signIn();
+
+    if (googleUser == null) {
+      throw Exception('Sign in cancelled');
+    }
+
+    final GoogleSignInAuthentication googleAuth = await googleUser.authentication;
+
+    final OAuthCredential credential = GoogleAuthProvider.credential(
+      accessToken: googleAuth.accessToken,
+      idToken: googleAuth.idToken,
+    );
+
+    return await _firebaseAuth.signInWithCredential(credential);
   }
 }
 /*

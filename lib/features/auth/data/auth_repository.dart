@@ -48,6 +48,11 @@ class AuthRepository {
     }
   }
 
+  Future<bool> isUserEmailVerified() async {
+    final user = _firebaseAuth.currentUser;
+    return user?.emailVerified ?? false;
+  }
+
   Future<bool> checkEmailVerified() async {
     final user = _firebaseAuth.currentUser;
     if (user == null) return false;

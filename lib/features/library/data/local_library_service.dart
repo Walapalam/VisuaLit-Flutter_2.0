@@ -17,18 +17,25 @@ class LocalLibraryService {
   /// Requests necessary storage permissions for mobile platforms.
   ///
   /// Returns `true` if permission is granted, otherwise `false`.
+  /// Requests necessary storage permissions for mobile platforms.
   Future<bool> _requestPermission() async {
     print('LocalLibraryService: Requesting storage permission...');
 
-    // Permissions are generally only required on mobile platforms.
     if (!Platform.isAndroid && !Platform.isIOS) {
-      print('LocalLibraryService: Running on desktop platform, skipping permission request');
+      print('LocalLibraryService: Running on non-mobile platform, skipping permission request');
       return true;
     }
 
     print('LocalLibraryService: Running on mobile platform (${Platform.operatingSystem}), requesting storage permission');
 
-    final status = await Permission.storage.request();
+    // Check if MANAGE_EXTERNAL_STORAGE is already granted
+    if (await Permission.manageExternalStorage.isGranted) {
+      print('LocalLibraryService: MANAGE_EXTERNAL_STORAGE permission already granted');
+      return true;
+    }
+
+    // Request the more powerful permission
+    final status = await Permission.manageExternalStorage.request();
     print('LocalLibraryService: Permission status: ${status.toString()}');
 
     if (status.isGranted) {
@@ -36,7 +43,6 @@ class LocalLibraryService {
       return true;
     }
 
-    // If permission is permanently denied, guide the user to app settings.
     if (status.isPermanentlyDenied) {
       print('LocalLibraryService: Permission permanently denied, opening app settings');
       await openAppSettings();
@@ -46,6 +52,7 @@ class LocalLibraryService {
 
     return false;
   }
+
 
   /// Opens the platform's file picker to select one or more EPUB files.
   ///

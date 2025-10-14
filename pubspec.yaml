@@ -1,8 +1,8 @@
 name: visualit
-description: "A new Flutter project."
+description: "An AI Powered Ebook Reader Experience"
 publish_to: 'none'
 
-version: 0.1.0+4
+version: 0.1.0+6
 
 environment:
   sdk: ^3.8.1

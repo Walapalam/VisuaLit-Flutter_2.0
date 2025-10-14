@@ -45,6 +45,7 @@ class _MarketplaceScreenState extends ConsumerState<MarketplaceScreen> {
   Widget build(BuildContext context) {
     final state = ref.watch(marketplaceProvider);
     final notifier = ref.read(marketplaceProvider.notifier);
+    final cartBooks = ref.watch(cartProvider);
 
     return Scaffold(
       backgroundColor: Theme.of(context).colorScheme.background,
@@ -56,22 +57,73 @@ class _MarketplaceScreenState extends ConsumerState<MarketplaceScreen> {
             SliverAppBar(
               floating: true,
               snap: true,
-              backgroundColor: Theme.of(context).colorScheme.background,
+              backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+              elevation: 0,
               title: TextField(
                 controller: _searchController,
                 decoration: InputDecoration(
                   hintText: 'Search books...',
-                  filled: true,
-                  fillColor: Theme.of(context).colorScheme.surface,
                   border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(30),
+                    borderRadius: BorderRadius.circular(8),
                     borderSide: BorderSide.none,
                   ),
-                  prefixIcon: const Icon(Icons.search),
+                  filled: true,
+                  fillColor: Theme.of(context).colorScheme.surface,
+                  contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 8,
+                  ),
+                  prefixIcon: Icon(
+                    Icons.search,
+                    color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6),
+                  ),
+                  suffixIcon: Stack(
+                    children: [
+                      IconButton(
+                        icon: Icon(
+                          Icons.shopping_cart,
+                          color: Theme.of(context).colorScheme.onSurface,
+                        ),
+                        onPressed: () {
+                          context.goNamed('cart');
+                        },
+                      ),
+                      if (cartBooks.isNotEmpty)
+                        Positioned(
+                          right: 8,
+                          top: 8,
+                          child: Container(
+                            padding: const EdgeInsets.all(2),
+                            decoration: BoxDecoration(
+                              color: Theme.of(context).colorScheme.secondary,
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            constraints: const BoxConstraints(
+                              minWidth: 16,
+                              minHeight: 16,
+                            ),
+                            child: Text(
+                              '${cartBooks.length}',
+                              style: TextStyle(
+                                color: Theme.of(context).colorScheme.onSecondary,
+                                fontSize: 12,
+                                fontWeight: FontWeight.bold,
+                              ),
+                              textAlign: TextAlign.center,
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
                 ),
-                onSubmitted: (query) => notifier.searchBooks(query),
+                onSubmitted: (query) {
+                  if (query.trim().isNotEmpty) {
+                    ref.read(marketplaceProvider.notifier).searchBooks(query.trim());
+                  }
+                },
               ),
             ),
+
 
             // Hero Banner (if not searching)
             if (state.searchQuery.isEmpty)

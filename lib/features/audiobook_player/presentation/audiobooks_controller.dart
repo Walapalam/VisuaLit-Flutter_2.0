@@ -6,7 +6,7 @@ import 'package:isar/isar.dart';
 import 'package:path/path.dart' as p;
 import 'package:visualit/core/providers/isar_provider.dart';
 import 'package:visualit/features/audiobook_player/data/audiobook.dart';
-import 'package:visualit/features/audiobook_player/data/local_library_service.dart';
+import 'package:visualit/features/audiobook_player/data/audiobook_library_service.dart';
 // --- (1) IMPORT THE PLAYER SERVICE ---
 import 'package:visualit/features/audiobook_player/presentation/audiobook_player_service.dart';
 
@@ -22,7 +22,7 @@ final audiobooksControllerProvider = StateNotifierProvider.autoDispose<
 
 class AudiobooksController extends StateNotifier<AsyncValue<List<Audiobook>>> {
   final Isar _isar;
-  final LocalLibraryService _localLibraryService;
+  final AudiobookLibraryService _localLibraryService;
   // --- (3) STORE THE REF ---
   final Ref _ref;
 

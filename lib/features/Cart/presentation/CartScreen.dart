@@ -9,6 +9,7 @@ import 'dart:io';
 import 'package:path_provider/path_provider.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:visualit/core/theme/theme_extensions.dart';
+import 'package:device_info_plus/device_info_plus.dart';
 
 
 class CartScreen extends ConsumerStatefulWidget {
@@ -32,6 +33,23 @@ class _CartScreenState extends ConsumerState<CartScreen> {
     final visuaLitDir = Directory('${downloadsDir.path}/VisuaLit');
     final file = File('${visuaLitDir.path}/$title.epub');
     return file.exists();
+  }
+
+  Future<bool> _requestStoragePermission() async {
+    if (Platform.isAndroid) {
+      final androidInfo = await DeviceInfoPlugin().androidInfo;
+
+      if (androidInfo.version.sdkInt >= 30) {
+        // Android 11+ requires MANAGE_EXTERNAL_STORAGE
+        final status = await Permission.manageExternalStorage.request();
+        return status.isGranted;
+      } else {
+        // Android 10 and below
+        final status = await Permission.storage.request();
+        return status.isGranted;
+      }
+    }
+    return true; // iOS doesn't need these permissions for app documents
   }
 
   @override
@@ -98,9 +116,9 @@ class _CartScreenState extends ConsumerState<CartScreen> {
                               throw Exception('Download URL not available');
                             }
 
-                            final status = await Permission.storage.request();
-                            if (!status.isGranted) {
-                              throw Exception('Storage permission denied');
+                            final status = await _requestStoragePermission();
+                            if (!status) {
+                              throw Exception('Storage permission denied. Some Error');
                             }
 
                             Directory? downloadsDir;

@@ -413,6 +413,9 @@ void _showBookDialog(BuildContext context, WidgetRef ref, Map<String, dynamic> b
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(),
+            style: TextButton.styleFrom(
+              foregroundColor: Theme.of(context).colorScheme.onSurface,
+            ),
             child: const Text('Close'),
           ),
           ElevatedButton(
@@ -420,6 +423,10 @@ void _showBookDialog(BuildContext context, WidgetRef ref, Map<String, dynamic> b
               ref.read(cartProvider.notifier).addBook(book, context);
               Navigator.of(context).pop();
             },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppTheme.primaryGreen,
+              foregroundColor: Theme.of(context).colorScheme.onSecondary,
+            ),
             child: const Text('Add to Cart'),
           ),
         ],
@@ -427,6 +434,7 @@ void _showBookDialog(BuildContext context, WidgetRef ref, Map<String, dynamic> b
     },
   );
 }
+
 
 // Retry Network Image Widget
 class RetryNetworkImage extends StatefulWidget {

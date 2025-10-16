@@ -1,24 +1,24 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_speed_dial/flutter_speed_dial.dart';
 import 'package:go_router/go_router.dart';
 import 'package:screen_brightness/screen_brightness.dart';
-import 'package:visualit/features/reader/presentation/reading_controller.dart';
+import 'package:flutter_epub_viewer/flutter_epub_viewer.dart';
 import 'package:visualit/features/reader/presentation/reading_preferences_controller.dart';
-import 'package:visualit/features/reader/presentation/widgets/book_page_widget.dart';
-import 'package:visualit/features/reader/presentation/widgets/html_content_widget.dart';
 import 'package:visualit/features/reader/presentation/widgets/reading_settings_panel.dart';
-// Import the BookOverviewDialog (and remove AllBooksOverviewDialog import if it was there)
 import 'package:visualit/features/reader/presentation/widgets/book_overview_dialog.dart';
-// Also need to import your local Book data models from Isar
-import 'package:visualit/features/reader/data/book_data.dart' as local_book_data;
+import 'package:visualit/features/reader/data/book_data.dart';
+import 'package:visualit/core/providers/isar_provider.dart';
 
-import '../../../core/services/isbn_lookup_service.dart'; // Alias to avoid conflict
-
+final bookProvider = FutureProvider.family<Book?, int>((ref, bookId) async {
+  final isar = await ref.watch(isarDBProvider.future);
+  return await isar.books.get(bookId);
+});
 
 class ReadingScreen extends ConsumerStatefulWidget {
-  final int bookId; // This is the Isar book ID
+  final int bookId;
   const ReadingScreen({super.key, required this.bookId});
 
   @override
@@ -27,36 +27,37 @@ class ReadingScreen extends ConsumerStatefulWidget {
 
 class _ReadingScreenState extends ConsumerState<ReadingScreen> {
   bool _isUiVisible = false;
-  PageController? _pageController;
-  ScrollController? _scrollController;
   bool _isLocked = false;
+  final EpubController _epubController = EpubController();
+  Book? _currentBook;
+  String _currentChapter = 'Loading...';
+  double _currentProgress = 0.0;
+  List<EpubChapter> _chapters = [];
 
   @override
   void initState() {
     super.initState();
-    _initializePageStyleControllers();
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersive);
+    _loadBook();
   }
 
-  void _initializePageStyleControllers() {
-    final prefs = ref.read(readingPreferencesProvider);
-    final readingState = ref.read(readingControllerProvider(widget.bookId));
-
-    if (prefs.pageTurnStyle == PageTurnStyle.paged) {
-      _pageController = PageController(initialPage: readingState.currentPage);
-      _scrollController?.dispose();
-      _scrollController = null;
-    } else {
-      _scrollController = ScrollController();
-      _pageController?.dispose();
-      _pageController = null;
-    }
+  Future<void> _loadBook() async {
+    final bookAsync = ref.read(bookProvider(widget.bookId));
+    bookAsync.when(
+      data: (book) {
+        if (book != null) {
+          setState(() {
+            _currentBook = book;
+          });
+        }
+      },
+      loading: () {},
+      error: (error, stack) {},
+    );
   }
 
   @override
   void dispose() {
-    _pageController?.dispose();
-    _scrollController?.dispose();
     ScreenBrightness().resetScreenBrightness();
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
     super.dispose();
@@ -81,64 +82,17 @@ class _ReadingScreenState extends ConsumerState<ReadingScreen> {
     );
   }
 
-  // UPDATED METHOD: Now gathers local book/chapter data and passes to BookOverviewDialog
   void _showBookOverviewDialog() async {
-    // Access the current local book's data and reading state from Riverpod
-    final readingState = ref.read(readingControllerProvider(widget.bookId));
-    final localBook = readingState.book; // This is your local Isar Book object
+    if (_currentBook == null) return;
 
-    if (localBook == null || localBook.title == null || localBook.title!.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Book data (title) not available for visualization lookup.')),
-      );
-      return;
-    }
-
-    // Show a loading indicator while fetching the ISBN
     showDialog(
       context: context,
       barrierDismissible: false,
       builder: (context) => const Center(child: CircularProgressIndicator()),
     );
 
-    // Perform ISBN lookup if missing
-    String? localBookISBN = localBook.isbn;
-    if (localBookISBN == null || localBookISBN.isEmpty) {
-      localBookISBN = await IsbnLookupService.lookupIsbnByTitle(localBook.title!);
-      print("ISBN fetched");// Static method call
-      // Optionally: Save the fetched ISBN to the local book model
-    }
-
-    // Dismiss the loading indicator
     Navigator.of(context).pop();
 
-    // Get current chapter index from the reading state
-    final currentChapterIndex = readingState.blocks[readingState.pageToBlockIndexMap[readingState.currentPage]!].chapterIndex;
-
-    if (currentChapterIndex == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Chapter information not available for visualization.')),
-      );
-      return;
-    }
-
-    // Extract all content blocks for the current chapter
-    final chapterBlocks = readingState.blocks
-        .where((block) => block.chapterIndex == currentChapterIndex)
-        .toList();
-
-    // Combine HTML content of blocks to form chapter_content
-    final currentChapterContent = chapterBlocks
-        .map((block) => block.htmlContent ?? '')
-        .join('\n');
-
-    // Log the values to debug
-    print('Book Title: ${localBook.title}');
-    print('Book ISBN: $localBookISBN');
-    print('Current Chapter Index: $currentChapterIndex');
-    print('Current Chapter Content: $currentChapterContent');
-
-    // Show the BookOverviewDialog
     showGeneralDialog(
       context: context,
       barrierColor: Colors.transparent,
@@ -149,125 +103,246 @@ class _ReadingScreenState extends ConsumerState<ReadingScreen> {
         return FadeTransition(
           opacity: animation,
           child: BookOverviewDialog(
-            bookTitleForLookup: localBook.title!,
-            localBookISBN: "9781472624031",
+            bookTitleForLookup: _currentBook!.title ?? '',
+            localBookISBN: _currentBook!.isbn ?? '',
             localChapterNumber: 1,
-            localChapterContent: currentChapterContent,
+            localChapterContent: _currentChapter,
           ),
         );
       },
     );
   }
 
+  Future<void> _saveReadingProgress() async {
+    if (_currentBook == null) return;
+
+    final isar = await ref.read(isarDBProvider.future);
+    await isar.writeTxn(() async {
+      _currentBook!.lastReadTimestamp = DateTime.now();
+      _currentBook!.lastReadPage = (_currentProgress * 100).toInt();
+      await isar.books.put(_currentBook!);
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
-    final viewSize = MediaQuery.of(context).size;
-    final provider = readingControllerProvider(widget.bookId);
-    final state = ref.watch(provider);
     final prefs = ref.watch(readingPreferencesProvider);
-
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      ref.read(provider.notifier).setLayoutParameters(prefs, viewSize);
-    });
-
-    ref.listen(provider.select((s) => s.currentPage), (previous, next) {
-      if (next != previous && _pageController?.hasClients == true) {
-        if (_pageController!.page?.round() != next) {
-          _pageController!.jumpToPage(next);
-        }
-      }
-    });
-
-    ref.listen(readingPreferencesProvider, (prev, next) {
-      if (prev?.fontSize != next.fontSize ||
-          prev?.lineSpacing != next.lineSpacing ||
-          prev?.fontFamily != next.fontFamily ||
-          prev?.pageTurnStyle != next.pageTurnStyle) {
-        ref.read(provider.notifier).setLayoutParameters(next, viewSize);
-      }
-
-      if (prev?.pageTurnStyle != next.pageTurnStyle) {
-        setState(_initializePageStyleControllers);
-      }
-    });
+    final bookAsync = ref.watch(bookProvider(widget.bookId));
 
     ref.listen(readingPreferencesProvider.select((p) => p.brightness), (_, next) async {
-      try { await ScreenBrightness().setScreenBrightness(next); } catch (_) {}
+      try {
+        await ScreenBrightness().setScreenBrightness(next);
+      } catch (_) {}
     });
 
-    final readerContent = Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 40),
-      child: _buildBody(state, viewSize, provider, prefs),
-    );
+    // Listen to font size changes and apply to epub controller
+    ref.listen(readingPreferencesProvider.select((p) => p.fontSize), (_, next) async {
+      try {
+        await _epubController.setFontSize(fontSize: next);
+      } catch (_) {}
+    });
 
     return Scaffold(
       backgroundColor: prefs.pageColor,
-      appBar: PreferredSize(
-        preferredSize: const Size.fromHeight(kToolbarHeight),
-        child: AnimatedOpacity(
-          opacity: 1.0,
-          duration: const Duration(milliseconds: 250),
-          child: AppBar(
-            backgroundColor: _isUiVisible
-                ? prefs.pageColor.withAlpha(200)
-                : Colors.transparent,
-            elevation: 0,
-            automaticallyImplyLeading: false,
-            centerTitle: true,
-            title: Text(
-              _isUiVisible ? state.chapterProgress : state.book?.title ?? "Loading...",
-              style: TextStyle(color: prefs.textColor, fontSize: 12),
-            ),
-            actions: [
-              AnimatedOpacity(
-                opacity: _isUiVisible ? 1.0 : 0.0,
-                duration: const Duration(milliseconds: 200),
-                child: IconButton(
-                  icon: Icon(Icons.close, color: prefs.textColor),
-                  onPressed: () => context.go('/home'),
-                ),
-              )
-            ],
+      extendBodyBehindAppBar: true, // Allow body to extend behind app bar
+      bottomNavigationBar: AnimatedSlide(
+        offset: Offset(0, _isUiVisible ? 0 : 1), // Slide from bottom
+        duration: const Duration(milliseconds: 300),
+        child: Container(
+          height: 80,
+          child: _buildBottomProgress(prefs),
+        ),
+      ),
+      floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
+      floatingActionButton: AnimatedScale(
+        scale: _isUiVisible ? 1.0 : 0.0,
+        duration: const Duration(milliseconds: 200),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            _buildVisualizationFab(),
+            const SizedBox(height: 10),
+            _buildSpeedDialFab(),
+          ],
+        ),
+      ),
+      body: GestureDetector(
+        behavior: HitTestBehavior.translucent,
+        onTap: _toggleUiVisibility, // Single tap to toggle UI
+        child: AbsorbPointer(
+          absorbing: _isLocked,
+          child: bookAsync.when(
+            data: (book) => book != null
+                ? _buildEpubViewer(book, prefs)
+                : const Center(child: Text('Book not found')),
+            loading: () => const Center(child: CircularProgressIndicator()),
+            error: (error, stack) => Center(child: Text('Error: $error')),
           ),
         ),
       ),
-      bottomNavigationBar: AnimatedContainer(
-        duration: const Duration(milliseconds: 250),
-        height: _isUiVisible ? 80 : 0,
-        child: _isUiVisible ? _buildBottomScrubber(state, prefs) : null,
+    );
+  }
+
+  Widget _buildEpubViewer(Book book, ReadingPreferences prefs) {
+    return Container(
+      color: prefs.pageColor, // Apply theme background color
+      child: EpubViewer(
+        epubSource: EpubSource.fromFile(File(book.epubFilePath)),
+        epubController: _epubController,
+        displaySettings: EpubDisplaySettings(
+          flow: EpubFlow.paginated, // Force paginated for proper chapter separation
+          snap: true, // Enable snapping for better page turns
+          spread: EpubSpread.values.first, // Single page view
+        ),
+        onChaptersLoaded: (List<EpubChapter> chapters) {
+          setState(() {
+            _chapters = chapters;
+            if (chapters.isNotEmpty) {
+              _currentChapter = chapters.first.title ?? 'Chapter 1';
+            }
+          });
+        },
+        onEpubLoaded: () async {
+          // Apply reading preferences
+          await _epubController.setFontSize(fontSize: prefs.fontSize);
+
+          // Set theme colors for epub content
+          await _setEpubTheme(prefs);
+
+          // Restore reading position if available
+          if (book.lastReadPage > 0) {
+            final progressPercent = book.lastReadPage / 100.0;
+            await _epubController.toProgressPercentage(progressPercent);
+          }
+        },
+        onRelocated: (EpubLocation location) {
+          _updateReadingProgress();
+        },
+        onTextSelected: (EpubTextSelection selection) {
+          print('Text selected: ${selection.selectedText}');
+        },
       ),
-      floatingActionButton: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          // Original FAB
-          AnimatedOpacity(
-            opacity: _isUiVisible ? 1.0 : 0.0,
-            duration: const Duration(milliseconds: 250),
-            child: Transform.translate(
-              offset: Offset(_isUiVisible ? 0 : 20, 0),
-              child: _buildSpeedDialFab(),
+    );
+  }
+
+  // Add method to apply theme to epub content
+  Future<void> _setEpubTheme(ReadingPreferences prefs) async {
+    try {
+      // Apply font family
+      if (prefs.fontFamily.isNotEmpty) {
+        // You might need to inject CSS for font family and colors
+        // This is a placeholder - actual implementation depends on epub viewer capabilities
+      }
+
+      // Note: Some epub viewers may not support dynamic theming
+      // You may need to inject custom CSS through the controller if available
+    } catch (e) {
+      print('Error applying epub theme: $e');
+    }
+  }
+
+  Future<void> _updateReadingProgress() async {
+    try {
+      setState(() {
+        _currentProgress = (_currentProgress + 0.01).clamp(0.0, 1.0);
+      });
+      _saveReadingProgress();
+    } catch (e) {
+      print('Error updating progress: $e');
+    }
+  }
+
+  void _showChapterList() {
+    if (_chapters.isEmpty) return;
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => Container(
+        height: MediaQuery.of(context).size.height * 0.6,
+        decoration: BoxDecoration(
+          color: Theme.of(context).colorScheme.surface,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+        ),
+        child: Column(
+          children: [
+            Container(
+              width: 40,
+              height: 4,
+              margin: const EdgeInsets.only(top: 8),
+              decoration: BoxDecoration(
+                color: Colors.grey[300],
+                borderRadius: BorderRadius.circular(2),
+              ),
             ),
-          ),
-          const SizedBox(width: 16),
-          // Visualization FAB
-          AnimatedOpacity(
-            opacity: _isUiVisible ? 1.0 : 0.0,
-            duration: const Duration(milliseconds: 250),
-            child: Transform.translate(
-              offset: Offset(_isUiVisible ? 0 : 20, 0),
-              child: _buildVisualizationFab(),
+            Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: Text(
+                'Chapters',
+                style: Theme.of(context).textTheme.headlineSmall,
+              ),
             ),
-          ),
-        ],
+            Expanded(
+              child: ListView.builder(
+                itemCount: _chapters.length,
+                itemBuilder: (context, index) {
+                  final chapter = _chapters[index];
+                  return ListTile(
+                    title: Text(chapter.title ?? 'Chapter ${index + 1}'),
+                    subtitle: Text('${chapter.href}'),
+                    onTap: () {
+                      Navigator.pop(context);
+                      _epubController.display(cfi: chapter.href);
+                    },
+                  );
+                },
+              ),
+            ),
+          ],
+        ),
       ),
-      body: GestureDetector(
-        behavior: HitTestBehavior.translucent, // Ensures taps are detected on empty spaces
-        onDoubleTap: _toggleUiVisibility, // Toggles the UI visibility on double-tap
-        child: AbsorbPointer(
-          absorbing: _isLocked, // Prevents interaction when locked
-          child: Stack(
-            children: [readerContent], // Your reading content
-          ),
+    );
+  }
+
+  Widget _buildBottomProgress(ReadingPreferences prefs) {
+    return BottomAppBar(
+      color: prefs.pageColor.withOpacity(0.9), // Use theme color
+      elevation: 0,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16.0),
+        child: Row(
+          children: [
+            Text(
+              '${(_currentProgress * 100).toInt()}%',
+              style: TextStyle(color: prefs.textColor, fontSize: 12),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Slider(
+                value: _currentProgress,
+                min: 0.0,
+                max: 1.0,
+                activeColor: Theme.of(context).colorScheme.primary,
+                inactiveColor: prefs.textColor.withOpacity(0.3),
+                onChanged: (value) async {
+                  setState(() {
+                    _currentProgress = value;
+                  });
+                  await _epubController.toProgressPercentage(value);
+                },
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                _currentChapter,
+                style: TextStyle(color: prefs.textColor, fontSize: 12),
+                overflow: TextOverflow.ellipsis,
+                textAlign: TextAlign.end,
+              ),
+            ),
+          ],
         ),
       ),
     );
@@ -281,140 +356,146 @@ class _ReadingScreenState extends ConsumerState<ReadingScreen> {
       foregroundColor: Theme.of(context).colorScheme.onSecondary,
       overlayColor: Colors.black,
       overlayOpacity: 0.5,
-      buttonSize: const Size(48, 48),
-      childrenButtonSize: const Size(44, 44),
-      curve: Curves.bounceIn,
-      visible: _isUiVisible,
+      buttonSize: const Size(56, 56), // Increased size
+      childrenButtonSize: const Size(50, 50),
+      spacing: 8,
+      spaceBetweenChildren: 8,
+      animationCurve: Curves.elasticInOut,
+      isOpenOnStart: false,
+      animationDuration: const Duration(milliseconds: 300),
+      visible: true, // Always visible when parent is visible
+      closeManually: false,
       children: [
         SpeedDialChild(
-            child: const Icon(Icons.bookmark_border),
-            label: 'Bookmark',
-            onTap: () {}),
+          child: const Icon(Icons.bookmark_border),
+          label: 'Bookmark',
+          backgroundColor: Theme.of(context).colorScheme.secondary,
+          foregroundColor: Theme.of(context).colorScheme.onSecondary,
+          onTap: () async {
+            try {
+              final location = await _epubController.getCurrentLocation();
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('Bookmark added!')),
+              );
+            } catch (e) {
+              print('Error adding bookmark: $e');
+            }
+          },
+        ),
         SpeedDialChild(
-            child: const Icon(Icons.share_outlined),
-            label: 'Share',
-            onTap: () {}),
-        SpeedDialChild(
-          child: Icon(
-              _isLocked ? Icons.lock_open_outlined : Icons.lock_outline),
+          child: Icon(_isLocked ? Icons.lock_open_outlined : Icons.lock_outline),
           label: _isLocked ? 'Unlock' : 'Lock Screen',
+          backgroundColor: Theme.of(context).colorScheme.secondary,
+          foregroundColor: Theme.of(context).colorScheme.onSecondary,
           onTap: () => setState(() => _isLocked = !_isLocked),
         ),
         SpeedDialChild(
-            child: const Icon(Icons.search), label: 'Search', onTap: () {}),
+          child: const Icon(Icons.search),
+          label: 'Search',
+          backgroundColor: Theme.of(context).colorScheme.secondary,
+          foregroundColor: Theme.of(context).colorScheme.onSecondary,
+          onTap: _showSearchDialog,
+        ),
         SpeedDialChild(
-            child: const Icon(Icons.tune_outlined),
-            label: 'Theme & Settings',
-            onTap: _showMainSettingsPanel),
+          child: const Icon(Icons.tune_outlined),
+          label: 'Theme & Settings',
+          backgroundColor: Theme.of(context).colorScheme.secondary,
+          foregroundColor: Theme.of(context).colorScheme.onSecondary,
+          onTap: _showMainSettingsPanel,
+        ),
       ],
     );
   }
 
   Widget _buildVisualizationFab() {
-    return SpeedDial(
-      icon: Icons.visibility,
-      activeIcon: Icons.visibility_off,
-      backgroundColor: Theme.of(context).colorScheme.secondary,
-      foregroundColor: Theme.of(context).colorScheme.onSecondary,
-      overlayColor: Colors.black,
-      overlayOpacity: 0.5,
-      buttonSize: const Size(48, 48),
-      childrenButtonSize: const Size(44, 44),
-      curve: Curves.bounceIn,
-      visible: _isUiVisible,
-      children: [
-        SpeedDialChild(
-            child: const Icon(Icons.visibility),
-            label: 'Toggle Visualization',
-            onTap: () {
-              _showBookOverviewDialog(); // Calls the updated method
-            }),
-        SpeedDialChild(
-            child: const Icon(Icons.tune),
-            label: 'Adjust Visualization Settings',
-            onTap: () {
-              // TODO: open visualization settings
-            }),
-      ],
+    return FloatingActionButton(
+      heroTag: "visualization",
+      onPressed: _showBookOverviewDialog,
+      backgroundColor: Theme.of(context).colorScheme.primary,
+      child: const Icon(Icons.visibility),
     );
   }
 
-  Widget _buildBody(
-      ReadingState state,
-      Size viewSize,
-      AutoDisposeStateNotifierProvider<ReadingController, ReadingState>
-      provider,
-      ReadingPreferences prefs) {
-    if (!state.isBookLoaded) return const Center(child: CircularProgressIndicator());
-    if (state.blocks.isEmpty) return const Center(child: Text('This book has no content.'));
-
-    if (prefs.pageTurnStyle == PageTurnStyle.scroll) {
-      return ListView.builder(
-        controller: _scrollController,
-        itemCount: state.blocks.length,
-        itemBuilder: (context, index) {
-          return HtmlContentWidget(
-            key: ValueKey('block_${state.blocks[index].id}'),
-            block: state.blocks[index],
-            blockIndex: index,
-            viewSize: viewSize,
-          );
-        },
-      );
-    } else {
-      return PageView.builder(
-        controller: _pageController,
-        itemCount: state.totalPages,
-        onPageChanged: ref.read(provider.notifier).onPageChanged,
-        itemBuilder: (context, index) {
-          final startingBlockIndex = state.pageToBlockIndexMap[index];
-          if (startingBlockIndex == null) return const Center(child: CircularProgressIndicator());
-          return BookPageWidget(
-            key: ValueKey('page_${index}_$startingBlockIndex'),
-            allBlocks: state.blocks,
-            startingBlockIndex: startingBlockIndex,
-            viewSize: viewSize,
-            pageIndex: index,
-            onPageBuilt: ref.read(provider.notifier).updatePageLayout,
-          );
-        },
-      );
-    }
+  void _showSearchDialog() {
+    showDialog(
+      context: context,
+      builder: (context) {
+        String searchQuery = '';
+        return AlertDialog(
+          title: const Text('Search in Book'),
+          content: TextField(
+            onChanged: (value) => searchQuery = value,
+            decoration: const InputDecoration(
+              hintText: 'Enter search term...',
+              border: OutlineInputBorder(),
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Cancel'),
+            ),
+            TextButton(
+              onPressed: () async {
+                Navigator.pop(context);
+                if (searchQuery.isNotEmpty) {
+                  try {
+                    final results = await _epubController.search(query: searchQuery);
+                    if (results.isNotEmpty) {
+                      _showSearchResults(results);
+                    } else {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('No results found')),
+                      );
+                    }
+                  } catch (e) {
+                    print('Error searching: $e');
+                  }
+                }
+              },
+              child: const Text('Search'),
+            ),
+          ],
+        );
+      },
+    );
   }
 
-  Widget _buildBottomScrubber(ReadingState state, ReadingPreferences prefs) {
-    if (prefs.pageTurnStyle == PageTurnStyle.scroll) return const SizedBox.shrink();
-
-    return BottomAppBar(
-      color: Theme.of(context).colorScheme.surface.withAlpha(242),
-      elevation: 0,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16.0),
-        child: Row(
+  void _showSearchResults(List<EpubSearchResult> results) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => Container(
+        height: MediaQuery.of(context).size.height * 0.6,
+        decoration: BoxDecoration(
+          color: Theme.of(context).colorScheme.surface,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+        ),
+        child: Column(
           children: [
-            Text('Page ${state.currentPage + 1}',
-                style: TextStyle(color: prefs.textColor, fontSize: 12)),
-            Expanded(
-              child: Slider(
-                value: state.currentPage
-                    .toDouble()
-                    .clamp(0, (state.totalPages > 0 ? state.totalPages - 1 : 0).
-                toDouble()),
-                min: 0,
-                max: (state.totalPages > 0
-                    ? state.totalPages - 1
-                    : 0)
-                    .toDouble(),
-                onChanged: (value) => ref
-                    .read(readingControllerProvider(widget.bookId)
-                    .notifier)
-                    .onPageChanged(value.round()),
-                activeColor: prefs.textColor,
-                inactiveColor: prefs.textColor.withAlpha(77),
+            Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: Text(
+                'Search Results (${results.length})',
+                style: Theme.of(context).textTheme.headlineSmall,
               ),
             ),
-            Text('${state.totalPages}',
-                style: TextStyle(color: prefs.textColor, fontSize: 12)),
+            Expanded(
+              child: ListView.builder(
+                itemCount: results.length,
+                itemBuilder: (context, index) {
+                  final result = results[index];
+                  return ListTile(
+                    title: Text(result.excerpt),
+                    onTap: () {
+                      Navigator.pop(context);
+                      _epubController.display(cfi: result.cfi);
+                    },
+                  );
+                },
+              ),
+            ),
           ],
         ),
       ),

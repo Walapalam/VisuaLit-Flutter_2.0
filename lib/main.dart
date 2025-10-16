@@ -8,6 +8,7 @@ import 'package:visualit/core/theme/app_theme.dart';
 import 'package:visualit/core/theme/theme_controller.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'firebase_options.dart';
+import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();

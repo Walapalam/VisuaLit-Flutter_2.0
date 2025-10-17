@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart'; // Import the services package
 import 'package:flutter_html/flutter_html.dart';
 import 'package:flutter_html_table/flutter_html_table.dart';
+import 'package:flutter_html_svg/flutter_html_svg.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../application/epub_parser_service.dart';
@@ -249,9 +250,8 @@ class _ReadingScreenState extends ConsumerState<ReadingScreen> {
                                 return const Icon(Icons.image, color: Colors.grey);
                               },
                             ),
-                            TableHtmlExtension(
-
-                            ),
+                            TableHtmlExtension(),
+                            SvgHtmlExtension()
                           ],
                         ),
                       ],
@@ -427,30 +427,85 @@ class _ReadingScreenState extends ConsumerState<ReadingScreen> {
 
   Map<String, Style> _parseCssToHtmlStyles(Map<String, String> cssFiles) {
     final styles = <String, Style>{};
+    final selectorStyles = <String, Style>{};
+
     for (final cssPath in cssFiles.values) {
       final cssContent = File(cssPath).readAsStringSync();
       final stylesheet = css_parser.parse(cssContent);
+
       for (final rule in stylesheet.topLevels.whereType<RuleSet>()) {
         final selectorGroup = rule.selectorGroup;
         if (selectorGroup == null) continue;
+
         for (final selector in selectorGroup.selectors) {
-          final name = selector.simpleSelectorSequences.first.simpleSelector.name;
+          final selectorText = selector.simpleSelectorSequences.map((seq) {
+            final s = seq.simpleSelector;
+            if (s is ClassSelector) return '.${s.name}';
+            if (s is IdSelector) return '#${s.name}';
+            return s.name ?? '';
+          }).join('');
+
+          // Compound/descendant selectors
+          final fullSelector = selector.simpleSelectorSequences.map((seq) {
+            final s = seq.simpleSelector;
+            if (s is ClassSelector) return '.${s.name}';
+            if (s is IdSelector) return '#${s.name}';
+            return s.name ?? '';
+          }).join(' ');
+
+          // Parse declarations
           Color? color;
           FontSize? fontSize;
+          FontWeight? fontWeight;
+          Color? backgroundColor;
+          TextAlign? textAlign;
+          double? margin;
+          double? padding;
+
           for (final decl in rule.declarationGroup.declarations) {
             if (decl is Declaration) {
-              if (decl.property == 'color') {
-                color = _parseCssColor(decl.expression.toString());
-              }
-              if (decl.property == 'font-size') {
-                fontSize = _parseCssFontSize(decl.expression.toString());
+              switch (decl.property) {
+                case 'color':
+                  color = _parseCssColor(decl.expression.toString());
+                  break;
+                case 'font-size':
+                  fontSize = _parseCssFontSize(decl.expression.toString());
+                  break;
+                case 'font-weight':
+                  fontWeight = _parseCssFontWeight(decl.expression.toString());
+                  break;
+                case 'background-color':
+                  backgroundColor = _parseCssColor(decl.expression.toString());
+                  break;
+                case 'text-align':
+                  textAlign = _parseCssTextAlign(decl.expression.toString());
+                  break;
+                case 'margin':
+                  margin = _parseCssSpacing(decl.expression.toString());
+                  break;
+                case 'padding':
+                  padding = _parseCssSpacing(decl.expression.toString());
+                  break;
               }
             }
           }
-          styles[name] = Style(color: color, fontSize: fontSize);
+
+          selectorStyles[fullSelector] = Style(
+            color: color,
+            fontSize: fontSize,
+            fontWeight: fontWeight,
+            backgroundColor: backgroundColor,
+            textAlign: textAlign,
+            margin: margin != null ? Margins.all(margin) : null,
+            padding: padding != null ? HtmlPaddings.all(padding) : null,
+          );
         }
       }
     }
+
+    // Merge selectorStyles into styles, prioritizing specificity
+    styles.addAll(selectorStyles);
+
     return styles;
   }
 
@@ -486,6 +541,58 @@ class _ReadingScreenState extends ConsumerState<ReadingScreen> {
     final size = double.tryParse(value);
     if (size != null) return FontSize(size);
     return null;
+  }
+
+
+// Helper for font-weight
+  FontWeight? _parseCssFontWeight(String value) {
+    value = value.trim();
+    switch (value) {
+      case 'bold':
+      case '700':
+        return FontWeight.bold;
+      case 'normal':
+      case '400':
+        return FontWeight.normal;
+      case '300':
+        return FontWeight.w300;
+      case '500':
+        return FontWeight.w500;
+      case '900':
+        return FontWeight.w900;
+      default:
+        return null;
+    }
+  }
+
+// Helper for text-align
+  TextAlign? _parseCssTextAlign(String value) {
+    value = value.trim();
+    switch (value) {
+      case 'center':
+        return TextAlign.center;
+      case 'right':
+        return TextAlign.right;
+      case 'left':
+        return TextAlign.left;
+      case 'justify':
+        return TextAlign.justify;
+      default:
+        return null;
+    }
+  }
+
+// Helper for margin/padding
+  double? _parseCssSpacing(String value) {
+    value = value.trim();
+    if (value.endsWith('px')) {
+      return double.tryParse(value.replaceAll('px', ''));
+    }
+    if (value.endsWith('em')) {
+      final size = double.tryParse(value.replaceAll('em', ''));
+      if (size != null) return size * 16;
+    }
+    return double.tryParse(value);
   }
 
   @override

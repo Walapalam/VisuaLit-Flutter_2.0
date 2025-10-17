@@ -26,16 +26,16 @@ class EpubMetadata {
   final String title;
   final String author;
   final List<EpubChapter> chapters;
-
-  // Map from EPUB internal path (e.g. "OEBPS/images/img1.jpg") to extracted local file path
   final Map<String, String> images;
+  final Map<String, String> cssFiles;
 
   EpubMetadata({
     required this.title,
     required this.author,
     required this.chapters,
     required this.images,
-  });
+    Map<String, String>? cssFiles,
+  }) : cssFiles = cssFiles ?? {};
 }
 
 class EpubParserService {
@@ -139,11 +139,28 @@ class EpubParserService {
       }
     }
 
+    final cssFiles = <String, String>{};
+    for (final entry in manifestMediaTypeByHref.entries) {
+      final epubHref = entry.key;
+      final mediaType = entry.value.toLowerCase();
+      if (mediaType == 'text/css' || p.extension(epubHref).toLowerCase() == '.css') {
+        final archiveFile = findFile(archive, epubHref);
+        if (archiveFile != null) {
+          final filename = p.basename(epubHref);
+          final localPath = p.join(extractDir.path, filename);
+          final outFile = File(localPath);
+          await outFile.writeAsBytes(archiveFile.content as List<int>);
+          cssFiles[epubHref] = outFile.path;
+        }
+      }
+    }
+
     return EpubMetadata(
       title: title,
       author: author,
       chapters: chapters,
       images: images,
+      cssFiles: cssFiles,
     );
   }
 

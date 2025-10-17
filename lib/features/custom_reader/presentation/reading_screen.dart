@@ -12,6 +12,8 @@ import 'package:visualit/core/providers/isar_provider.dart';
 import 'dart:io';
 import 'package:path/path.dart' as p;
 import 'package:html/parser.dart' as html_parser;
+import 'package:csslib/parser.dart' as css_parser;
+import 'package:csslib/visitor.dart';
 
 class ReadingScreen extends ConsumerStatefulWidget {
   final int bookId;
@@ -133,12 +135,7 @@ class _ReadingScreenState extends ConsumerState<ReadingScreen> {
                         const SizedBox(height: 16),
                         Html(
                           data: processedContent, // Use processed content with local file URIs
-                          style: {
-                            "body": Style(
-                              fontSize: FontSize(16),
-                              lineHeight: const LineHeight(1.6),
-                            ),
-                          },
+                          style: _parseCssToHtmlStyles(_epubData!.cssFiles),
                           extensions: [
                             TagExtension(
                               tagsToExtend: {"img"}, // Set of strings, not single string
@@ -426,6 +423,69 @@ class _ReadingScreenState extends ConsumerState<ReadingScreen> {
         print('DEBUG: CSS file not found for "$href" (resolved: $lookupPath)');
       }
     }
+  }
+
+  Map<String, Style> _parseCssToHtmlStyles(Map<String, String> cssFiles) {
+    final styles = <String, Style>{};
+    for (final cssPath in cssFiles.values) {
+      final cssContent = File(cssPath).readAsStringSync();
+      final stylesheet = css_parser.parse(cssContent);
+      for (final rule in stylesheet.topLevels.whereType<RuleSet>()) {
+        final selectorGroup = rule.selectorGroup;
+        if (selectorGroup == null) continue;
+        for (final selector in selectorGroup.selectors) {
+          final name = selector.simpleSelectorSequences.first.simpleSelector.name;
+          Color? color;
+          FontSize? fontSize;
+          for (final decl in rule.declarationGroup.declarations) {
+            if (decl is Declaration) {
+              if (decl.property == 'color') {
+                color = _parseCssColor(decl.expression.toString());
+              }
+              if (decl.property == 'font-size') {
+                fontSize = _parseCssFontSize(decl.expression.toString());
+              }
+            }
+          }
+          styles[name] = Style(color: color, fontSize: fontSize);
+        }
+      }
+    }
+    return styles;
+  }
+
+  // Helper to parse CSS color strings
+  Color? _parseCssColor(String value) {
+    value = value.trim();
+    if (value.startsWith('#')) {
+      final hex = value.substring(1);
+      if (hex.length == 6) {
+        return Color(int.parse('FF$hex', radix: 16));
+      } else if (hex.length == 3) {
+        final r = hex[0] * 2, g = hex[1] * 2, b = hex[2] * 2;
+        return Color(int.parse('FF$r$g$b', radix: 16));
+      }
+    }
+    // Add more named color support if needed
+    return null;
+  }
+
+// Helper to parse CSS font-size strings
+  FontSize? _parseCssFontSize(String value) {
+    value = value.trim();
+    if (value.endsWith('px')) {
+      final numStr = value.replaceAll('px', '');
+      final size = double.tryParse(numStr);
+      if (size != null) return FontSize(size);
+    }
+    if (value.endsWith('em')) {
+      final numStr = value.replaceAll('em', '');
+      final size = double.tryParse(numStr);
+      if (size != null) return FontSize(size * 16); // 1em = 16px default
+    }
+    final size = double.tryParse(value);
+    if (size != null) return FontSize(size);
+    return null;
   }
 
   @override

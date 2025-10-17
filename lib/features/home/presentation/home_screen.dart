@@ -204,9 +204,7 @@ class _BookShelf extends StatelessWidget {
                 author: book.author ?? 'Unknown Author',
                 onTap: () {
                   if (book.status == db.ProcessingStatus.ready) {
-                    context.goNamed('bookReader',
-                        pathParameters: {'bookId': book.id.toString()}
-                    );
+                    context.goNamed('epubReader', pathParameters: {'bookId': book.id.toString()});
                   } else {
                     ScaffoldMessenger.of(context).showSnackBar(SnackBar(
                       content: Text('${book.title ?? 'Book'} is still processing...'),

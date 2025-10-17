@@ -23,6 +23,7 @@ import '../../features/auth/presentation/splash_screen.dart';
 import '../../features/reader/presentation/reading_screen.dart';
 import 'package:visualit/features/marketplace/presentation/marketplace_screen.dart';
 import 'package:visualit/features/Cart/presentation/CartScreen.dart';
+import 'package:visualit/features/custom_reader/presentation/reading_screen.dart' as custom_reader;
 
 final _rootNavigatorKey = GlobalKey<NavigatorState>();
 
@@ -79,6 +80,14 @@ final goRouterProvider = Provider<GoRouter>((ref) {
         path: '/cart',
         name: 'cart',
         builder: (context, state) => const CartScreen(),
+      ),
+      GoRoute(
+        path: '/epub/:bookId',
+        name: 'epubReader',
+        builder: (context, state) {
+          final bookId = int.tryParse(state.pathParameters['bookId'] ?? '0') ?? 0;
+          return custom_reader.ReadingScreen(bookId: bookId);
+        },
       ),
       // TODO: Add '/preferences' route here when built
 

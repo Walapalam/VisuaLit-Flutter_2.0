@@ -1,6 +1,7 @@
 // dart
 import 'package:flutter/material.dart';
 import 'package:flutter_html/flutter_html.dart';
+import 'package:flutter_html_table/flutter_html_table.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../application/epub_parser_service.dart';
@@ -25,7 +26,7 @@ class ReadingScreen extends ConsumerStatefulWidget {
 
 class _ReadingScreenState extends ConsumerState<ReadingScreen> {
   final EpubParserService _epubParser = EpubParserService();
-  final PageController _pageController = PageController();
+  final PageController _pageController = PageController(initialPage: 0);
 
   EpubMetadata? _epubData;
   String? _epubPath;
@@ -109,6 +110,7 @@ class _ReadingScreenState extends ConsumerState<ReadingScreen> {
           },
           itemBuilder: (context, index) {
             final chapter = _epubData!.chapters[index];
+            debugPrint('Rendering chapter $index: ${chapter.href}');
 
             // Preprocess the HTML to rewrite image sources
             final processedContent = chapter.content;
@@ -240,6 +242,9 @@ class _ReadingScreenState extends ConsumerState<ReadingScreen> {
                           return const Icon(Icons.image, color: Colors.grey);
                         },
                       ),
+                      TableHtmlExtension(
+
+                      ),
                     ],
                   ),
                 ],
@@ -287,7 +292,7 @@ class _ReadingScreenState extends ConsumerState<ReadingScreen> {
   }
 
   void _nextChapter() {
-    if (_currentChapterIndex < (_epubData?.chapters.length ?? 0) - 1) {
+    if (_currentChapterIndex < (_epubData?.chapters.length ?? 1) - 1) {
       _pageController.nextPage(
         duration: const Duration(milliseconds: 300),
         curve: Curves.easeInOut,

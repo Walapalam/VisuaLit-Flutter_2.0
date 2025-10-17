@@ -7,6 +7,7 @@ import 'package:visualit/features/library/presentation/library_controller.dart';
 import 'package:visualit/features/reader/data/book_data.dart' as db;
 import 'package:visualit/shared_widgets/book_card.dart';
 import '../../../core/providers/isar_provider.dart';
+import 'package:visualit/features/reader/presentation/epub_viewer_service.dart';
 
 class HomeScreen extends ConsumerWidget {
   const HomeScreen({super.key});
@@ -202,11 +203,19 @@ class _BookShelf extends StatelessWidget {
                 Uint8List.fromList(book.coverImageBytes!) : null,
                 title: book.title ?? 'No Title',
                 author: book.author ?? 'Unknown Author',
-                onTap: () {
+                onTap: () async {
                   if (book.status == db.ProcessingStatus.ready) {
-                    context.goNamed('bookReader',
-                        pathParameters: {'bookId': book.id.toString()}
-                    );
+                    try {
+                      // Use custom reading screen instead of direct epub viewer
+                      await EpubViewerService.openBookWithCustomUI(book, context);
+                    } catch (e) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text('Failed to open ${book.title}: $e'),
+                          backgroundColor: Colors.red,
+                        ),
+                      );
+                    }
                   } else {
                     ScaffoldMessenger.of(context).showSnackBar(SnackBar(
                       content: Text('${book.title ?? 'Book'} is still processing...'),

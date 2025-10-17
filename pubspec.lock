@@ -1666,6 +1666,15 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "15.0.0"
+  vocsy_epub_viewer:
+    dependency: "direct main"
+    description:
+      path: "."
+      ref: "refactor/deprecate-registrar"
+      resolved-ref: b960cab179616cb53bb5a069e944f8e7aa06237d
+      url: "https://github.com/Sahad2701/vocsy_epub_viewer.git"
+    source: git
+    version: "3.0.0"
   wakelock_plus:
     dependency: transitive
     description:

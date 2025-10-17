@@ -40,6 +40,7 @@ class Book {
   // Reading progress
   int lastReadPage = 0;
   DateTime? lastReadTimestamp;
+  String? lastReadLocator; // Serialized locator for epub viewer
 
   // File size tracking for cache management
   int? fileSizeInBytes;

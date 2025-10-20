@@ -35,7 +35,7 @@ class ReadingScreen extends ConsumerStatefulWidget {
 
 class _ReadingScreenState extends ConsumerState<ReadingScreen> {
   final EpubParserService _epubParser = EpubParserService();
-  final PageController _pageController = PageController(initialPage: 0);
+  late PageController _pageController;
   final ScrollController _scrollController = ScrollController();
 
   NewReadingController? _readingController;
@@ -90,18 +90,9 @@ class _ReadingScreenState extends ConsumerState<ReadingScreen> {
 
       setState(() {
         _epubData = epubData;
-        _isLoading = false;
       });
 
-      // Restore scroll position after loading the book
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (_pageController.hasClients) {
-          _pageController.jumpToPage(_currentChapterIndex);
-        }
-        if (_scrollController.hasClients) {
-          _scrollController.jumpTo(_currentScrollOffset);
-        }
-      });
+      // We'll handle navigation to the correct chapter elsewhere
     } catch (e) {
       setState(() {
         _error = e.toString();
@@ -110,26 +101,39 @@ class _ReadingScreenState extends ConsumerState<ReadingScreen> {
     }
   }
 
-
   Future<void> _initializeController() async {
     try {
+      setState(() {
+        _isLoading = true;
+      });
+
       log('Initializing reading controller for bookId: ${widget.bookId}', name: '_ReadingScreenState');
       final isar = await ref.read(isarInstanceProvider.future);
       _readingController = NewReadingController(isar);
 
+      // Load book data first
+      await _loadBookAndEpub();
+
+      // Then load reading progress
       final progress = await _readingController!.loadProgress(widget.bookId);
+
       if (progress != null) {
         _currentChapterIndex = _getChapterIndexFromHref(progress.lastChapterHref);
         _currentScrollOffset = progress.lastScrollOffset;
-        log('Restored progress: ChapterIndex=$_currentChapterIndex, ScrollOffset=$_currentScrollOffset', name: '_ReadingScreenState');
+        log('Restored progress: ChapterIndex=$_currentChapterIndex, ScrollOffset=$_currentScrollOffset',
+            name: '_ReadingScreenState');
       }
 
-      await _loadBookAndEpub();
+      // Initialize PageController with the correct starting page
+      _pageController = PageController(initialPage: _currentChapterIndex);
 
+      // Complete initialization
+      setState(() {
+        _isLoading = false;
+      });
+
+      // Important: Jump to correct scroll position AFTER the state update has been applied
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (_pageController.hasClients) {
-          _pageController.jumpToPage(_currentChapterIndex);
-        }
         if (_scrollController.hasClients) {
           _scrollController.jumpTo(_currentScrollOffset);
         }
@@ -155,18 +159,25 @@ class _ReadingScreenState extends ConsumerState<ReadingScreen> {
   }
 
   int _getChapterIndexFromHref(String href) {
-    return _epubData?.chapters.indexWhere((chapter) => chapter.href == href) ?? 0;
+    if (_epubData == null) return 0;
+
+    final index = _epubData!.chapters.indexWhere((chapter) => chapter.href == href);
+    return index >= 0 ? index : 0;
   }
 
   String _getChapterHrefFromIndex(int index) {
     return _epubData?.chapters[index].href ?? '';
   }
 
-  void _saveProgress({required int bookIndex, required int chapterIndex, required double scrollOffset}) {
+  Future<void> _saveProgress({required int bookIndex, required int chapterIndex, required double scrollOffset}) async {
     log('Saving progress: BookId=$bookIndex, ChapterIndex=$chapterIndex, ScrollOffset=$scrollOffset', name: '_ReadingScreenState');
-    if (_readingController != null) {
+    if (_readingController != null && _epubData != null) {
       final chapterHref = _getChapterHrefFromIndex(chapterIndex);
-      _readingController!.saveProgress(bookIndex, chapterHref, scrollOffset);
+      if (chapterHref.isNotEmpty) {
+        await _readingController!.saveProgress(bookIndex, chapterHref, scrollOffset);
+      } else {
+        log('Warning: Could not save progress - invalid chapter href', name: '_ReadingScreenState');
+      }
     }
   }
 
@@ -187,7 +198,23 @@ class _ReadingScreenState extends ConsumerState<ReadingScreen> {
       );
     }
 
-    return Scaffold(
+    return PopScope(
+      canPop: false,
+      onPopInvoked: (didPop) async {
+        if (didPop) return;
+
+        // Save progress before navigating away
+        await _saveProgress(
+          bookIndex: widget.bookId,
+          chapterIndex: _currentChapterIndex,
+          scrollOffset: _currentScrollOffset,
+        );
+
+        if (mounted) {
+          context.go("/home");
+        }
+      },
+      child: Scaffold(
       body: Stack(
         children: [
           // Chapter content with tap to toggle overlay
@@ -394,7 +421,7 @@ class _ReadingScreenState extends ConsumerState<ReadingScreen> {
           ),
         ],
       ),
-    );
+    ),);
   }
 
   Widget _buildNavigationBar() {
@@ -684,10 +711,26 @@ class _ReadingScreenState extends ConsumerState<ReadingScreen> {
 
   @override
   void dispose() {
+    // First, cancel any pending debounced saves
     _saveDebounceTimer?.cancel();
+
+    // Force a final save with the current position
+    if (_readingController != null && !_isLoading) {
+      _saveProgress(
+        bookIndex: widget.bookId,
+        chapterIndex: _currentChapterIndex,
+        scrollOffset: _currentScrollOffset,
+      );
+    }
+
+    // Then dispose of controllers
     _scrollController.dispose();
     _pageController.dispose();
-    SystemChrome.setEnabledSystemUIMode(SystemUiMode.manual, overlays: SystemUiOverlay.values);
+
+    // Reset system UI
+    SystemChrome.setEnabledSystemUIMode(SystemUiMode.manual,
+        overlays: SystemUiOverlay.values);
+
     super.dispose();
   }
 }

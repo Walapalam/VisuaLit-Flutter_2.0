@@ -22,6 +22,9 @@ import 'package:visualit/features/custom_reader/model/new_reading_progress.dart'
 import 'dart:developer';
 import 'package:visualit/core/theme/app_theme.dart';
 import 'package:visualit/core/utils/responsive_helper.dart';
+import 'package:flutter_speed_dial/flutter_speed_dial.dart';
+import 'dart:ui';
+import 'package:visualit/features/custom_reader/presentation/widgets/custom_reading_settings_panel.dart';
 
 class ReadingScreen extends ConsumerStatefulWidget {
   final int bookId;
@@ -49,8 +52,15 @@ class _ReadingScreenState extends ConsumerState<ReadingScreen> {
   bool _isLoading = true;
   String? _error;
   bool _showOverlay = true;
+
   double _currentScrollOffset = 0.0;
   double? _pendingScrollOffset;
+
+  bool _isLocked = false;
+
+// Add to _ReadingScreenState in reading_screen.dart
+  bool _isSettingsOverlayVisible = false;
+  String? _activeSettingsCategory; // null, 'text', 'theme', or 'layout'
 
   @override
   void initState() {
@@ -290,7 +300,7 @@ class _ReadingScreenState extends ConsumerState<ReadingScreen> {
           // Chapter content with tap to toggle overlay
           Positioned.fill(
             child: GestureDetector(
-              onTap: _toggleOverlay, // Use the new toggle method
+              onTap: _isLocked ? null : _toggleOverlay, // Use the new toggle method
               child: PageView.builder(
                 controller: _pageController,
                 itemCount: _epubData?.chapters.length ?? 0,
@@ -503,32 +513,45 @@ class _ReadingScreenState extends ConsumerState<ReadingScreen> {
                 opacity: _showOverlay ? 1.0 : 0.0,
                 duration: const Duration(milliseconds: 300),
                 child: SafeArea(
-                  child: _buildNavigationBar(),
+                  child: _buildNavigationBar(backgroundColor: Colors.transparent),
                 ),
               ),
             ),
           ),
+
+          if (_isSettingsOverlayVisible)
+            GestureDetector(
+              onTap: _hideSettingsPanel,
+              behavior: HitTestBehavior.opaque,
+              child: Container(
+                color: Colors.transparent,
+                width: double.infinity,
+                height: double.infinity,
+              ),
+            ),
+          if (_isSettingsOverlayVisible)
+            CustomReadingSettingsPanel(
+              category: 'text',
+              onBack: _hideSettingsPanel,
+              scrollController: ScrollController(), // <-- provide a controller
+            )
+
         ],
       ),
     ),);
   }
 
-  Widget _buildNavigationBar() {
+  Widget _buildNavigationBar({Color? backgroundColor}) {
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 16.0),
+      color: backgroundColor ?? Colors.black.withOpacity(0.8),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           // Left FAB (Settings)
           Padding(
             padding: const EdgeInsets.only(left: 16.0),
-            child: FloatingActionButton(
-              heroTag: "settingsFab",
-              mini: true,
-              backgroundColor: AppTheme.primaryGreen,
-              child: const Icon(Icons.settings, color: Colors.black),
-              onPressed: _showSettingsPanel,
-            ),
+            child: _buildSettingsSpeedDial(),
           ),
 
           // Center pill with navigation
@@ -577,16 +600,100 @@ class _ReadingScreenState extends ConsumerState<ReadingScreen> {
           // Right FAB (Visualization)
           Padding(
             padding: const EdgeInsets.only(right: 16.0),
-            child: FloatingActionButton(
-              heroTag: "visualizationFab",
-              mini: true,
-              backgroundColor: AppTheme.primaryGreen,
-              child: const Icon(Icons.visibility, color: Colors.black),
-              onPressed: _showBookOverview,
-            ),
+            child: _buildVisualizationSpeedDial(),
           ),
         ],
       ),
+    );
+  }
+
+  Widget _buildSettingsSpeedDial() {
+    return SpeedDial(
+      icon: Icons.more_horiz,
+      activeIcon: Icons.close,
+      backgroundColor: AppTheme.primaryGreen,
+      foregroundColor: Colors.black,
+      overlayColor: Colors.black,
+      overlayOpacity: 0.5,
+      buttonSize: const Size(48, 48),
+      childrenButtonSize: const Size(44, 44),
+      curve: Curves.bounceIn,
+      visible: _showOverlay,
+      direction: SpeedDialDirection.up,
+      switchLabelPosition: true,
+      spacing: 10,
+      children: [
+        SpeedDialChild(
+            child: const Icon(Icons.bookmark_border),
+            label: 'Bookmark',
+            onTap: () {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('Bookmark added')),
+              );
+            }
+        ),
+        SpeedDialChild(
+            child: const Icon(Icons.share_outlined),
+            label: 'Share',
+            onTap: () {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('Share feature coming soon')),
+              );
+            }
+        ),
+        SpeedDialChild(
+          child: Icon(_isLocked ? Icons.lock_open_outlined : Icons.lock_outline),
+          label: _isLocked ? 'Unlock' : 'Lock Screen',
+          onTap: () => setState(() => _isLocked = !_isLocked),
+        ),
+        SpeedDialChild(
+            child: const Icon(Icons.search),
+            label: 'Search',
+            onTap: () {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('Search feature coming soon')),
+              );
+            }
+        ),
+        SpeedDialChild(
+          child: const Icon(Icons.tune_outlined),
+          label: 'Theme & Settings',
+          onTap: _showSettingsPanel,
+        ),
+      ],
+    );
+  }
+
+
+  Widget _buildVisualizationSpeedDial() {
+    return SpeedDial(
+      icon: Icons.visibility,
+      activeIcon: Icons.visibility_off,
+      backgroundColor: AppTheme.primaryGreen,
+      foregroundColor: Colors.black,
+      overlayColor: Colors.black,
+      overlayOpacity: 0.5,
+      buttonSize: const Size(48, 48),
+      childrenButtonSize: const Size(44, 44),
+      curve: Curves.bounceIn,
+      visible: _showOverlay,
+      children: [
+        SpeedDialChild(
+          child: const Icon(Icons.visibility),
+          label: 'Toggle Visualization',
+          onTap: () => _showBookOverview(),
+        ),
+        SpeedDialChild(
+            child: const Icon(Icons.tune),
+            label: 'Adjust Visualization Settings',
+            onTap: () {
+              // Implement visualization settings
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('Visualization settings coming soon')),
+              );
+            }
+        ),
+      ],
     );
   }
 
@@ -671,98 +778,112 @@ class _ReadingScreenState extends ConsumerState<ReadingScreen> {
     );
   }
 
-
-
   void _showChapterBottomSheet() {
     showModalBottomSheet(
       context: context,
-      backgroundColor: Colors.black.withOpacity(0.9),
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
+      backgroundColor: Colors.transparent, // Make the sheet itself transparent
+      isScrollControlled: true,
       builder: (context) => DraggableScrollableSheet(
         initialChildSize: 0.6,
         minChildSize: 0.3,
-        maxChildSize: 0.9,
+        maxChildSize: 0.6,
         expand: false,
-        builder: (context, scrollController) => Column(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(16),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: Text(
-                      'Chapters',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
+        builder: (context, scrollController) => Container(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              _buildNavigationBar(backgroundColor: Colors.transparent),
+              Expanded(
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: Colors.black.withOpacity(0.9), // Your desired background color
+                    borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
                   ),
-                  IconButton(
-                    icon: Icon(Icons.close, color: Colors.white),
-                    onPressed: () => Navigator.pop(context),
-                  ),
-                ],
-              ),
-            ),
-            Divider(color: Colors.grey.shade700, height: 1),
-            Expanded(
-              child: ListView.builder(
-                controller: scrollController,
-                itemCount: _epubData?.chapters.length ?? 0,
-                itemBuilder: (context, index) {
-                  final chapter = _epubData!.chapters[index];
-                  return ListTile(
-                    title: Text(
-                      chapter.title,
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontWeight: _currentChapterIndex == index
-                            ? FontWeight.bold
-                            : FontWeight.normal,
-                      ),
-                    ),
-                    trailing: _currentChapterIndex == index
-                        ? Icon(Icons.check_circle, color: Colors.blue)
-                        : null,
-                    onTap: () {
-                      Navigator.pop(context);
-                      _pageController.animateToPage(
-                        index,
-                        duration: const Duration(milliseconds: 300),
-                        curve: Curves.easeInOut,
+                  child: ListView.builder(
+                    controller: scrollController,
+                    itemCount: _epubData?.chapters.length ?? 0,
+                    itemBuilder: (context, index) {
+                      final chapter = _epubData!.chapters[index];
+                      return ListTile(
+                        title: Text(
+                          chapter.title,
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontWeight: _currentChapterIndex == index
+                                ? FontWeight.bold
+                                : FontWeight.normal,
+                          ),
+                        ),
+                        trailing: _currentChapterIndex == index
+                            ? Icon(Icons.check_circle, color: Colors.blue)
+                            : null,
+                        onTap: () {
+                          Navigator.pop(context);
+                          _pageController.animateToPage(
+                            index,
+                            duration: const Duration(milliseconds: 300),
+                            curve: Curves.easeInOut,
+                          );
+                        },
                       );
                     },
-                  );
-                },
-              ),
-            ),
-          ],
+                  ),
+                ),
+              )
+            ],
+          ),
         ),
       ),
     );
   }
 
-  void _showSettingsPanel() {
-    // Will implement this method to show reading settings
-    // (font size, background color, etc.)
-    showDialog(
+
+  void _showAdvancedSettings() {
+    showModalBottomSheet(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Reading Settings'),
-        content: const Text('Settings panel will go here'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Close'),
-          ),
-        ],
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => DraggableScrollableSheet(
+        initialChildSize: 0.6,
+        minChildSize: 0.3,
+        maxChildSize: 0.95,
+        expand: false,
+        builder: (context, scrollController) => CustomReadingSettingsPanel(
+          category: 'advanced',
+          onBack: () => Navigator.pop(context),
+          scrollController: scrollController, // <-- add this
+        ),
       ),
     );
   }
+
+
+  void _showSettingsPanel() {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => DraggableScrollableSheet(
+        initialChildSize: 0.40,
+        minChildSize: 0.40,
+        maxChildSize: 0.70,
+        expand: true, // Locks the sheet at 55% height
+        builder: (context, scrollController) => CustomReadingSettingsPanel(
+          category: 'text',
+          onBack: () => Navigator.pop(context),
+          scrollController: scrollController,
+        ),
+      ),
+    );
+  }
+
+
+  void _hideSettingsPanel() {
+    setState(() {
+      _isSettingsOverlayVisible = false;
+    });
+  }
+
 
   void _showBookOverview() {
     // Will implement this method to show book info/visualization

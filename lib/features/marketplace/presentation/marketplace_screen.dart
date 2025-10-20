@@ -30,7 +30,10 @@ class _MarketplaceScreenState extends ConsumerState<MarketplaceScreen> {
 
   void _onScroll() {
     if (_scrollController.position.pixels >= _scrollController.position.maxScrollExtent * 0.8) {
-      ref.read(marketplaceProvider.notifier).loadBooks();
+      final state = ref.read(marketplaceProvider);
+      if (!state.isLoading && state.nextUrl != null) {
+        ref.read(marketplaceProvider.notifier).loadBooks();
+      }
     }
   }
 
@@ -149,8 +152,15 @@ class _MarketplaceScreenState extends ConsumerState<MarketplaceScreen> {
                     mainAxisSpacing: AppSpacing.md,
                   ),
                   delegate: SliverChildBuilderDelegate(
-                        (context, index) => _BookCard(book: state.books[index]),
-                    childCount: state.books.length,
+                        (context, index) {
+                      if (index < state.books.length) {
+                        return _BookCard(book: state.books[index]);
+                      } else {
+                        // Show loading indicator at the end
+                        return const Center(child: CircularProgressIndicator());
+                      }
+                    },
+                    childCount: state.isLoading ? state.books.length + 1 : state.books.length,
                   ),
                 ),
               ),
@@ -185,28 +195,46 @@ class _HeroBanner extends StatelessWidget {
         ),
         borderRadius: BorderRadius.circular(16),
       ),
-      child: Padding(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Text(
-              'Discover Free Books',
-              style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                color: Colors.white,
-                fontWeight: FontWeight.bold,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Padding(
+            padding: const EdgeInsets.only(top: 15, right: 15, bottom: 5, left: 15),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Discover Free Books',
+                  style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                    color: Colors.white,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  'Thousands of classics from Project Gutenberg',
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    color: Colors.white70,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.only(right: 15, left: 15),
+            child: Align(
+              alignment: Alignment.centerLeft,
+              child: IconButton(
+                icon: const Icon(Icons.arrow_forward_rounded, color: Colors.white, size: 25),
+                onPressed: () {
+                  context.goNamed('allBooks');
+                },
+                tooltip: 'See all books',
               ),
             ),
-            const SizedBox(height: 8),
-            Text(
-              'Thousands of classics from Project Gutenberg',
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                color: Colors.white70,
-              ),
-            ),
-          ],
-        ),
+          )
+        ],
       ),
     );
   }

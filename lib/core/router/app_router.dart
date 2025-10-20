@@ -24,6 +24,7 @@ import '../../features/reader/presentation/old_reading_screen.dart';
 import 'package:visualit/features/marketplace/presentation/marketplace_screen.dart';
 import 'package:visualit/features/Cart/presentation/CartScreen.dart';
 import 'package:visualit/features/custom_reader/presentation/reading_screen.dart' as custom_reader;
+import 'package:visualit/features/marketplace/presentation/all_books_screen.dart'; // Add this import
 
 final _rootNavigatorKey = GlobalKey<NavigatorState>();
 
@@ -88,6 +89,11 @@ final goRouterProvider = Provider<GoRouter>((ref) {
           final bookId = int.tryParse(state.pathParameters['bookId'] ?? '0') ?? 0;
           return custom_reader.ReadingScreen(bookId: bookId);
         },
+      ),
+      GoRoute(
+        path: '/all-books',
+        name: 'allBooks',
+        builder: (context, state) => const AllBooksScreen(),
       ),
       // TODO: Add '/preferences' route here when built
 

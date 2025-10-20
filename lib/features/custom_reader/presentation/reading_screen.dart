@@ -278,21 +278,17 @@ class _ReadingScreenState extends ConsumerState<ReadingScreen> {
       );
     }
 
-    return PopScope(
-      canPop: false,
-      onPopInvoked: (didPop) async {
-        if (didPop) return;
-
-        // Save progress before navigating away
+    return WillPopScope(
+      onWillPop: () async {
         await _saveProgress(
           bookIndex: widget.bookId,
           chapterIndex: _currentChapterIndex,
           scrollOffset: _currentScrollOffset,
         );
-
         if (mounted) {
           context.go("/home");
         }
+        return false; // Prevent default pop (backgrounding)
       },
       child: Scaffold(
       body: Stack(

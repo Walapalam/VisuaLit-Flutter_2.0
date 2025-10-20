@@ -26,6 +26,7 @@ import 'package:flutter_speed_dial/flutter_speed_dial.dart';
 import 'dart:ui';
 import 'package:visualit/features/custom_reader/presentation/widgets/custom_reading_settings_panel.dart';
 import 'package:visualit/features/custom_reader/presentation/reading_preferences_controller.dart';
+import 'package:visualit/features/reader/presentation/widgets/book_overview_dialog.dart';
 
 class ReadingScreen extends ConsumerStatefulWidget {
   final int bookId;
@@ -715,8 +716,9 @@ class _ReadingScreenState extends ConsumerState<ReadingScreen> {
         SpeedDialChild(
           child: const Icon(Icons.visibility),
           label: 'Toggle Visualization',
-          onTap: () => _showBookOverview(),
+          onTap: _showBookOverviewDialog,
         ),
+
         SpeedDialChild(
             child: const Icon(Icons.tune),
             label: 'Adjust Visualization Settings',
@@ -912,6 +914,30 @@ class _ReadingScreenState extends ConsumerState<ReadingScreen> {
     );
   }
 
+  void _showBookOverviewDialog() {
+    final bookTitle = _epubData?.title ?? 'Unknown';
+    final chapterNumber = _currentChapterIndex + 1;
+    final chapterContent = _epubData?.chapters[_currentChapterIndex].content ?? '';
+
+    showGeneralDialog(
+      context: context,
+      barrierColor: Colors.transparent,
+      barrierDismissible: true,
+      barrierLabel: 'Book Visualizations',
+      transitionDuration: const Duration(milliseconds: 300),
+      pageBuilder: (context, animation, secondaryAnimation) {
+        return FadeTransition(
+          opacity: animation,
+          child: BookOverviewDialog(
+            bookTitleForLookup: bookTitle,
+            localBookISBN: null, // Add ISBN lookup if needed
+            localChapterNumber: chapterNumber,
+            localChapterContent: chapterContent,
+          ),
+        );
+      },
+    );
+  }
 
   void _hideSettingsPanel() {
     setState(() {

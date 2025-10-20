@@ -14,13 +14,13 @@ import 'package:visualit/features/scaffold.dart';
 import 'package:visualit/features/settings/presentation/settings_screen.dart';
 import 'package:visualit/features/settings/presentation/storage_settings_screen.dart';
 import 'package:visualit/features/audiobook_player/presentation/audiobooks_screen.dart';
-import 'package:visualit/features/reader/presentation/reading_screen.dart';
+import 'package:visualit/features/reader/presentation/old_reading_screen.dart';
 import 'package:visualit/features/audiobook_player/presentation/audiobook_player_screen.dart';
 import 'package:visualit/main.dart';
 
 import '../../features/audiobook_player/presentation/audiobook_player_screen.dart';
 import '../../features/auth/presentation/splash_screen.dart';
-import '../../features/reader/presentation/reading_screen.dart';
+import '../../features/reader/presentation/old_reading_screen.dart';
 import 'package:visualit/features/marketplace/presentation/marketplace_screen.dart';
 import 'package:visualit/features/Cart/presentation/CartScreen.dart';
 import 'package:visualit/features/custom_reader/presentation/reading_screen.dart' as custom_reader;

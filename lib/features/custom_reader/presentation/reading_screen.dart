@@ -11,10 +11,15 @@ import 'package:isar/isar.dart';
 import 'package:visualit/features/reader/data/book_data.dart';
 import 'package:visualit/core/providers/isar_provider.dart';
 import 'dart:io';
+import 'dart:async';
 import 'package:path/path.dart' as p;
 import 'package:html/parser.dart' as html_parser;
 import 'package:csslib/parser.dart' as css_parser;
 import 'package:csslib/visitor.dart';
+import 'package:visualit/features/custom_reader/application/epub_parser_service.dart';
+import 'package:visualit/features/custom_reader/new_reading_controller.dart';
+import 'package:visualit/features/custom_reader/model/new_reading_progress.dart';
+import 'dart:developer';
 
 class ReadingScreen extends ConsumerStatefulWidget {
   final int bookId;
@@ -31,6 +36,10 @@ class ReadingScreen extends ConsumerStatefulWidget {
 class _ReadingScreenState extends ConsumerState<ReadingScreen> {
   final EpubParserService _epubParser = EpubParserService();
   final PageController _pageController = PageController(initialPage: 0);
+  final ScrollController _scrollController = ScrollController();
+
+  NewReadingController? _readingController;
+  Timer? _saveDebounceTimer;
 
   EpubMetadata? _epubData;
   String? _epubPath;
@@ -38,11 +47,13 @@ class _ReadingScreenState extends ConsumerState<ReadingScreen> {
   bool _isLoading = true;
   String? _error;
   bool _showOverlay = true;
+  double _currentScrollOffset = 0.0;
 
   @override
   void initState() {
     super.initState();
-    _loadBookAndEpub();
+    _initializeController();
+    //_loadBookAndEpub();
     // Ensure the system UI is visible when the screen is first loaded
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.manual, overlays: SystemUiOverlay.values);
   }
@@ -63,7 +74,6 @@ class _ReadingScreenState extends ConsumerState<ReadingScreen> {
 
   Future<void> _loadBookAndEpub() async {
     try {
-      // Use the app-wide Isar provider instead of opening Isar here
       final isar = await ref.read(isarInstanceProvider.future);
       final book = await isar.books.get(widget.bookId);
 
@@ -82,11 +92,81 @@ class _ReadingScreenState extends ConsumerState<ReadingScreen> {
         _epubData = epubData;
         _isLoading = false;
       });
+
+      // Restore scroll position after loading the book
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (_pageController.hasClients) {
+          _pageController.jumpToPage(_currentChapterIndex);
+        }
+        if (_scrollController.hasClients) {
+          _scrollController.jumpTo(_currentScrollOffset);
+        }
+      });
     } catch (e) {
       setState(() {
         _error = e.toString();
         _isLoading = false;
       });
+    }
+  }
+
+
+  Future<void> _initializeController() async {
+    try {
+      log('Initializing reading controller for bookId: ${widget.bookId}', name: '_ReadingScreenState');
+      final isar = await ref.read(isarInstanceProvider.future);
+      _readingController = NewReadingController(isar);
+
+      final progress = await _readingController!.loadProgress(widget.bookId);
+      if (progress != null) {
+        _currentChapterIndex = _getChapterIndexFromHref(progress.lastChapterHref);
+        _currentScrollOffset = progress.lastScrollOffset;
+        log('Restored progress: ChapterIndex=$_currentChapterIndex, ScrollOffset=$_currentScrollOffset', name: '_ReadingScreenState');
+      }
+
+      await _loadBookAndEpub();
+
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (_pageController.hasClients) {
+          _pageController.jumpToPage(_currentChapterIndex);
+        }
+        if (_scrollController.hasClients) {
+          _scrollController.jumpTo(_currentScrollOffset);
+        }
+      });
+
+      _scrollController.addListener(_onScroll);
+    } catch (e) {
+      log('Error initializing controller: $e', name: '_ReadingScreenState', error: e);
+      setState(() {
+        _error = e.toString();
+        _isLoading = false;
+      });
+    }
+  }
+
+  void _onScroll() {
+    _currentScrollOffset = _scrollController.hasClients ? _scrollController.offset : 0.0;
+    _saveDebounceTimer?.cancel();
+    _saveDebounceTimer = Timer(const Duration(seconds: 1), () {
+      log('Scroll detected. Saving progress...', name: '_ReadingScreenState');
+      _saveProgress(bookIndex: widget.bookId, chapterIndex: _currentChapterIndex, scrollOffset: _currentScrollOffset);
+    });
+  }
+
+  int _getChapterIndexFromHref(String href) {
+    return _epubData?.chapters.indexWhere((chapter) => chapter.href == href) ?? 0;
+  }
+
+  String _getChapterHrefFromIndex(int index) {
+    return _epubData?.chapters[index].href ?? '';
+  }
+
+  void _saveProgress({required int bookIndex, required int chapterIndex, required double scrollOffset}) {
+    log('Saving progress: BookId=$bookIndex, ChapterIndex=$chapterIndex, ScrollOffset=$scrollOffset', name: '_ReadingScreenState');
+    if (_readingController != null) {
+      final chapterHref = _getChapterHrefFromIndex(chapterIndex);
+      _readingController!.saveProgress(bookIndex, chapterHref, scrollOffset);
     }
   }
 
@@ -120,7 +200,14 @@ class _ReadingScreenState extends ConsumerState<ReadingScreen> {
                 onPageChanged: (index) {
                   setState(() {
                     _currentChapterIndex = index;
+                    _currentScrollOffset = 0.0;
                   });
+                  _saveProgress(
+                    bookIndex: widget.bookId,
+                    chapterIndex: _currentChapterIndex,
+                    scrollOffset: _currentScrollOffset,
+                  );
+
                 },
                 itemBuilder: (context, index) {
                   final chapter = _epubData!.chapters[index];
@@ -313,7 +400,7 @@ class _ReadingScreenState extends ConsumerState<ReadingScreen> {
   Widget _buildNavigationBar() {
     return Container(
       padding: const EdgeInsets.all(8.0),
-      color: Colors.black.withOpacity(0.8), // Added for better visibility
+      color: Colors.black.withOpacity(0.8),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
@@ -597,8 +684,9 @@ class _ReadingScreenState extends ConsumerState<ReadingScreen> {
 
   @override
   void dispose() {
+    _saveDebounceTimer?.cancel();
+    _scrollController.dispose();
     _pageController.dispose();
-    // Restore the system UI when the screen is disposed
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.manual, overlays: SystemUiOverlay.values);
     super.dispose();
   }

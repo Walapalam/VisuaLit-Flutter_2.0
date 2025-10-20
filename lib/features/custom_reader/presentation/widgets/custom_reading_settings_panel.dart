@@ -1,3 +1,4 @@
+// lib/features/custom_reader/presentation/widgets/custom_reading_settings_panel.dart
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'dart:ui';
@@ -148,13 +149,26 @@ class CustomReadingSettingsPanel extends ConsumerWidget {
                       const Divider(color: Colors.white24),
                       _SettingsRow(
                         icon: Icons.color_lens_outlined,
-                        label: 'Color Theme',
+                        label: 'Text Color',
                         child: Row(
                           mainAxisAlignment: MainAxisAlignment.spaceAround,
                           children: [
-                            _ThemeChip(theme: ReadingPreferences.light),
-                            _ThemeChip(theme: ReadingPreferences.sepia),
-                            _ThemeChip(theme: ReadingPreferences.dark),
+                            _ColorChip(color: Colors.white, onTap: () => prefsController.setTextColor(Colors.white)),
+                            _ColorChip(color: Colors.black, onTap: () => prefsController.setTextColor(Colors.black)),
+                            _ColorChip(color: Colors.grey, onTap: () => prefsController.setTextColor(Colors.grey)),
+                          ],
+                        ),
+                      ),
+                      const Divider(color: Colors.white24),
+                      _SettingsRow(
+                        icon: Icons.color_lens_outlined,
+                        label: 'Background Color',
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceAround,
+                          children: [
+                            _ColorChip(color: Colors.white, onTap: () => prefsController.setPageColor(Colors.white)),
+                            _ColorChip(color: Colors.black, onTap: () => prefsController.setPageColor(Colors.black)),
+                            _ColorChip(color: Colors.grey, onTap: () => prefsController.setPageColor(Colors.grey)),
                           ],
                         ),
                       ),
@@ -176,6 +190,62 @@ class CustomReadingSettingsPanel extends ConsumerWidget {
                           contentPadding: EdgeInsets.zero,
                           activeColor: AppTheme.primaryGreen,
                         ),
+                      const Divider(color: Colors.white24),
+                      _SettingsRow(
+                        icon: Icons.height,
+                        label: 'Line Height',
+                        child: Slider(
+                          value: prefs.lineHeight,
+                          min: 1.0,
+                          max: 3.0,
+                          divisions: 20,
+                          onChanged: prefsController.setLineHeight,
+                          activeColor: Colors.white,
+                          inactiveColor: Colors.white30,
+                        ),
+                      ),
+                      const Divider(color: Colors.white24),
+                      _SettingsRow(
+                        icon: Icons.padding,
+                        label: 'Side Padding',
+                        child: Slider(
+                          value: prefs.sidePadding,
+                          min: 0,
+                          max: 50,
+                          divisions: 50,
+                          onChanged: prefsController.setSidePadding,
+                          activeColor: Colors.white,
+                          inactiveColor: Colors.white30,
+                        ),
+                      ),
+                      const Divider(color: Colors.white24),
+                      _SettingsRow(
+                        icon: Icons.padding,
+                        label: 'Top Padding',
+                        child: Slider(
+                          value: prefs.topPadding,
+                          min: 0,
+                          max: 50,
+                          divisions: 50,
+                          onChanged: prefsController.setTopPadding,
+                          activeColor: Colors.white,
+                          inactiveColor: Colors.white30,
+                        ),
+                      ),
+                      const Divider(color: Colors.white24),
+                      _SettingsRow(
+                        icon: Icons.padding,
+                        label: 'Bottom Padding',
+                        child: Slider(
+                          value: prefs.bottomPadding,
+                          min: 0,
+                          max: 50,
+                          divisions: 50,
+                          onChanged: prefsController.setBottomPadding,
+                          activeColor: Colors.white,
+                          inactiveColor: Colors.white30,
+                        ),
+                      ),
                     ],
                   ),
                 ),
@@ -276,6 +346,29 @@ class _FontButton extends ConsumerWidget {
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
         ),
         child: Text(fontFamily, style: TextStyle(fontFamily: fontFamily)),
+      ),
+    );
+  }
+}
+
+class _ColorChip extends StatelessWidget {
+  final Color color;
+  final VoidCallback onTap;
+
+  const _ColorChip({required this.color, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        width: 40,
+        height: 40,
+        decoration: BoxDecoration(
+          color: color,
+          shape: BoxShape.circle,
+          border: Border.all(color: Colors.white24, width: 1),
+        ),
       ),
     );
   }

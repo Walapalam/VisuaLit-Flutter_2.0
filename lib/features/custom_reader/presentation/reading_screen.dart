@@ -25,6 +25,7 @@ import 'package:visualit/core/utils/responsive_helper.dart';
 import 'package:flutter_speed_dial/flutter_speed_dial.dart';
 import 'dart:ui';
 import 'package:visualit/features/custom_reader/presentation/widgets/custom_reading_settings_panel.dart';
+import 'package:visualit/features/custom_reader/presentation/reading_preferences_controller.dart';
 
 class ReadingScreen extends ConsumerStatefulWidget {
   final int bookId;
@@ -322,6 +323,35 @@ class _ReadingScreenState extends ConsumerState<ReadingScreen> {
                 itemBuilder: (context, index) {
                   final chapter = _epubData!.chapters[index];
                   debugPrint('Rendering chapter $index: ${chapter.href}');
+                  final prefs = ref.watch(readingPreferencesProvider);
+
+                  // Parse CSS styles as fallback
+                  Map<String, Style> htmlStyles = _parseCssToHtmlStyles(_epubData!.cssFiles);
+
+                  if (prefs.fontSize != 18.0 || prefs.fontFamily != 'Georgia' || prefs.lineHeight != 1.6 || prefs.brightness != 1.0) {
+                    // Base style with preferences
+                    final baseStyle = prefs.baseTextStyle.copyWith(
+                      color: prefs.textColor,
+                    );
+
+                    // Override common tags
+                    htmlStyles['body'] = Style(
+                      fontSize: FontSize(prefs.fontSize),
+                      fontFamily: prefs.fontFamily,
+                      color: prefs.textColor,
+                      lineHeight: LineHeight(prefs.lineHeight),
+                    );
+                    htmlStyles['p'] = htmlStyles['body'] ?? Style();
+                    for (int i = 1; i <= 6; i++) {
+                      htmlStyles['h$i'] = Style(
+                        fontSize: FontSize(prefs.getStyleForHeading(i).fontSize ?? prefs.fontSize),
+                        fontFamily: prefs.fontFamily,
+                        color: prefs.textColor,
+                        fontWeight: prefs.getStyleForHeading(i).fontWeight,
+                        lineHeight: LineHeight(prefs.lineHeight),
+                      );
+                    }
+                  }
 
                   // Create a local controller variable
                   ScrollController chapterScrollController;
@@ -350,7 +380,15 @@ class _ReadingScreenState extends ConsumerState<ReadingScreen> {
                     chapterScrollController = ScrollController();
                   }
 
-                  return SingleChildScrollView(
+                  return Container(
+                    color: prefs.pageColor,
+                    padding: EdgeInsets.only(
+                      left: prefs.leftPadding,
+                      right: prefs.rightPadding,
+                      top: prefs.topPadding,
+                      bottom: prefs.bottomPadding,
+                    ),
+                    child: SingleChildScrollView(
                     controller: chapterScrollController,
                     padding: const EdgeInsets.all(16.0),
                     child: Column(
@@ -359,7 +397,7 @@ class _ReadingScreenState extends ConsumerState<ReadingScreen> {
                         const SizedBox(height: 16),
                         Html(
                           data: chapter.content, // Use processed content with local file URIs
-                          style: _parseCssToHtmlStyles(_epubData!.cssFiles),
+                          style: htmlStyles,
                           extensions: [
                             TagExtension(
                               tagsToExtend: {"img"}, // Set of strings, not single string
@@ -479,7 +517,7 @@ class _ReadingScreenState extends ConsumerState<ReadingScreen> {
                         ),
                       ],
                     ),
-                  );
+                  ),);
                 },
               ),
             ),
@@ -859,6 +897,7 @@ class _ReadingScreenState extends ConsumerState<ReadingScreen> {
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
+      isDismissible: true, // Allow dismissal by tapping outside
       builder: (context) => DraggableScrollableSheet(
         initialChildSize: 0.40,
         minChildSize: 0.40,

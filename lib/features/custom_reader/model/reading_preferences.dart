@@ -5,89 +5,116 @@ enum PageTurnStyle { paged, scroll }
 
 class ReadingPreferences {
   final double fontSize;
-  final double lineSpacing;
   final String fontFamily;
-  final Color pageColor;
-  final Color textColor;
   final double brightness;
   final PageTurnStyle pageTurnStyle;
   final bool matchDeviceTheme;
   final ThemeMode themeMode;
+  final Color textColor;
+  final Color pageColor;
+  final double sidePadding; // Renamed from leftPadding/rightPadding
+  final double topPadding;
+  final double bottomPadding;
+  final double lineHeight; // Moved to end
 
   const ReadingPreferences({
-    this.fontSize = 18.0,
-    this.lineSpacing = 1.6,
-    this.fontFamily = 'Georgia',
-    this.pageColor = const Color(0xFF121212),
-    this.textColor = const Color(0xFFE0E0E0),
-    this.brightness = 1.0,
-    this.pageTurnStyle = PageTurnStyle.paged,
-    this.matchDeviceTheme = false,
-    this.themeMode = ThemeMode.dark,
+    required this.fontSize,
+    required this.fontFamily,
+    required this.brightness,
+    required this.pageTurnStyle,
+    required this.matchDeviceTheme,
+    required this.themeMode,
+    required this.textColor,
+    required this.pageColor,
+    required this.sidePadding,
+    required this.topPadding,
+    required this.bottomPadding,
+    required this.lineHeight,
   });
-
-  // Predefined themes
-  static const ReadingPreferences light = ReadingPreferences(
-      pageColor: Color(0xFFF5F0E5),
-      textColor: Color(0xFF1F1F1F),
-      themeMode: ThemeMode.light
-  );
-
-  static const ReadingPreferences sepia = ReadingPreferences(
-      pageColor: Color(0xFFFBF0D9),
-      textColor: Color(0xFF5B4636),
-      themeMode: ThemeMode.light
-  );
-
-  static const ReadingPreferences dark = ReadingPreferences(
-      pageColor: Color(0xFF121212),
-      textColor: Color(0xFFB0B0B0),
-      themeMode: ThemeMode.dark
-  );
 
   ReadingPreferences copyWith({
     double? fontSize,
-    double? lineSpacing,
     String? fontFamily,
-    Color? pageColor,
-    Color? textColor,
     double? brightness,
     PageTurnStyle? pageTurnStyle,
     bool? matchDeviceTheme,
     ThemeMode? themeMode,
+    Color? textColor,
+    Color? pageColor,
+    double? sidePadding,
+    double? topPadding,
+    double? bottomPadding,
+    double? lineHeight,
   }) {
     return ReadingPreferences(
       fontSize: fontSize ?? this.fontSize,
-      lineSpacing: lineSpacing ?? this.lineSpacing,
       fontFamily: fontFamily ?? this.fontFamily,
-      pageColor: pageColor ?? this.pageColor,
-      textColor: textColor ?? this.textColor,
       brightness: brightness ?? this.brightness,
       pageTurnStyle: pageTurnStyle ?? this.pageTurnStyle,
       matchDeviceTheme: matchDeviceTheme ?? this.matchDeviceTheme,
       themeMode: themeMode ?? this.themeMode,
+      textColor: textColor ?? this.textColor,
+      pageColor: pageColor ?? this.pageColor,
+      sidePadding: sidePadding ?? this.sidePadding,
+      topPadding: topPadding ?? this.topPadding,
+      bottomPadding: bottomPadding ?? this.bottomPadding,
+      lineHeight: lineHeight ?? this.lineHeight,
     );
   }
 
+  // Convenience getters for backward compatibility
+  double get leftPadding => sidePadding;
+  double get rightPadding => sidePadding;
+
   TextStyle get baseTextStyle => TextStyle(
-    fontFamily: fontFamily,
     fontSize: fontSize,
+    fontFamily: fontFamily,
     color: textColor,
-    height: lineSpacing,
+    height: lineHeight,
   );
 
   TextStyle getStyleForHeading(int level) {
     switch (level) {
       case 1:
-        return baseTextStyle.copyWith(fontSize: fontSize * 1.8, fontWeight: FontWeight.bold);
+        return baseTextStyle.copyWith(fontSize: fontSize * 2.0, fontWeight: FontWeight.bold);
       case 2:
         return baseTextStyle.copyWith(fontSize: fontSize * 1.5, fontWeight: FontWeight.bold);
       case 3:
-        return baseTextStyle.copyWith(fontSize: fontSize * 1.3, fontWeight: FontWeight.w700);
+        return baseTextStyle.copyWith(fontSize: fontSize * 1.25, fontWeight: FontWeight.w600);
       case 4:
         return baseTextStyle.copyWith(fontSize: fontSize * 1.15, fontWeight: FontWeight.w600);
       default:
         return baseTextStyle.copyWith(fontWeight: FontWeight.w600);
     }
   }
+
+  static const ReadingPreferences light = ReadingPreferences(
+    fontSize: 18.0,
+    fontFamily: 'Georgia',
+    brightness: 1.0,
+    pageTurnStyle: PageTurnStyle.paged,
+    matchDeviceTheme: false,
+    themeMode: ThemeMode.light,
+    textColor: Colors.black,
+    pageColor: Colors.white,
+    sidePadding: 16.0,
+    topPadding: 16.0,
+    bottomPadding: 16.0,
+    lineHeight: 1.6,
+  );
+
+  static const ReadingPreferences dark = ReadingPreferences(
+    fontSize: 18.0,
+    fontFamily: 'Georgia',
+    brightness: 1.0,
+    pageTurnStyle: PageTurnStyle.paged,
+    matchDeviceTheme: false,
+    themeMode: ThemeMode.dark,
+    textColor: Colors.white,
+    pageColor: Colors.black,
+    sidePadding: 16.0,
+    topPadding: 16.0,
+    bottomPadding: 16.0,
+    lineHeight: 1.6,
+  );
 }

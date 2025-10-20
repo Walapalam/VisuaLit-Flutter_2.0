@@ -73,11 +73,6 @@ class CompactSettingsBar extends ConsumerWidget {
                     onTap: () => prefsController.applyTheme(ReadingPreferences.light),
                   ),
                   _ThemeButton(
-                    theme: ReadingPreferences.sepia,
-                    isSelected: prefs.pageColor == ReadingPreferences.sepia.pageColor,
-                    onTap: () => prefsController.applyTheme(ReadingPreferences.sepia),
-                  ),
-                  _ThemeButton(
                     theme: ReadingPreferences.dark,
                     isSelected: prefs.pageColor == ReadingPreferences.dark.pageColor,
                     onTap: () => prefsController.applyTheme(ReadingPreferences.dark),

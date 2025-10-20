@@ -20,6 +20,8 @@ import 'package:visualit/features/custom_reader/application/epub_parser_service.
 import 'package:visualit/features/custom_reader/new_reading_controller.dart';
 import 'package:visualit/features/custom_reader/model/new_reading_progress.dart';
 import 'dart:developer';
+import 'package:visualit/core/theme/app_theme.dart';
+import 'package:visualit/core/utils/responsive_helper.dart';
 
 class ReadingScreen extends ConsumerStatefulWidget {
   final int bookId;
@@ -48,6 +50,7 @@ class _ReadingScreenState extends ConsumerState<ReadingScreen> {
   String? _error;
   bool _showOverlay = true;
   double _currentScrollOffset = 0.0;
+  double? _pendingScrollOffset;
 
   @override
   void initState() {
@@ -132,11 +135,35 @@ class _ReadingScreenState extends ConsumerState<ReadingScreen> {
         _isLoading = false;
       });
 
-      // Important: Jump to correct scroll position AFTER the state update has been applied
+      // // DEBUG: Add scroll controller listener to log position changes
+      // _scrollController.addListener(() {
+      //   log('ScrollController position: ${_scrollController.offset}', name: '_ReadingScreenState');
+      // });
+
+      // IMPORTANT: We need a longer delay to ensure both the PageView and ScrollView are ready
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (_scrollController.hasClients) {
-          _scrollController.jumpTo(_currentScrollOffset);
-        }
+        // Give more time for the PageView to settle on the correct page
+        Future.delayed(const Duration(milliseconds: 500), () {
+          if (_scrollController.hasClients && mounted) {
+            log('Attempting to apply scroll offset: $_currentScrollOffset', name: '_ReadingScreenState');
+
+            try {
+              // If the scroll position is valid, jump to it
+              if (_currentScrollOffset > 0 &&
+                  _currentScrollOffset < _scrollController.position.maxScrollExtent) {
+                _scrollController.jumpTo(_currentScrollOffset);
+                log('Jump to scroll offset successful: $_currentScrollOffset', name: '_ReadingScreenState');
+              } else {
+                log('Invalid scroll offset: $_currentScrollOffset (max: ${_scrollController.position.maxScrollExtent})',
+                    name: '_ReadingScreenState');
+              }
+            } catch (e) {
+              log('Error applying scroll offset: $e', name: '_ReadingScreenState');
+            }
+          } else {
+            log('ScrollController has no clients when trying to restore position', name: '_ReadingScreenState');
+          }
+        });
       });
 
       _scrollController.addListener(_onScroll);
@@ -149,13 +176,56 @@ class _ReadingScreenState extends ConsumerState<ReadingScreen> {
     }
   }
 
+  Future<void> _restoreReadingProgress() async {
+    try {
+      // Add null check to ensure _readingController is not null
+      if (_readingController == null) {
+        log('Cannot restore reading progress: _readingController is null', name: '_ReadingScreenState');
+        return;
+      }
+
+      final progress = await _readingController!.loadProgress(widget.bookId);
+      if (progress != null && _epubData != null) {
+        // Find the chapter index from href
+        int chapterIndex = _epubData!.chapters.indexWhere(
+                (chapter) => chapter.href == progress.lastChapterHref);
+
+        if (chapterIndex >= 0) {
+          setState(() {
+            _currentChapterIndex = chapterIndex;
+            // Store the scroll offset to be applied when the page is built
+            _pendingScrollOffset = progress.lastScrollOffset;
+          });
+
+          log('Restored progress: ChapterIndex=$chapterIndex, ScrollOffset=${progress.lastScrollOffset}',
+              name: '_ReadingScreenState');
+
+          // Change the page - this will trigger the itemBuilder
+          _pageController.jumpToPage(chapterIndex);
+        }
+      }
+    } catch (e) {
+      log('Error restoring reading progress: $e', name: '_ReadingScreenState');
+    }
+  }
+
   void _onScroll() {
-    _currentScrollOffset = _scrollController.hasClients ? _scrollController.offset : 0.0;
-    _saveDebounceTimer?.cancel();
-    _saveDebounceTimer = Timer(const Duration(seconds: 1), () {
-      log('Scroll detected. Saving progress...', name: '_ReadingScreenState');
-      _saveProgress(bookIndex: widget.bookId, chapterIndex: _currentChapterIndex, scrollOffset: _currentScrollOffset);
-    });
+    if (_scrollController.hasClients) {
+      _currentScrollOffset = _scrollController.offset;
+
+      // Cancel previous debounce timer
+      _saveDebounceTimer?.cancel();
+
+      // Schedule a new save with debouncing
+      _saveDebounceTimer = Timer(const Duration(seconds: 1), () {
+        log('Debounced save triggered. ScrollOffset=$_currentScrollOffset', name: '_ReadingScreenState');
+        _saveProgress(
+            bookIndex: widget.bookId,
+            chapterIndex: _currentChapterIndex,
+            scrollOffset: _currentScrollOffset
+        );
+      });
+    }
   }
 
   int _getChapterIndexFromHref(String href) {
@@ -227,29 +297,62 @@ class _ReadingScreenState extends ConsumerState<ReadingScreen> {
                 onPageChanged: (index) {
                   setState(() {
                     _currentChapterIndex = index;
-                    _currentScrollOffset = 0.0;
+                    // Don't reset _currentScrollOffset to 0.0 here
                   });
+
+                  log("PageView changed to chapter index: $index, Current Scroll Offset: $_currentScrollOffset", name: '_ReadingScreenState');
+
+                  // Save progress when chapter changes
                   _saveProgress(
                     bookIndex: widget.bookId,
                     chapterIndex: _currentChapterIndex,
-                    scrollOffset: _currentScrollOffset,
+                    scrollOffset: 0.0, // Starting at the top of the new chapter
                   );
 
+                  _currentScrollOffset = 0.0;
+                  // Debug log
+                  log('Page changed to chapter $index, resetting scroll to 0.0', name: '_ReadingScreenState');
                 },
                 itemBuilder: (context, index) {
                   final chapter = _epubData!.chapters[index];
-                  // _debugPrintChapterCssLinks(chapter);
-                  // _debugPrintChapterCssContents(chapter, _epubData!.cssFiles);
                   debugPrint('Rendering chapter $index: ${chapter.href}');
-                  final processedContent = chapter.content;
+
+                  // Create a local controller variable
+                  ScrollController chapterScrollController;
+
+                  // If this is the current chapter being restored, use a special approach
+                  if (index == _currentChapterIndex) {
+                    // Use the main scroll controller
+                    chapterScrollController = _scrollController;
+
+                    // Use a post-frame callback to set the scroll position after the widget is built
+                    WidgetsBinding.instance.addPostFrameCallback((_) {
+                      if (chapterScrollController.hasClients) {
+                        log('Applying scroll offset: $_currentScrollOffset to chapter $index', name: '_ReadingScreenState');
+                        try {
+                          // Apply the saved scroll position
+                          chapterScrollController.jumpTo(_currentScrollOffset);
+                        } catch (e) {
+                          log('Error applying scroll offset: $e', name: '_ReadingScreenState');
+                        }
+                      } else {
+                        log('ScrollController has no clients in post-frame callback', name: '_ReadingScreenState');
+                      }
+                    });
+                  } else {
+                    // For non-active chapters, use a separate controller
+                    chapterScrollController = ScrollController();
+                  }
+
                   return SingleChildScrollView(
+                    controller: chapterScrollController,
                     padding: const EdgeInsets.all(16.0),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         const SizedBox(height: 16),
                         Html(
-                          data: processedContent, // Use processed content with local file URIs
+                          data: chapter.content, // Use processed content with local file URIs
                           style: _parseCssToHtmlStyles(_epubData!.cssFiles),
                           extensions: [
                             TagExtension(
@@ -385,21 +488,7 @@ class _ReadingScreenState extends ConsumerState<ReadingScreen> {
               child: AnimatedOpacity(
                 opacity: _showOverlay ? 1.0 : 0.0,
                 duration: const Duration(milliseconds: 300),
-                child: AppBar(
-                  leading: IconButton(
-                    icon: const Icon(Icons.arrow_back),
-                    onPressed: () => context.go("/home"),
-                  ),
-                  title: Text(_epubData?.title ?? 'Reader'),
-                  actions: [
-                    IconButton(
-                      icon: const Icon(Icons.list),
-                      onPressed: _showChapterList,
-                    ),
-                  ],
-                  backgroundColor: Colors.black.withOpacity(0.8),
-                  elevation: 0,
-                ),
+                child: _buildAppBarOverlay(),
               ),
             ),
           ),
@@ -426,24 +515,276 @@ class _ReadingScreenState extends ConsumerState<ReadingScreen> {
 
   Widget _buildNavigationBar() {
     return Container(
-      padding: const EdgeInsets.all(8.0),
-      color: Colors.black.withOpacity(0.8),
+      padding: const EdgeInsets.symmetric(vertical: 16.0),
       child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          IconButton(
-            icon: const Icon(Icons.arrow_back, color: Colors.white),
-            onPressed: _currentChapterIndex > 0 ? _previousChapter : null,
+          // Left FAB (Settings)
+          Padding(
+            padding: const EdgeInsets.only(left: 16.0),
+            child: FloatingActionButton(
+              heroTag: "settingsFab",
+              mini: true,
+              backgroundColor: AppTheme.primaryGreen,
+              child: const Icon(Icons.settings, color: Colors.black),
+              onPressed: _showSettingsPanel,
+            ),
           ),
-          Text(
-            'Chapter ${_currentChapterIndex + 1} of ${_epubData?.chapters.length ?? 0}',
-            style: const TextStyle(color: Colors.white),
+
+          // Center pill with navigation
+          Expanded(
+            child: Center(
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 4.0),
+                decoration: BoxDecoration(
+                  color: Colors.black.withOpacity(0.8),
+                  borderRadius: BorderRadius.circular(30.0),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    // Previous chapter button
+                    IconButton(
+                      icon: const Icon(Icons.arrow_back_ios, color: AppTheme.primaryGreen, size: 20),
+                      onPressed: _currentChapterIndex > 0 ? _previousChapter : null,
+                    ),
+
+                    // Chapter indicator - tappable to show chapter list
+                    GestureDetector(
+                      onTap: _showChapterBottomSheet,
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 8.0),
+                        child: Text(
+                          'Chapter ${_currentChapterIndex + 1} of ${_epubData?.chapters.length ?? 0}',
+                          style: const TextStyle(color: Colors.white),
+                        ),
+                      ),
+                    ),
+
+                    // Next chapter button
+                    IconButton(
+                      icon: const Icon(Icons.arrow_forward_ios, color: AppTheme.primaryGreen, size: 20),
+                      onPressed: _currentChapterIndex < (_epubData?.chapters.length ?? 0) - 1
+                          ? _nextChapter
+                          : null,
+                    ),
+                  ],
+                ),
+              ),
+            ),
           ),
-          IconButton(
-            icon: const Icon(Icons.arrow_forward, color: Colors.white),
-            onPressed: _currentChapterIndex < (_epubData?.chapters.length ?? 0) - 1
-                ? _nextChapter
-                : null,
+
+          // Right FAB (Visualization)
+          Padding(
+            padding: const EdgeInsets.only(right: 16.0),
+            child: FloatingActionButton(
+              heroTag: "visualizationFab",
+              mini: true,
+              backgroundColor: AppTheme.primaryGreen,
+              child: const Icon(Icons.visibility, color: Colors.black),
+              onPressed: _showBookOverview,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildAppBarOverlay() {
+    final String bookTitle = _epubData?.title ?? 'Unknown';
+    final String chapterTitle = _currentChapterIndex < (_epubData?.chapters.length ?? 0)
+        ? _epubData!.chapters[_currentChapterIndex].title
+        : 'Chapter ${_currentChapterIndex + 1}';
+
+    final double titleSize = 18.0;
+    final double subtitleSize = 14.0;
+
+    return Container(
+      decoration: BoxDecoration(
+        // Use a gradient for fading effect
+        gradient: LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [
+            Colors.black.withOpacity(0.9),  // More opaque at top
+            Colors.black.withOpacity(0.6),  // Medium opacity
+            Colors.black.withOpacity(0.0),  // Completely transparent at bottom
+          ],
+          stops: const [0.0, 0.7, 1.0],
+        ),
+      ),
+      child: SafeArea(
+        bottom: false, // Only apply safe area to top
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16.0, 8.0, 16.0, 16.0), // Add bottom padding
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Book title with wrapping
+              Text(
+                bookTitle.toUpperCase(),
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: titleSize,
+                  fontWeight: FontWeight.bold,
+                  letterSpacing: 0.5,
+                ),
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 2),
+              // Chapter name
+              Text(
+                chapterTitle,
+                style: TextStyle(
+                  color: Colors.grey[300],
+                  fontSize: subtitleSize,
+                  fontWeight: FontWeight.normal,
+                ),
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                textAlign: TextAlign.center,
+              ),
+              // Close button circle
+              Padding(
+                padding: const EdgeInsets.only(top: 4.0, bottom: 2.0),
+                child: Container(
+                  width: 20,
+                  height: 20,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: Colors.grey.withOpacity(0.3),
+                  ),
+                  child: IconButton(
+                    icon: const Icon(Icons.close, color: Colors.white, size: 10),
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(),
+                    onPressed: () => context.go("/home"),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+
+
+  void _showChapterBottomSheet() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.black.withOpacity(0.9),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (context) => DraggableScrollableSheet(
+        initialChildSize: 0.6,
+        minChildSize: 0.3,
+        maxChildSize: 0.9,
+        expand: false,
+        builder: (context, scrollController) => Column(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(16),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      'Chapters',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                  IconButton(
+                    icon: Icon(Icons.close, color: Colors.white),
+                    onPressed: () => Navigator.pop(context),
+                  ),
+                ],
+              ),
+            ),
+            Divider(color: Colors.grey.shade700, height: 1),
+            Expanded(
+              child: ListView.builder(
+                controller: scrollController,
+                itemCount: _epubData?.chapters.length ?? 0,
+                itemBuilder: (context, index) {
+                  final chapter = _epubData!.chapters[index];
+                  return ListTile(
+                    title: Text(
+                      chapter.title,
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontWeight: _currentChapterIndex == index
+                            ? FontWeight.bold
+                            : FontWeight.normal,
+                      ),
+                    ),
+                    trailing: _currentChapterIndex == index
+                        ? Icon(Icons.check_circle, color: Colors.blue)
+                        : null,
+                    onTap: () {
+                      Navigator.pop(context);
+                      _pageController.animateToPage(
+                        index,
+                        duration: const Duration(milliseconds: 300),
+                        curve: Curves.easeInOut,
+                      );
+                    },
+                  );
+                },
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showSettingsPanel() {
+    // Will implement this method to show reading settings
+    // (font size, background color, etc.)
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Reading Settings'),
+        content: const Text('Settings panel will go here'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Close'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showBookOverview() {
+    // Will implement this method to show book info/visualization
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Book Overview'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Title: ${_epubData?.title ?? "Unknown"}'),
+            const SizedBox(height: 8),
+            Text('Author: ${_epubData?.author ?? "Unknown"}'),
+            const SizedBox(height: 8),
+            Text('${_epubData?.chapters.length ?? 0} chapters'),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Close'),
           ),
         ],
       ),

@@ -169,63 +169,34 @@ class EpubParserService {
     final chapterTitles = <String, String>{};
     String? tocPath;
 
+    // Find the NCX file in the manifest
     for (final item in opfXml.findAllElements('item')) {
-      final properties = item.getAttribute('properties');
-      if (properties != null && properties.contains('nav')) {
-        tocPath = p.normalize(p.join(opfDir, item.getAttribute('href')!)).replaceAll(r'\', '/');
+      if (item.getAttribute('media-type') == 'application/x-dtbncx+xml') {
+        tocPath = item.getAttribute('href');
+        if (tocPath != null && !p.isAbsolute(tocPath)) {
+          tocPath = p.normalize(p.join(opfDir, tocPath));
+        }
         break;
       }
     }
 
-    if (tocPath == null) {
-      final spineElement = opfXml.findAllElements('spine').first;
-      final tocId = spineElement.getAttribute('toc');
-      if (tocId != null) {
-        for (final item in opfXml.findAllElements('item')) {
-          if (item.getAttribute('id') == tocId) {
-            tocPath = p.normalize(p.join(opfDir, item.getAttribute('href')!)).replaceAll(r'\', '/');
-            break;
-          }
-        }
+    if (tocPath == null) return chapterTitles;
+
+    final tocFile = findFile(archive, tocPath);
+    if (tocFile == null) return chapterTitles;
+
+    final tocXml = XmlDocument.parse(utf8.decode(tocFile.content as List<int>));
+    for (final navPoint in tocXml.findAllElements('navPoint')) {
+      final label = navPoint.findElements('navLabel').first.findElements('text').first.text;
+      final contentElem = navPoint.findElements('content').first;
+      final src = contentElem.getAttribute('src');
+      if (src != null) {
+        // Remove anchor if present
+        final srcPath = src.split('#').first;
+        final normalizedSrc = p.normalize(srcPath);
+        chapterTitles[normalizedSrc] = label;
       }
     }
-
-    if (tocPath != null) {
-      final tocFile = findFile(archive, tocPath);
-      if (tocFile != null) {
-        final tocContent = safeDecode(tocFile.content as List<int>);
-        final tocXml = XmlDocument.parse(tocContent);
-
-        for (final navElement in tocXml.findAllElements('nav')) {
-          final epubType = navElement.getAttribute('epub:type');
-          if (epubType == 'toc') {
-            for (final link in navElement.findAllElements('a')) {
-              final href = link.getAttribute('href');
-              final title = link.text.trim();
-              if (href != null && title.isNotEmpty) {
-                final resolved = p.normalize(p.join(p.dirname(tocPath), href)).replaceAll(r'\', '/');
-                chapterTitles[resolved] = title;
-              }
-            }
-          }
-        }
-
-        for (final navPoint in tocXml.findAllElements('navPoint')) {
-          final textElement = navPoint
-              .findElements('navLabel')
-              .first
-              .findElements('text')
-              .first;
-          final contentElement = navPoint.findElements('content').first;
-          final title = textElement.text.trim();
-          final href = contentElement.getAttribute('src');
-          if (href != null && title.isNotEmpty) {
-            chapterTitles[p.normalize(p.join(p.dirname(tocPath), href)).replaceAll(r'\', '/')] = title;
-          }
-        }
-      }
-    }
-
     return chapterTitles;
   }
 

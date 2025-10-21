@@ -10,6 +10,7 @@ import 'package:visualit/core/providers/isar_provider.dart';
 import 'package:visualit/core/theme/app_theme.dart';
 import 'package:visualit/features/marketplace/presentation/marketplace_notifier.dart';
 import 'marketplace_providers.dart';
+import 'package:shimmer/shimmer.dart';
 
 class MarketplaceScreen extends ConsumerStatefulWidget {
   const MarketplaceScreen({super.key});
@@ -267,7 +268,16 @@ class _BestsellersSection extends ConsumerWidget {
     return FutureBuilder<List<dynamic>>(
       future: ref.read(marketplaceProvider.notifier).getBestsellers(),
       builder: (context, snapshot) {
-        if (!snapshot.hasData || snapshot.data!.isEmpty) return const SizedBox.shrink();
+        if (!snapshot.hasData || snapshot.connectionState == ConnectionState.waiting) {
+          return SizedBox(
+            height: context.bookShelfHeight,
+            child: ListView.builder(
+              scrollDirection: Axis.horizontal,
+              itemCount: 6,
+              itemBuilder: (context, index) => const HorizontalBookCardSkeleton(),
+            ),
+          );
+        }
 
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -328,7 +338,16 @@ class _CategoryRow extends ConsumerWidget {
     return FutureBuilder<List<dynamic>>(
       future: ref.read(marketplaceProvider.notifier).getBooksBySubject(subject),
       builder: (context, snapshot) {
-        if (!snapshot.hasData || snapshot.data!.isEmpty) return const SizedBox.shrink();
+        if (!snapshot.hasData || snapshot.connectionState == ConnectionState.waiting) {
+          return SizedBox(
+            height: context.bookShelfHeight,
+            child: ListView.builder(
+              scrollDirection: Axis.horizontal,
+              itemCount: 6,
+              itemBuilder: (context, index) => const HorizontalBookCardSkeleton(),
+            ),
+          );
+        }
 
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -669,7 +688,18 @@ class _AllBooksViewState extends State<_AllBooksView> {
           ),
         ),
         Expanded(
-          child: GridView.builder(
+          child: state.isLoading
+              ? GridView.builder(
+            itemCount: 8,
+            gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: columns,
+              childAspectRatio: 0.7,
+              crossAxisSpacing: 16,
+              mainAxisSpacing: 16,
+            ),
+            itemBuilder: (context, index) => const BookCardSkeleton(),
+          )
+              : GridView.builder(
             controller: widget.scrollController,
             padding: const EdgeInsets.all(16),
             gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
@@ -683,8 +713,80 @@ class _AllBooksViewState extends State<_AllBooksView> {
               return _BookCard(book: state.books[index]);
             },
           ),
-        ),
+        )
       ],
+    );
+  }
+}
+
+class BookCardSkeleton extends StatelessWidget {
+  const BookCardSkeleton({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Shimmer.fromColors(
+      baseColor: AppTheme.darkGrey,
+      highlightColor: AppTheme.black,
+      child: Card(
+        elevation: 4,
+        color: AppTheme.darkGrey,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Expanded(
+              child: ClipRRect(
+                borderRadius: BorderRadius.vertical(top: Radius.circular(8)),
+                child: Container(
+                  color: AppTheme.darkGrey,
+                ),
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.all(8.0),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(6),
+                child: Container(
+                  height: 16,
+                  color: AppTheme.darkGrey,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class HorizontalBookCardSkeleton extends StatelessWidget {
+  const HorizontalBookCardSkeleton({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Shimmer.fromColors(
+      baseColor: AppTheme.darkGrey,
+      highlightColor: AppTheme.black,
+      child: Container(
+        width: 120,
+        margin: const EdgeInsets.only(right: 12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(8),
+                child: Container(color: AppTheme.darkGrey),
+              ),
+            ),
+            const SizedBox(height: 8),
+            ClipRRect(
+              borderRadius: BorderRadius.circular(6),
+              child: Container(height: 12, color: AppTheme.darkGrey),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

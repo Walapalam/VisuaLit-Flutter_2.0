@@ -384,14 +384,14 @@ class _ReadingScreenState extends ConsumerState<ReadingScreen> {
                   return Container(
                     color: prefs.pageColor,
                     padding: EdgeInsets.only(
-                      left: prefs.leftPadding,
-                      right: prefs.rightPadding,
-                      top: prefs.topPadding,
+                      left: 2.0,//prefs.leftPadding,
+                      right: 2.0, //prefs.rightPadding,
+                      top: 80.0,
                       bottom: prefs.bottomPadding,
                     ),
                     child: SingleChildScrollView(
                     controller: chapterScrollController,
-                    padding: const EdgeInsets.all(16.0),
+                      padding: const EdgeInsets.symmetric(horizontal: 0.0, vertical: 16.0),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [

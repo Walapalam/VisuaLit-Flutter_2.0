@@ -27,6 +27,8 @@ import 'dart:ui';
 import 'package:visualit/features/custom_reader/presentation/widgets/custom_reading_settings_panel.dart';
 import 'package:visualit/features/custom_reader/presentation/reading_preferences_controller.dart';
 import 'package:visualit/features/reader/presentation/widgets/book_overview_dialog.dart';
+import 'package:flutter_svg/flutter_svg.dart';
+
 
 class ReadingScreen extends ConsumerStatefulWidget {
   final int bookId;
@@ -188,6 +190,23 @@ class _ReadingScreenState extends ConsumerState<ReadingScreen> {
     }
   }
 
+  String injectCssAndAdjustStyles(String htmlContent, List<String> cssContents) {
+    final cssBlock = cssContents.map((css) => '<style>$css</style>').join('\n');
+    htmlContent = htmlContent.replaceFirst(
+      '</head>',
+      '$cssBlock\n</head>',
+    );
+    htmlContent = htmlContent.replaceAllMapped(
+      RegExp(r'(<img[^>]*class="(?:calibre11|calibre12)"[^>]*>)'),
+          (match) => '<div style="text-align:center;">${match.group(1)}</div>',
+    );
+    htmlContent = htmlContent.replaceAll(
+      '<p ',
+      '<p style="text-align:justify;" ',
+    );
+    return htmlContent;
+  }
+
   Future<void> _restoreReadingProgress() async {
     try {
       // Add null check to ensure _readingController is not null
@@ -341,6 +360,7 @@ class _ReadingScreenState extends ConsumerState<ReadingScreen> {
                       fontFamily: prefs.fontFamily,
                       color: prefs.textColor,
                       lineHeight: LineHeight(prefs.lineHeight),
+                      textAlign: TextAlign.justify,
                     );
                     htmlStyles['p'] = htmlStyles['body'] ?? Style();
                     for (int i = 1; i <= 6; i++) {
@@ -350,6 +370,7 @@ class _ReadingScreenState extends ConsumerState<ReadingScreen> {
                         color: prefs.textColor,
                         fontWeight: prefs.getStyleForHeading(i).fontWeight,
                         lineHeight: LineHeight(prefs.lineHeight),
+                        textAlign: TextAlign.center,
                       );
                     }
                   }
@@ -400,120 +421,95 @@ class _ReadingScreenState extends ConsumerState<ReadingScreen> {
                           data: chapter.content, // Use processed content with local file URIs
                           style: htmlStyles,
                           extensions: [
+                            // Existing img tag extension
                             TagExtension(
-                              tagsToExtend: {"img"}, // Set of strings, not single string
+                              tagsToExtend: {"img"},
                               builder: (context) {
                                 final src = context.attributes['src'];
-
-                                if (src == null || src.isEmpty) {
-                                  return const SizedBox.shrink();
+                                if (src != null && src.isNotEmpty) {
+                                  return _buildImageWidget(src, _epubData!.chapters[_currentChapterIndex].href);
                                 }
-
-                                print('TagExtension processing src: $src');
-
-                                // Handle file:// URIs (which your rewriteImageSrcs creates)
-                                if (src.startsWith('file://')) {
-                                  final filePath = Uri.parse(src).toFilePath();
-                                  if (File(filePath).existsSync()) {
-                                    return Image.file(
-                                      File(filePath),
-                                      fit: BoxFit.contain,
-                                      errorBuilder: (context, error, stackTrace) {
-                                        return Container(
-                                          width: double.infinity,
-                                          height: 200,
-                                          color: Colors.grey[300],
-                                          child: const Column(
-                                            mainAxisAlignment: MainAxisAlignment.center,
-                                            children: [
-                                              Icon(Icons.broken_image),
-                                              Text('Image failed to load'),
-                                            ],
-                                          ),
-                                        );
-                                      },
-                                    );
-                                  }
-                                }
-
-                                // Handle relative paths as fallback
-                                if (!src.startsWith('http') && !src.startsWith('data:')) {
-                                  final chapterDir = p.dirname(chapter.href);
-                                  final resolvedPath = p.normalize(p.join(chapterDir, src)).replaceAll('\\', '/');
-                                  final lookupPath = resolvedPath.startsWith('/') ? resolvedPath.substring(1) : resolvedPath;
-                                  final localFile = _epubData!.images[lookupPath];
-
-                                  if (localFile != null && File(localFile).existsSync()) {
-                                    return Image.file(
-                                      File(localFile),
-                                      fit: BoxFit.contain,
-                                      errorBuilder: (context, error, stackTrace) {
-                                        return Container(
-                                          width: double.infinity,
-                                          height: 200,
-                                          color: Colors.grey[300],
-                                          child: const Column(
-                                            mainAxisAlignment: MainAxisAlignment.center,
-                                            children: [
-                                              Icon(Icons.broken_image),
-                                              Text('Image failed to load'),
-                                            ],
-                                          ),
-                                        );
-                                      },
-                                    );
-                                  }
-                                }
-
-                                // Fallback for unhandled images
-                                return Container(
-                                  width: double.infinity,
-                                  height: 200,
-                                  color: Colors.grey[300],
-                                  child: const Column(
-                                    mainAxisAlignment: MainAxisAlignment.center,
-                                    children: [
-                                      Icon(Icons.broken_image),
-                                      Text('Image not found'),
-                                    ],
-                                  ),
-                                );
+                                return const SizedBox.shrink();
                               },
                             ),
+
+                            // NEW: Separate SVG image extension
+                            TagExtension(
+                              tagsToExtend: {"image"},
+                              builder: (context) {
+                                print('DEBUG: Processing SVG image element');
+                                print('DEBUG: All attributes: ${context.attributes}');
+
+                                // Get the href from xlink:href or href attribute
+                                final xlinkHref = context.attributes['xlink:href'];
+                                final href = context.attributes['href'];
+                                final imageRef = xlinkHref ?? href;
+
+                                print('DEBUG: xlink:href=$xlinkHref, href=$href, final=$imageRef');
+
+                                if (imageRef != null && imageRef.isNotEmpty) {
+                                  print('DEBUG: Building SVG image widget for: $imageRef');
+                                  return _buildImageWidget(imageRef, _epubData!.chapters[_currentChapterIndex].href);
+                                }
+
+                                print('DEBUG: No valid href found in SVG image element');
+                                return const SizedBox.shrink();
+                              },
+                            ),
+
                             ImageExtension(
                               builder: (extensionContext) {
-                                final element = extensionContext.element;
-                                final src = element?.attributes['src'];
-                                if (src != null && src.startsWith('file://')) {
-                                  print(">>> IMAGE EXTENSION: Attempting to render file: $src");
-                                  final file = File.fromUri(Uri.parse(src));
-                                  if (file.existsSync()) {
-                                    return Image.file(
-                                      file,
-                                      key: ValueKey(src), // Add a key for debugging
-                                      width: double.infinity,
-                                      fit: BoxFit.fitWidth,
-                                      errorBuilder: (context, error, stackTrace) {
-                                        print(">>> IMAGE EXTENSION ERROR: Error loading image file: $src, Error: $error");
-                                        return Container(
-                                          width: double.infinity,
-                                          height: 100,
-                                          color: Colors.red.withOpacity(0.3),
-                                          child: Center(child: Text("Image failed to load\n$error", textAlign: TextAlign.center)),
-                                        );
-                                      },
-                                    );
-                                  } else {
-                                    print(">>> IMAGE EXTENSION ERROR: File does not exist at path: ${file.path}");
-                                    return const Icon(Icons.error, color: Colors.orange);
-                                  }
+                                final src = extensionContext.attributes['src'];
+                                if (src != null && src.isNotEmpty) {
+                                  return _buildImageWidget(src, _epubData!.chapters[_currentChapterIndex].href);
                                 }
-                                // Let the default handler deal with other images (network, assets, etc.)
-                                return const Icon(Icons.image, color: Colors.grey);
+                                return const SizedBox.shrink();
                               },
                             ),
+
                             TableHtmlExtension(),
-                            SvgHtmlExtension()
+
+                            TagExtension(
+                              tagsToExtend: {"svg"},
+                              builder: (context) {
+                                print('DEBUG: Processing SVG element with attributes: ${context.attributes}');
+
+                                // Get the raw SVG content
+                                final element = context.element;
+                                if (element != null) {
+                                  print('DEBUG: Full SVG element HTML: ${element.outerHtml}');
+                                  print('DEBUG: SVG children count: ${element.children.length}');
+
+                                  // Check each child element
+                                  for (int i = 0; i < element.children.length; i++) {
+                                    final child = element.children[i];
+                                    print('DEBUG: SVG child $i: tag=${child.localName}, attributes=${child.attributes}');
+
+                                    if (child.localName == 'image') {
+                                      // print(child.attributes.entries.last.value);
+                                      final xlinkHref = child.attributes.entries.last.value;
+                                      final href = child.attributes['href'];
+                                      final imageRef = xlinkHref ?? href;
+
+                                      print('DEBUG: Found image child with href: $imageRef');
+
+                                      if (imageRef != null && imageRef.isNotEmpty) {
+                                        return _buildImageWidget(imageRef, _epubData!.chapters[_currentChapterIndex].href);
+                                      }
+                                    }
+                                  }
+                                }
+
+                                return const SizedBox.shrink();
+                              },
+                            ),
+
+                            SvgHtmlExtension(
+                              networkSchemas: ["https", "http", "file"],
+                              extension: "svg",
+                              dataEncoding: "base64",
+                              dataMimeType: "image/svg+xml",
+                            ),
                           ],
                         ),
                       ],
@@ -698,6 +694,83 @@ class _ReadingScreenState extends ConsumerState<ReadingScreen> {
       ],
     );
   }
+
+  Widget _buildImageWidget(String src, String chapterHref) {
+    print('Building image widget for src: $src');
+
+    // Handle file:// URIs
+    if (src.startsWith('file://')) {
+      final filePath = Uri.parse(src).toFilePath();
+      if (File(filePath).existsSync()) {
+        return Center(
+          child: Image.file(
+            File(filePath),
+            fit: BoxFit.contain,
+            errorBuilder: (context, error, stackTrace) {
+              return _buildErrorWidget('Image failed to load');
+            },
+          ),
+        );
+      }
+    }
+
+    // Skip external URLs and data URIs
+    if (src.startsWith('data:') ||
+        src.startsWith('http:') ||
+        src.startsWith('https:')) {
+      return const SizedBox.shrink();
+    }
+
+    // Handle relative paths
+    final chapterDir = p.dirname(chapterHref);
+    String resolvedPath;
+
+    if (src.startsWith('../')) {
+      resolvedPath = p.normalize(p.join(chapterDir, src));
+    } else if (src.startsWith('./')) {
+      resolvedPath = p.normalize(p.join(chapterDir, src.substring(2)));
+    } else if (!src.startsWith('/')) {
+      resolvedPath = p.normalize(p.join(chapterDir, src));
+    } else {
+      resolvedPath = src.substring(1);
+    }
+
+    resolvedPath = resolvedPath.replaceAll(r'\', '/');
+    print('Resolved image path: $resolvedPath');
+
+    final localFile = _epubData!.images[resolvedPath];
+    if (localFile != null && File(localFile).existsSync()) {
+      return Center(
+        child: Image.file(
+          File(localFile),
+          fit: BoxFit.contain,
+          errorBuilder: (context, error, stackTrace) {
+            return _buildErrorWidget('Image failed to load');
+          },
+        ),
+      );
+    }
+
+    print('Image not found for path: $resolvedPath');
+    return _buildErrorWidget('Image not found');
+  }
+
+  Widget _buildErrorWidget(String message) {
+    return Container(
+      width: double.infinity,
+      height: 200,
+      color: Colors.grey[300],
+      alignment: Alignment.center,
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          const Icon(Icons.broken_image),
+          Text(message),
+        ],
+      ),
+    );
+  }
+
 
 
   Widget _buildVisualizationSpeedDial() {
@@ -1132,13 +1205,19 @@ class _ReadingScreenState extends ConsumerState<ReadingScreen> {
             fontSize: fontSize,
             fontWeight: fontWeight,
             backgroundColor: backgroundColor,
-            textAlign: textAlign,
+            textAlign: TextAlign.justify,
             margin: margin != null ? Margins.all(margin) : null,
             padding: padding != null ? HtmlPaddings.all(padding) : null,
           );
         }
       }
     }
+
+    // Ensure h1 to h6 and img tags are center-aligned
+    for (var i = 1; i <= 6; i++) {
+      selectorStyles['h$i'] = Style(textAlign: TextAlign.center);
+    }
+    selectorStyles['img'] = Style(textAlign: TextAlign.center);
 
     // Merge selectorStyles into styles, prioritizing specificity
     styles.addAll(selectorStyles);

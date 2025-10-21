@@ -90,6 +90,45 @@ class EpubParserService {
       }
     }
 
+    // In your parseEpub method, after building the manifest, add this:
+    final svgImageRefs = <String>{};
+
+// Check all HTML/XHTML files for SVG image references
+    for (final entry in manifestMediaTypeByHref.entries) {
+      final epubHref = entry.key;
+      final mediaType = entry.value.toLowerCase();
+
+      if (mediaType.contains('html') || mediaType.contains('xhtml')) {
+        final archiveFile = findFile(archive, epubHref);
+        if (archiveFile != null) {
+          final content = safeDecode(archiveFile.content as List<int>);
+          final refs = _extractSvgImageReferences(content);
+
+          // Resolve relative paths
+          final chapterDir = p.dirname(epubHref);
+          for (final ref in refs) {
+            String resolvedRef;
+            if (ref.startsWith('../')) {
+              resolvedRef = p.normalize(p.join(chapterDir, ref));
+            } else if (ref.startsWith('./')) {
+              resolvedRef = p.normalize(p.join(chapterDir, ref.substring(2)));
+            } else if (!ref.startsWith('/')) {
+              resolvedRef = p.normalize(p.join(chapterDir, ref));
+            } else {
+              resolvedRef = ref.substring(1);
+            }
+            resolvedRef = resolvedRef.replaceAll(r'\', '/');
+            svgImageRefs.add(resolvedRef);
+          }
+        }
+      }
+    }
+
+    print('DEBUG: SVG image references found: ${svgImageRefs.length}');
+    for (final ref in svgImageRefs) {
+      print('DEBUG: SVG ref: $ref');
+    }
+
     // Extract images into a temp dir and build an epubHref -> localFilePath map
     final tempDir = await getTemporaryDirectory();
     final extractDir = Directory(p.join(tempDir.path,
@@ -100,7 +139,14 @@ class EpubParserService {
     for (final entry in manifestMediaTypeByHref.entries) {
       final epubHref = entry.key;
       final mediaType = entry.value.toLowerCase();
-      if (mediaType.startsWith('image/') || _looksLikeImage(epubHref)) {
+
+      bool shouldExtract = mediaType.startsWith('image/') ||
+          _looksLikeImage(epubHref) ||
+          svgImageRefs.contains(epubHref);
+
+      if (shouldExtract) {
+        print('DEBUG: Extracting image: $epubHref (reason: ${mediaType.startsWith('image/') ? 'manifest' : svgImageRefs.contains(epubHref) ? 'svg-ref' : 'extension'})');
+
         final archiveFile = findFile(archive, epubHref);
         if (archiveFile != null) {
           final filename = p.basename(epubHref);
@@ -108,6 +154,9 @@ class EpubParserService {
           final outFile = File(localPath);
           await outFile.writeAsBytes(archiveFile.content as List<int>);
           images[epubHref] = outFile.path;
+          print('DEBUG: Successfully extracted to: $localPath');
+        } else {
+          print('DEBUG: Archive file not found for: $epubHref');
         }
       }
     }
@@ -205,13 +254,15 @@ class EpubParserService {
       String content, String chapterHref, Map<String, String> images) {
     final html_dom.Document document = html_parser.parse(content);
     final imageElements = document.querySelectorAll('img');
-    final chapterUri = Uri.parse(chapterHref);
 
     print('DEBUG: ----- Rewriting images for chapter: $chapterHref -----');
     print('DEBUG: Found ${imageElements.length} image tags.');
 
     for (final img in imageElements) {
-      final rawSrc = img.attributes['src'];
+      final attributes = img.attributes;
+      if (attributes == null) continue;
+
+      final rawSrc = attributes['src'];
       if (rawSrc == null || rawSrc.isEmpty) continue;
 
       print('DEBUG: Processing raw src: "$rawSrc"');
@@ -225,27 +276,40 @@ class EpubParserService {
         continue;
       }
 
-      // Use Uri.resolve to correctly handle relative paths (e.g., "../")
-      // and decode any URL-encoded characters.
-      final resolvedUri = chapterUri.resolve(rawSrc);
-      final resolvedPath = p.normalize(resolvedUri.path).replaceAll(r'\', '/');
+      // Get the directory of the chapter file
+      final chapterDir = p.dirname(chapterHref);
 
+      // Resolve the relative path properly
+      String resolvedPath;
+      if (rawSrc.startsWith('../')) {
+        // Handle relative paths that go up directories
+        resolvedPath = p.normalize(p.join(chapterDir, rawSrc));
+      } else if (rawSrc.startsWith('./')) {
+        // Handle current directory relative paths
+        resolvedPath = p.normalize(p.join(chapterDir, rawSrc.substring(2)));
+      } else if (!rawSrc.startsWith('/')) {
+        // Handle relative paths in same directory
+        resolvedPath = p.normalize(p.join(chapterDir, rawSrc));
+      } else {
+        // Handle absolute paths (remove leading slash)
+        resolvedPath = rawSrc.substring(1);
+      }
+
+      // Normalize path separators
+      resolvedPath = resolvedPath.replaceAll(r'\', '/');
+
+      print('DEBUG: Chapter dir: "$chapterDir"');
       print('DEBUG: Resolved path: "$resolvedPath"');
 
-      // The resolved path may have a leading '/', which our image map keys don't.
-      final lookupPath = resolvedPath.startsWith('/') ? resolvedPath.substring(1) : resolvedPath;
-
-      print('DEBUG: Look up path: "$lookupPath"');
-
-      final localFile = images[lookupPath];
+      final localFile = images[resolvedPath];
 
       if (localFile != null && File(localFile).existsSync()) {
         final fileUri = Uri.file(localFile).toString();
         print('DEBUG: SUCCESS - Replacing with file URI: $fileUri');
-        img.attributes['src'] = fileUri;
+        attributes['src'] = fileUri;
       } else {
-        print('DEBUG: FAILED - No local file found for lookup path "$lookupPath"');
-        if(images.isNotEmpty) {
+        print('DEBUG: FAILED - No local file found for resolved path "$resolvedPath"');
+        if (images.isNotEmpty) {
           print('DEBUG: Available image keys: ${images.keys.join(", ")}');
         }
       }
@@ -256,17 +320,83 @@ class EpubParserService {
     return result;
   }
 
-  bool _looksLikeImage(String href) {
-    final ext = p.extension(href).toLowerCase();
-    return [
-      '.jpg',
-      '.jpeg',
-      '.png',
-      '.gif',
-      '.svg',
-      '.webp',
-      '.bmp'
-    ].contains(ext);
+  Set<String> _extractSvgImageReferences(String content) {
+    final imageRefs = <String>{};
+
+    try {
+      print('DEBUG: Parsing content for SVG references, content length: ${content.length}');
+
+      // Try XML parsing first for proper SVG namespace handling
+      try {
+        final xmlDoc = XmlDocument.parse(content);
+
+        // Look for image elements in SVG namespace
+        final svgImages = xmlDoc.findAllElements('image');
+        for (final img in svgImages) {
+          final xlinkHref = img.getAttribute('xlink:href');
+          final href = img.getAttribute('href');
+
+          final imageRef = xlinkHref ?? href;
+          if (imageRef != null && imageRef.isNotEmpty && _looksLikeImage(imageRef)) {
+            print('DEBUG: Found SVG image reference via XML: $imageRef');
+            imageRefs.add(imageRef);
+          }
+        }
+
+      } catch (xmlError) {
+        print('DEBUG: XML parsing failed, trying HTML parser: $xmlError');
+
+        // Fallback to HTML parsing
+        final document = html_parser.parse(content);
+
+        // Check if content contains SVG at all
+        if (content.contains('<svg') || content.contains('image')) {
+          print('DEBUG: Content contains SVG or image tags');
+
+          // Find all image elements
+          final allImages = document.querySelectorAll('image');
+          for (final img in allImages) {
+            final xlinkHref = img.attributes['xlink:href'];
+            final href = img.attributes['href'];
+
+            final imageRef = xlinkHref ?? href;
+            if (imageRef != null && imageRef.isNotEmpty && _looksLikeImage(imageRef)) {
+              print('DEBUG: Found image element reference via HTML: $imageRef');
+              imageRefs.add(imageRef);
+            }
+          }
+
+          // Also check SVG image elements
+          final svgImages = document.querySelectorAll('svg image');
+          for (final img in svgImages) {
+            final xlinkHref = img.attributes['xlink:href'];
+            final href = img.attributes['href'];
+
+            final imageRef = xlinkHref ?? href;
+            if (imageRef != null && imageRef.isNotEmpty && _looksLikeImage(imageRef)) {
+              print('DEBUG: Found SVG image reference via HTML: $imageRef');
+              imageRefs.add(imageRef);
+            }
+          }
+        }
+      }
+
+      print('DEBUG: Total SVG image references found: ${imageRefs.length}');
+      for (final ref in imageRefs) {
+        print('DEBUG: - $ref');
+      }
+
+    } catch (e) {
+      print('ERROR: Exception in _extractSvgImageReferences: $e');
+    }
+
+    return imageRefs;
+  }
+
+
+  bool _looksLikeImage(String path) {
+    final ext = p.extension(path).toLowerCase();
+    return ['.jpg', '.jpeg', '.png', '.gif', '.bmp', '.webp', '.svg'].contains(ext);
   }
 
   String safeDecode(List<int> bytes) {

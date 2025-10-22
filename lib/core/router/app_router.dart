@@ -14,15 +14,17 @@ import 'package:visualit/features/scaffold.dart';
 import 'package:visualit/features/settings/presentation/settings_screen.dart';
 import 'package:visualit/features/settings/presentation/storage_settings_screen.dart';
 import 'package:visualit/features/audiobook_player/presentation/audiobooks_screen.dart';
-import 'package:visualit/features/reader/presentation/reading_screen.dart';
+import 'package:visualit/features/reader/presentation/old_reading_screen.dart';
 import 'package:visualit/features/audiobook_player/presentation/audiobook_player_screen.dart';
 import 'package:visualit/main.dart';
 
 import '../../features/audiobook_player/presentation/audiobook_player_screen.dart';
 import '../../features/auth/presentation/splash_screen.dart';
-import '../../features/reader/presentation/reading_screen.dart';
+import '../../features/reader/presentation/old_reading_screen.dart';
 import 'package:visualit/features/marketplace/presentation/marketplace_screen.dart';
 import 'package:visualit/features/Cart/presentation/CartScreen.dart';
+import 'package:visualit/features/custom_reader/presentation/reading_screen.dart' as custom_reader;
+import 'package:visualit/features/marketplace/presentation/all_books_screen.dart'; // Add this import
 
 final _rootNavigatorKey = GlobalKey<NavigatorState>();
 
@@ -73,13 +75,27 @@ final goRouterProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/storage-settings',
         name: 'storageSettings',
-        builder: (context, state) => const StorageSettingsScreen(),
-      ),
+        builder: (context, state) => const StorageSettingsScreen(),),
+
       GoRoute(
         path: '/cart',
         name: 'cart',
         builder: (context, state) => const CartScreen(),
       ),
+      GoRoute(
+        path: '/epub/:bookId',
+        name: 'epubReader',
+        builder: (context, state) {
+          final bookId = int.tryParse(state.pathParameters['bookId'] ?? '0') ?? 0;
+          return custom_reader.ReadingScreen(bookId: bookId);
+        },
+      ),
+      GoRoute(
+        path: '/all-books',
+        name: 'allBooks',
+        builder: (context, state) => const AllBooksScreen(),
+      ),
+      // TODO: Add '/preferences' route here when built
 
       // Main application shell route
       StatefulShellRoute.indexedStack(
@@ -102,58 +118,50 @@ final goRouterProvider = Provider<GoRouter>((ref) {
               ),
             ],
           ),
+
           StatefulShellBranch(routes: [
             GoRoute(path: '/settings', name: 'settings', builder: (context, state) => const SettingsScreen()),
           ]),
         ],
       ),
     ],
-    redirect: (context, state) {
+    redirect: (context, state) async {
       final status = authState.status;
       final location = state.matchedLocation;
       final publicRoutes = ['/splash', '/onboarding', '/login', '/signup'];
-      final hasError = authState.errorMessage != null;
 
-
-      // For debugging
-      debugPrint('AUTH STATUS: $status, LOCATION: $location');
-
-      // Stay on splash while loading
-      if (status == AuthStatus.initial || status == AuthStatus.loading) {
-        return location == '/splash' ? null : '/splash';
+      // Stay on splash until initialization is complete (including loading state)
+      if ((status == AuthStatus.initial || status == AuthStatus.loading) && location != '/splash') {
+        return '/splash';
       }
 
-      // IMPORTANT: Check error condition BEFORE checking unauthenticated status
-      // Don't redirect during auth attempts with errors - this must come first
-      if ((location == '/login' || location == '/signup') &&
-          hasError &&
-          status == AuthStatus.unauthenticated) {
-        debugPrint('Staying on login/signup due to auth error');
-        return null; // Stay on current page when there's an auth error
+      /*
+      // If authenticated or guest, redirect to home from public routes
+      if ((status == AuthStatus.authenticated || status == AuthStatus.guest || status == AuthStatus.offlineGuest) &&
+          publicRoutes.contains(location)) {
+        return '/home';
+      }*/
+
+      // If invalidLogin, stay on /login
+      if (status == AuthStatus.invalidLogin && location != '/login' && location != '/onboarding') {
+        return '/login';
       }
 
-      // Authenticated users should go to home if on public routes
       if ((status == AuthStatus.authenticated || status == AuthStatus.guest) &&
           publicRoutes.contains(location)) {
         return '/home';
       }
 
-      // Unauthenticated users should go to onboarding if not on public routes
-      if (status == AuthStatus.unauthenticated &&
-          !publicRoutes.contains(location)) {
+      // If unauthenticated and not on a public route, redirect to onboarding
+      if (status == AuthStatus.unauthenticated && !publicRoutes.contains(location)) {
         return '/onboarding';
       }
 
-      // From splash, redirect based on auth status
+      // If on splash and initialization is complete, redirect based on status
       if (location == '/splash' && status != AuthStatus.initial && status != AuthStatus.loading) {
-        if (status == AuthStatus.unauthenticated) {
-          return '/onboarding';
-        } else {
-          return '/home';
-        }
+        return status == AuthStatus.unauthenticated ? '/onboarding' : '/home';
       }
 
-      // No redirect needed
       return null;
     },
   );

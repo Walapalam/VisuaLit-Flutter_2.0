@@ -4,11 +4,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:permission_handler/permission_handler.dart';
 
 /// This provider creates a single instance of LocalLibraryService for the app.
-final localLibraryServiceProvider = Provider<LocalLibraryService>((ref) {
-  return LocalLibraryService();
+final localLibraryServiceProvider = Provider<AudiobookLibraryService>((ref) {
+  return AudiobookLibraryService();
 });
 
-class LocalLibraryService {
+class AudiobookLibraryService {
   /// Correctly requests the special 'All Files Access' permission for scanning folders.
   Future<bool> _requestManageStoragePermission() async {
     if (!Platform.isAndroid) return true;

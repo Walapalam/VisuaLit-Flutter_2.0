@@ -12,7 +12,7 @@
 // import 'package:visualit/features/reader/data/bookmark.dart';
 // import 'package:visualit/features/reader/data/highlight.dart';
 // import 'package:visualit/features/reader/data/page_cache.dart';
-// import 'package:visualit/features/reader/data/reading_progress.dart';
+// import 'package:visualit/features/reader/data/new_reading_progress.dart';
 //
 // /// Mock implementation of ILoggerService for testing.
 // class MockLoggerService extends Mock implements ILoggerService {}

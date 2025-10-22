@@ -7,24 +7,20 @@ import 'package:visualit/core/services/sync_service.dart';
 import 'package:visualit/core/theme/app_theme.dart';
 import 'package:visualit/core/theme/theme_controller.dart';
 import 'package:firebase_core/firebase_core.dart';
-import 'features/auth/presentation/auth_controller.dart';
 import 'firebase_options.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await dotenv.load(fileName: ".env");
-  await Firebase.initializeApp(
-    options: DefaultFirebaseOptions.currentPlatform,
-  );
 
-  // Initialize authentication state
-  final container = ProviderContainer();
-  await container.read(authControllerProvider.notifier).initialize();
+  // Check if Firebase is already initialized before initializing
+  if (Firebase.apps.isEmpty) {
+    await Firebase.initializeApp(
+      options: DefaultFirebaseOptions.currentPlatform,
+    );
+  }
 
-  runApp(ProviderScope(
-    parent: container,
-    child: const MyApp(),
-  ));
+  runApp(const ProviderScope(child: MyApp()));
 }
 
 class MyApp extends ConsumerWidget {

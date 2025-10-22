@@ -11,7 +11,7 @@ import 'package:visualit/core/services/interfaces/i_sync_service.dart';
 import 'package:visualit/core/services/sync_service.dart';
 import 'package:visualit/features/reader/data/bookmark.dart';
 import 'package:visualit/features/reader/data/highlight.dart';
-import 'package:visualit/features/reader/data/reading_progress.dart';
+import 'package:visualit/features/reader/data/new_reading_progress.dart';
 
 import '../../mocks/mock_services.dart';
 import 'sync_service_test.mocks.dart';

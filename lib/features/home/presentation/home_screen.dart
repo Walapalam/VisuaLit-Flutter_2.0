@@ -25,7 +25,7 @@ class HomeScreen extends ConsumerWidget {
         final streakHistory = List<bool>.generate(42, (i) => i % 3 != 0);
 
         return Scaffold(
-          backgroundColor: Theme.of(context).colorScheme.background,
+          backgroundColor: Theme.of(context).colorScheme.primary,
           body: SafeArea(
             child: libraryState.when(
               loading: () => const Center(child: CircularProgressIndicator()),
@@ -33,7 +33,7 @@ class HomeScreen extends ConsumerWidget {
               data: (books) => CustomScrollView(
                 slivers: [
                   SliverAppBar(
-                    backgroundColor: Theme.of(context).colorScheme.background,
+                    backgroundColor: Theme.of(context).colorScheme.primary,
                     floating: true,
                     snap: true,
                     title: TextField(
@@ -204,9 +204,7 @@ class _BookShelf extends StatelessWidget {
                 author: book.author ?? 'Unknown Author',
                 onTap: () {
                   if (book.status == db.ProcessingStatus.ready) {
-                    context.goNamed('bookReader',
-                        pathParameters: {'bookId': book.id.toString()}
-                    );
+                    context.goNamed('epubReader', pathParameters: {'bookId': book.id.toString()});
                   } else {
                     ScaffoldMessenger.of(context).showSnackBar(SnackBar(
                       content: Text('${book.title ?? 'Book'} is still processing...'),

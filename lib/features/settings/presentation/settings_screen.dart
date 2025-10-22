@@ -116,23 +116,21 @@ import 'package:flutter/material.dart';
                                   context,
                                   'Notifications',
                                   Icons.notifications_outlined,
-                                  () {
-                                    // TODO: Navigate to notification settings screen
-                                  },
+                                  () => context.pushNamed('notifications'),
                                 ),
                                 const Divider(height: 1),
                                 _buildNavigationItem(
                                   context,
                                   'Privacy Settings',
                                   Icons.privacy_tip_outlined,
-                                  () => Navigator.pushNamed(context, '/privacy-settings'),
+                                  () => context.pushNamed('privacySettings'),
                                 ),
                                 const Divider(height: 1),
                                 _buildNavigationItem(
                                   context,
                                   'About',
                                   Icons.info_outline,
-                                  () => Navigator.pushNamed(context, '/about'),
+                                  () => context.pushNamed('about'),
                                 ),
                                 const Divider(height: 1),
                                 _buildNavigationItem(

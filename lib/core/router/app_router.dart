@@ -13,6 +13,9 @@ import 'package:visualit/features/library/presentation/library_screen.dart';
 import 'package:visualit/features/scaffold.dart';
 import 'package:visualit/features/settings/presentation/settings_screen.dart';
 import 'package:visualit/features/settings/presentation/storage_settings_screen.dart';
+import 'package:visualit/features/settings/presentation/privacy_settings_screen.dart';
+import 'package:visualit/features/settings/presentation/notifications_screen.dart';
+import 'package:visualit/features/settings/presentation/about_screen.dart';
 import 'package:visualit/features/audiobook_player/presentation/audiobooks_screen.dart';
 import 'package:visualit/features/reader/presentation/old_reading_screen.dart';
 import 'package:visualit/features/audiobook_player/presentation/audiobook_player_screen.dart';
@@ -94,6 +97,22 @@ final goRouterProvider = Provider<GoRouter>((ref) {
         path: '/all-books',
         name: 'allBooks',
         builder: (context, state) => const AllBooksScreen(),
+      ),
+      // Add new settings routes
+      GoRoute(
+        path: '/privacy-settings',
+        name: 'privacySettings',
+        builder: (context, state) => const PrivacySettingsScreen(),
+      ),
+      GoRoute(
+        path: '/about',
+        name: 'about',
+        builder: (context, state) => const AboutScreen(),
+      ),
+      GoRoute(
+        path: '/notifications',
+        name: 'notifications',
+        builder: (context, state) => const NotificationsScreen(),
       ),
       // TODO: Add '/preferences' route here when built
 

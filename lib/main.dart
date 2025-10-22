@@ -7,6 +7,7 @@ import 'package:visualit/core/services/sync_service.dart';
 import 'package:visualit/core/theme/app_theme.dart';
 import 'package:visualit/core/theme/theme_controller.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:visualit/features/settings/services/notification_service.dart';
 import 'firebase_options.dart';
 
 Future<void> main() async {
@@ -20,7 +21,19 @@ Future<void> main() async {
     );
   }
 
-  runApp(const ProviderScope(child: MyApp()));
+  // Create a ProviderContainer to access providers before the widget tree is built
+  final container = ProviderContainer();
+
+  // Initialize notification service
+  try {
+    final notificationService = container.read(notificationServiceProvider);
+    await notificationService.init();
+    debugPrint('Notification service initialized successfully');
+  } catch (e) {
+    debugPrint('Error initializing notification service: $e');
+  }
+
+  runApp(ProviderScope(parent: container, child: const MyApp()));
 }
 
 class MyApp extends ConsumerWidget {

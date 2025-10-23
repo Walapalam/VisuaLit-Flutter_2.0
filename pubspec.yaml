@@ -2,7 +2,7 @@ name: visualit
 description: "An AI Powered Ebook Reader Experience"
 publish_to: 'none'
 
-version: 0.1.0+8
+version: 0.1.0+9
 environment:
   sdk: ^3.8.1
 
@@ -53,6 +53,7 @@ dependencies:
   flutter_markdown: ^0.7.0
   shared_preferences: ^2.2.2
   awesome_notifications: ^0.10.1
+  awesome_notifications_core: ^0.10.1
   timezone: ^0.9.2
 
 dev_dependencies:

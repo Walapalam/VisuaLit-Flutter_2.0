@@ -7,6 +7,7 @@
 #include "generated_plugin_registrant.h"
 
 #include <awesome_notifications/awesome_notifications_plugin_c_api.h>
+#include <awesome_notifications_core/awesome_notifications_core_plugin_c_api.h>
 #include <connectivity_plus/connectivity_plus_windows_plugin.h>
 #include <desktop_webview_window/desktop_webview_window_plugin.h>
 #include <firebase_auth/firebase_auth_plugin_c_api.h>
@@ -20,6 +21,8 @@
 void RegisterPlugins(flutter::PluginRegistry* registry) {
   AwesomeNotificationsPluginCApiRegisterWithRegistrar(
       registry->GetRegistrarForPlugin("AwesomeNotificationsPluginCApi"));
+  AwesomeNotificationsCorePluginCApiRegisterWithRegistrar(
+      registry->GetRegistrarForPlugin("AwesomeNotificationsCorePluginCApi"));
   ConnectivityPlusWindowsPluginRegisterWithRegistrar(
       registry->GetRegistrarForPlugin("ConnectivityPlusWindowsPlugin"));
   DesktopWebviewWindowPluginRegisterWithRegistrar(

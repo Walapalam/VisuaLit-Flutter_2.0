@@ -1,0 +1,183 @@
+<?xml version='1.0' encoding='utf-8'?>
+<ncx xmlns="http://www.daisy.org/z3986/2005/ncx/" version="2005-1" xml:lang="eng">
+  <head>
+    <meta content="36e308e2-6df0-4dbb-bdaa-193d0de2dd48" name="dtb:uid"/>
+    <meta content="2" name="dtb:depth"/>
+    <meta content="calibre (3.46.0)" name="dtb:generator"/>
+    <meta content="0" name="dtb:totalPageCount"/>
+    <meta content="0" name="dtb:maxPageNumber"/>
+  </head>
+  <docTitle>
+    <text>Harry Potter and the Prisoner of Azkaban</text>
+  </docTitle>
+  <navMap>
+    <navPoint class="chapter" id="num_1" playOrder="1">
+      <navLabel>
+        <text>Title Page</text>
+      </navLabel>
+      <content src="text/part0000.html"/>
+    </navPoint>
+    <navPoint class="chapter" id="num_2" playOrder="2">
+      <navLabel>
+        <text>Pottermore.com</text>
+      </navLabel>
+      <content src="text/part0001.html"/>
+    </navPoint>
+    <navPoint class="chapter" id="num_3" playOrder="3">
+      <navLabel>
+        <text>Contents</text>
+      </navLabel>
+      <content src="text/part0003.html"/>
+    </navPoint>
+    <navPoint class="chapter" id="num_4" playOrder="3">
+      <navLabel>
+        <text>Chapter 1 - Owl Post</text>
+      </navLabel>
+      <content src="text/part0004.html#3Q280-e23cb6061e6b4c94b0603b4361696f1a"/>
+    </navPoint>
+    <navPoint class="chapter" id="num_5" playOrder="4">
+      <navLabel>
+        <text>Chapter 2 - Aunt Marge's Big Mistake</text>
+      </navLabel>
+      <content src="text/part0005.html#4OIQ0-e23cb6061e6b4c94b0603b4361696f1a"/>
+    </navPoint>
+    <navPoint class="chapter" id="num_6" playOrder="5">
+      <navLabel>
+        <text>Chapter 3 - The Knight Bus</text>
+      </navLabel>
+      <content src="text/part0006.html#5N3C0-e23cb6061e6b4c94b0603b4361696f1a"/>
+    </navPoint>
+    <navPoint class="chapter" id="num_7" playOrder="6">
+      <navLabel>
+        <text>Chapter 4 - The Leaky Cauldron</text>
+      </navLabel>
+      <content src="text/part0007.html#6LJU0-e23cb6061e6b4c94b0603b4361696f1a"/>
+    </navPoint>
+    <navPoint class="chapter" id="num_8" playOrder="7">
+      <navLabel>
+        <text>Chapter 5 - The Dementor</text>
+      </navLabel>
+      <content src="text/part0008.html#7K4G0-e23cb6061e6b4c94b0603b4361696f1a"/>
+    </navPoint>
+    <navPoint class="chapter" id="num_9" playOrder="8">
+      <navLabel>
+        <text>Chapter 6 - Talons and Tea Leaves</text>
+      </navLabel>
+      <content src="text/part0009.html#8IL20-e23cb6061e6b4c94b0603b4361696f1a"/>
+    </navPoint>
+    <navPoint class="chapter" id="num_10" playOrder="9">
+      <navLabel>
+        <text>Chapter 7 - The Boggart in the Wardrobe</text>
+      </navLabel>
+      <content src="text/part0010.html#9H5K0-e23cb6061e6b4c94b0603b4361696f1a"/>
+    </navPoint>
+    <navPoint class="chapter" id="num_11" playOrder="10">
+      <navLabel>
+        <text>Chapter 8 - Flight of the Fat Lady</text>
+      </navLabel>
+      <content src="text/part0011.html#AFM60-e23cb6061e6b4c94b0603b4361696f1a"/>
+    </navPoint>
+    <navPoint class="chapter" id="num_12" playOrder="11">
+      <navLabel>
+        <text>Chapter 9 - Grim Defeat</text>
+      </navLabel>
+      <content src="text/part0012.html#BE6O0-e23cb6061e6b4c94b0603b4361696f1a"/>
+    </navPoint>
+    <navPoint class="chapter" id="num_13" playOrder="12">
+      <navLabel>
+        <text>Chapter 10 - The Marauder's Map</text>
+      </navLabel>
+      <content src="text/part0013.html#CCNA0-e23cb6061e6b4c94b0603b4361696f1a"/>
+    </navPoint>
+    <navPoint class="chapter" id="num_14" playOrder="13">
+      <navLabel>
+        <text>Chapter 11 - The Firebolt</text>
+      </navLabel>
+      <content src="text/part0014.html#DB7S0-e23cb6061e6b4c94b0603b4361696f1a"/>
+    </navPoint>
+    <navPoint class="chapter" id="num_15" playOrder="14">
+      <navLabel>
+        <text>Chapter 12 - The Patronus</text>
+      </navLabel>
+      <content src="text/part0015.html#E9OE0-e23cb6061e6b4c94b0603b4361696f1a"/>
+    </navPoint>
+    <navPoint class="chapter" id="num_16" playOrder="15">
+      <navLabel>
+        <text>Chapter 13 - Gryffindor Versus Ravenclaw</text>
+      </navLabel>
+      <content src="text/part0016.html#F8900-e23cb6061e6b4c94b0603b4361696f1a"/>
+    </navPoint>
+    <navPoint class="chapter" id="num_17" playOrder="16">
+      <navLabel>
+        <text>Chapter 14 - Snape's Grudge</text>
+      </navLabel>
+      <content src="text/part0017.html#G6PI0-e23cb6061e6b4c94b0603b4361696f1a"/>
+    </navPoint>
+    <navPoint class="chapter" id="num_18" playOrder="17">
+      <navLabel>
+        <text>Chapter 15 - The Quidditch Final</text>
+      </navLabel>
+      <content src="text/part0018.html#H5A40-e23cb6061e6b4c94b0603b4361696f1a"/>
+    </navPoint>
+    <navPoint class="chapter" id="num_19" playOrder="18">
+      <navLabel>
+        <text>Chapter 16 - Professor Trelawney's Prediction</text>
+      </navLabel>
+      <content src="text/part0019.html#I3QM0-e23cb6061e6b4c94b0603b4361696f1a"/>
+    </navPoint>
+    <navPoint class="chapter" id="num_20" playOrder="19">
+      <navLabel>
+        <text>Chapter 17 - Cat, Rat, and Dog</text>
+      </navLabel>
+      <content src="text/part0020.html#J2B80-e23cb6061e6b4c94b0603b4361696f1a"/>
+    </navPoint>
+    <navPoint class="chapter" id="num_21" playOrder="20">
+      <navLabel>
+        <text>Chapter 18 - Moony, Wormtail, Padfoot, and Prongs</text>
+      </navLabel>
+      <content src="text/part0021.html#K0RQ0-e23cb6061e6b4c94b0603b4361696f1a"/>
+    </navPoint>
+    <navPoint class="chapter" id="num_22" playOrder="21">
+      <navLabel>
+        <text>Chapter 19 - The Servant of Lord Voldemort</text>
+      </navLabel>
+      <content src="text/part0022.html#KVCC0-e23cb6061e6b4c94b0603b4361696f1a"/>
+    </navPoint>
+    <navPoint class="chapter" id="num_23" playOrder="22">
+      <navLabel>
+        <text>Chapter 20 - The Dementor's Kiss</text>
+      </navLabel>
+      <content src="text/part0023.html#LTSU0-e23cb6061e6b4c94b0603b4361696f1a"/>
+    </navPoint>
+    <navPoint class="chapter" id="num_24" playOrder="23">
+      <navLabel>
+        <text>Chapter 21 - Hermione's Secret</text>
+      </navLabel>
+      <content src="text/part0024.html#MSDG0-e23cb6061e6b4c94b0603b4361696f1a"/>
+    </navPoint>
+    <navPoint class="chapter" id="num_25" playOrder="24">
+      <navLabel>
+        <text>Chapter 22 - Owl Post Again</text>
+      </navLabel>
+      <content src="text/part0025.html#NQU20-e23cb6061e6b4c94b0603b4361696f1a"/>
+    </navPoint>
+    <navPoint class="chapter" id="num_26" playOrder="25">
+      <navLabel>
+        <text>Also By</text>
+      </navLabel>
+      <content src="text/part0026.html#OPEK0-e23cb6061e6b4c94b0603b4361696f1a"/>
+    </navPoint>
+    <navPoint class="chapter" id="num_27" playOrder="26">
+      <navLabel>
+        <text>Harry Potter and the Goblet of Fire - The Riddle House</text>
+      </navLabel>
+      <content src="text/part0027.html#PNV60-e23cb6061e6b4c94b0603b4361696f1a"/>
+    </navPoint>
+    <navPoint class="chapter" id="num_28" playOrder="27">
+      <navLabel>
+        <text>Copyright</text>
+      </navLabel>
+      <content src="text/part0029.html#RL0A0-e23cb6061e6b4c94b0603b4361696f1a"/>
+    </navPoint>
+  </navMap>
+</ncx>

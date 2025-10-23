@@ -29,7 +29,6 @@ import 'package:visualit/features/custom_reader/presentation/reading_preferences
 import 'package:visualit/features/reader/presentation/widgets/book_overview_dialog.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 
-
 class ReadingScreen extends ConsumerStatefulWidget {
   final int bookId;
 

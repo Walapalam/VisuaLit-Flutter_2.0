@@ -1,0 +1,123 @@
+<?xml version='1.0' encoding='utf-8'?>
+<package xmlns="http://www.idpf.org/2007/opf" unique-identifier="uuid_id" version="2.0">
+  <metadata xmlns:calibre="http://calibre.kovidgoyal.net/2009/metadata" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:dcterms="http://purl.org/dc/terms/" xmlns:opf="http://www.idpf.org/2007/opf" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+    <meta name="cover" content="cover"/>
+    <dc:title>Harry Potter and the Prisoner of Azkaban</dc:title>
+    <dc:language>en</dc:language>
+    <meta name="calibre:timestamp" content="2020-04-04T02:56:41.808000+00:00"/>
+    <dc:identifier opf:scheme="MOBI-ASIN">B0192CTMX2</dc:identifier>
+    <dc:identifier id="uuid_id" opf:scheme="uuid">36e308e2-6df0-4dbb-bdaa-193d0de2dd48</dc:identifier>
+    <dc:creator opf:file-as="Rowling, J.K." opf:role="aut">J.K. Rowling</dc:creator>
+    <dc:contributor opf:role="bkp">calibre (3.46.0) [https://calibre-ebook.com]</dc:contributor>
+    <dc:date>2015-12-08T07:00:00+00:00</dc:date>
+    <dc:publisher>Pottermore Publishing</dc:publisher>
+    <dc:rights>Copyright (c) 1999 J.K. Rowling</dc:rights>
+    <meta content="horizontal-lr" name="primary-writing-mode"/>
+  </metadata>
+  <manifest>
+    <item href="images/00031.jpeg" id="cover" media-type="image/jpeg"/>
+    <item href="titlepage.xhtml" id="titlepage" media-type="application/xhtml+xml"/>
+    <item href="text/part0000.html" id="id35" media-type="application/xhtml+xml"/>
+    <item href="text/part0001.html" id="id36" media-type="application/xhtml+xml"/>
+    <item href="text/part0002.html" id="id37" media-type="application/xhtml+xml"/>
+    <item href="text/part0003.html" id="id38" media-type="application/xhtml+xml"/>
+    <item href="text/part0004.html" id="id39" media-type="application/xhtml+xml"/>
+    <item href="text/part0005.html" id="id40" media-type="application/xhtml+xml"/>
+    <item href="text/part0006.html" id="id41" media-type="application/xhtml+xml"/>
+    <item href="text/part0007.html" id="id42" media-type="application/xhtml+xml"/>
+    <item href="text/part0008.html" id="id43" media-type="application/xhtml+xml"/>
+    <item href="text/part0009.html" id="id44" media-type="application/xhtml+xml"/>
+    <item href="text/part0010.html" id="id45" media-type="application/xhtml+xml"/>
+    <item href="text/part0011.html" id="id46" media-type="application/xhtml+xml"/>
+    <item href="text/part0012.html" id="id47" media-type="application/xhtml+xml"/>
+    <item href="text/part0013.html" id="id48" media-type="application/xhtml+xml"/>
+    <item href="text/part0014.html" id="id49" media-type="application/xhtml+xml"/>
+    <item href="text/part0015.html" id="id50" media-type="application/xhtml+xml"/>
+    <item href="text/part0016.html" id="id51" media-type="application/xhtml+xml"/>
+    <item href="text/part0017.html" id="id52" media-type="application/xhtml+xml"/>
+    <item href="text/part0018.html" id="id53" media-type="application/xhtml+xml"/>
+    <item href="text/part0019.html" id="id54" media-type="application/xhtml+xml"/>
+    <item href="text/part0020.html" id="id55" media-type="application/xhtml+xml"/>
+    <item href="text/part0021.html" id="id56" media-type="application/xhtml+xml"/>
+    <item href="text/part0022.html" id="id57" media-type="application/xhtml+xml"/>
+    <item href="text/part0023.html" id="id58" media-type="application/xhtml+xml"/>
+    <item href="text/part0024.html" id="id59" media-type="application/xhtml+xml"/>
+    <item href="text/part0025.html" id="id60" media-type="application/xhtml+xml"/>
+    <item href="text/part0026.html" id="id61" media-type="application/xhtml+xml"/>
+    <item href="text/part0027.html" id="id62" media-type="application/xhtml+xml"/>
+    <item href="text/part0028.html" id="id63" media-type="application/xhtml+xml"/>
+    <item href="text/part0029.html" id="id64" media-type="application/xhtml+xml"/>
+    <item href="images/00001.jpeg" id="id1" media-type="image/jpeg"/>
+    <item href="images/00002.jpeg" id="id2" media-type="image/jpeg"/>
+    <item href="images/00003.jpeg" id="id3" media-type="image/jpeg"/>
+    <item href="images/00004.jpeg" id="id4" media-type="image/jpeg"/>
+    <item href="images/00005.jpeg" id="id5" media-type="image/jpeg"/>
+    <item href="images/00006.jpeg" id="id6" media-type="image/jpeg"/>
+    <item href="images/00007.jpeg" id="id7" media-type="image/jpeg"/>
+    <item href="images/00008.jpeg" id="id8" media-type="image/jpeg"/>
+    <item href="images/00009.jpeg" id="id9" media-type="image/jpeg"/>
+    <item href="images/00010.jpeg" id="id10" media-type="image/jpeg"/>
+    <item href="images/00011.jpeg" id="id11" media-type="image/jpeg"/>
+    <item href="images/00012.jpeg" id="id12" media-type="image/jpeg"/>
+    <item href="images/00013.jpeg" id="id13" media-type="image/jpeg"/>
+    <item href="images/00014.jpeg" id="id14" media-type="image/jpeg"/>
+    <item href="images/00015.jpeg" id="id15" media-type="image/jpeg"/>
+    <item href="images/00016.jpeg" id="id16" media-type="image/jpeg"/>
+    <item href="images/00017.jpeg" id="id17" media-type="image/jpeg"/>
+    <item href="images/00018.jpeg" id="id18" media-type="image/jpeg"/>
+    <item href="images/00019.jpeg" id="id19" media-type="image/jpeg"/>
+    <item href="images/00020.jpeg" id="id20" media-type="image/jpeg"/>
+    <item href="images/00021.jpeg" id="id21" media-type="image/jpeg"/>
+    <item href="images/00022.jpeg" id="id22" media-type="image/jpeg"/>
+    <item href="images/00023.jpeg" id="id23" media-type="image/jpeg"/>
+    <item href="images/00024.jpeg" id="id24" media-type="image/jpeg"/>
+    <item href="images/00025.jpeg" id="id25" media-type="image/jpeg"/>
+    <item href="images/00026.jpeg" id="id26" media-type="image/jpeg"/>
+    <item href="images/00027.jpeg" id="id27" media-type="image/jpeg"/>
+    <item href="images/00028.jpeg" id="id28" media-type="image/jpeg"/>
+    <item href="images/00029.jpeg" id="id29" media-type="image/jpeg"/>
+    <item href="images/00030.jpeg" id="id30" media-type="image/jpeg"/>
+    <item href="page_styles.css" id="page_css" media-type="text/css"/>
+    <item href="stylesheet.css" id="css" media-type="text/css"/>
+    <item href="toc.ncx" id="ncx" media-type="application/x-dtbncx+xml"/>
+  </manifest>
+  <spine toc="ncx">
+    <itemref idref="titlepage"/>
+    <itemref idref="id35"/>
+    <itemref idref="id36"/>
+    <itemref idref="id37"/>
+    <itemref idref="id38"/>
+    <itemref idref="id39"/>
+    <itemref idref="id40"/>
+    <itemref idref="id41"/>
+    <itemref idref="id42"/>
+    <itemref idref="id43"/>
+    <itemref idref="id44"/>
+    <itemref idref="id45"/>
+    <itemref idref="id46"/>
+    <itemref idref="id47"/>
+    <itemref idref="id48"/>
+    <itemref idref="id49"/>
+    <itemref idref="id50"/>
+    <itemref idref="id51"/>
+    <itemref idref="id52"/>
+    <itemref idref="id53"/>
+    <itemref idref="id54"/>
+    <itemref idref="id55"/>
+    <itemref idref="id56"/>
+    <itemref idref="id57"/>
+    <itemref idref="id58"/>
+    <itemref idref="id59"/>
+    <itemref idref="id60"/>
+    <itemref idref="id61"/>
+    <itemref idref="id62"/>
+    <itemref idref="id63"/>
+    <itemref idref="id64"/>
+  </spine>
+  <guide>
+    <reference href="titlepage.xhtml" title="Cover" type="cover"/>
+    <reference href="text/part0000.html#1-e23cb6061e6b4c94b0603b4361696f1a" title="Title Page" type="text"/>
+    <reference href="text/part0003.html#toc" title="Contents " type="toc"/>
+    <reference href="text/part0029.html#RL0A0-e23cb6061e6b4c94b0603b4361696f1a" title="Copyright" type="copyright-page"/>
+  </guide>
+</package>

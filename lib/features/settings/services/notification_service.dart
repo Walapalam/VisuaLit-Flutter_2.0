@@ -4,6 +4,7 @@ import 'package:timezone/data/latest.dart' as tz;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:permission_handler/permission_handler.dart';
+import 'notification_callbacks.dart';
 
 final notificationServiceProvider = Provider<NotificationService>((ref) {
   return NotificationService();
@@ -54,25 +55,11 @@ class NotificationService {
 
     // Setup action listeners for notifications
     AwesomeNotifications().setListeners(
-      onActionReceivedMethod: (ReceivedAction receivedAction) {
-        debugPrint('Notification action received: ${receivedAction.toMap()}');
-        // Handle notification action here
-        return Future.value(true);
-      },
-      onNotificationCreatedMethod: (ReceivedNotification receivedNotification) {
-        debugPrint('Notification created: ${receivedNotification.toMap()}');
-        return Future.value(true);
-      },
-      onNotificationDisplayedMethod: (ReceivedNotification receivedNotification) {
-        debugPrint('Notification displayed: ${receivedNotification.toMap()}');
-        return Future.value(true);
-      },
-      onDismissActionReceivedMethod: (ReceivedAction receivedAction) {
-        debugPrint('Notification dismissed: ${receivedAction.toMap()}');
-        return Future.value(true);
-      },
+      onActionReceivedMethod: onActionNotificationMethod,
+      onNotificationCreatedMethod: onNotificationCreatedMethod,
+      onNotificationDisplayedMethod: onNotificationDisplayedMethod,
+      onDismissActionReceivedMethod: onDismissActionReceivedMethod,
     );
-
     debugPrint('Notification service initialized successfully');
   }
 

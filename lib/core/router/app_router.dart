@@ -6,7 +6,6 @@ import 'package:visualit/features/auth/presentation/auth_controller.dart';
 import 'package:visualit/features/auth/presentation/login_screen.dart';
 import 'package:visualit/features/auth/presentation/signup_screen.dart';
 import 'package:visualit/features/auth/presentation/onboarding_screen.dart';
-import 'package:visualit/features/auth/presentation/signup_screen.dart';
 import 'package:visualit/features/auth/presentation/splash_screen.dart';
 import 'package:visualit/features/home/presentation/home_screen.dart';
 import 'package:visualit/features/library/presentation/library_screen.dart';
@@ -16,6 +15,7 @@ import 'package:visualit/features/settings/presentation/storage_settings_screen.
 import 'package:visualit/features/settings/presentation/privacy_settings_screen.dart';
 import 'package:visualit/features/settings/presentation/notifications_screen.dart';
 import 'package:visualit/features/settings/presentation/about_screen.dart';
+import 'package:visualit/features/settings/presentation/help_support_screen.dart';
 import 'package:visualit/features/audiobook_player/presentation/audiobooks_screen.dart';
 import 'package:visualit/features/reader/presentation/old_reading_screen.dart';
 import 'package:visualit/features/audiobook_player/presentation/audiobook_player_screen.dart';
@@ -113,6 +113,11 @@ final goRouterProvider = Provider<GoRouter>((ref) {
         path: '/notifications',
         name: 'notifications',
         builder: (context, state) => const NotificationsScreen(),
+      ),
+      GoRoute(
+        path: '/help-support',
+        name: 'helpSupport',
+        builder: (context, state) => const HelpSupportScreen(),
       ),
       // TODO: Add '/preferences' route here when built
 

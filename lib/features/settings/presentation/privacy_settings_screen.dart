@@ -177,21 +177,23 @@ class PrivacySettingsScreen extends ConsumerWidget {
     // Show loading state if preferences are still initializing
     if (initializerState is AsyncLoading) {
       return Scaffold(
-        body: Column(
-          children: [
-            const HeroBannerWidget(
-              icon: Icons.privacy_tip,
-              title: 'Privacy Settings',
-              subtitle: 'Manage your data and privacy preferences',
-            ),
-            Expanded(
-              child: Center(
-                child: CircularProgressIndicator(
-                  color: AppTheme.primaryGreen,
+        body: SafeArea(
+          child: Column(
+            children: [
+              const HeroBannerWidget(
+                icon: Icons.privacy_tip,
+                title: 'Privacy Settings',
+                subtitle: 'Manage your data and privacy preferences',
+              ),
+              Expanded(
+                child: Center(
+                  child: CircularProgressIndicator(
+                    color: AppTheme.primaryGreen,
+                  ),
                 ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       );
     }
@@ -199,7 +201,54 @@ class PrivacySettingsScreen extends ConsumerWidget {
     // Show error state if initialization failed
     if (initializerState is AsyncError) {
       return Scaffold(
-        body: Column(
+        body: SafeArea(
+          child: Column(
+            children: [
+              const HeroBannerWidget(
+                icon: Icons.privacy_tip,
+                title: 'Privacy Settings',
+                subtitle: 'Manage your data and privacy preferences',
+              ),
+              Expanded(
+                child: Center(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        Icons.error_outline,
+                        size: 48,
+                        color: Colors.red.shade300,
+                      ),
+                      const SizedBox(height: 16),
+                      Text(
+                        'Failed to load settings',
+                        style: theme.textTheme.titleLarge,
+                      ),
+                      const SizedBox(height: 8),
+                      ElevatedButton(
+                        onPressed: () {
+                          ref.invalidate(settingsInitializerProvider);
+                        },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppTheme.primaryGreen,
+                          foregroundColor: Colors.white,
+                        ),
+                        child: const Text('Retry'),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    // Main content when preferences are loaded successfully
+    return Scaffold(
+      body: SafeArea(
+        child: Column(
           children: [
             const HeroBannerWidget(
               icon: Icons.privacy_tip,
@@ -207,235 +256,192 @@ class PrivacySettingsScreen extends ConsumerWidget {
               subtitle: 'Manage your data and privacy preferences',
             ),
             Expanded(
-              child: Center(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(
-                      Icons.error_outline,
-                      size: 48,
-                      color: Colors.red.shade300,
-                    ),
-                    const SizedBox(height: 16),
-                    Text(
-                      'Failed to load settings',
-                      style: theme.textTheme.titleLarge,
-                    ),
-                    const SizedBox(height: 8),
-                    ElevatedButton(
-                      onPressed: () {
-                        ref.invalidate(settingsInitializerProvider);
-                      },
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: AppTheme.primaryGreen,
-                        foregroundColor: Colors.white,
+              child: SingleChildScrollView(
+                physics: const BouncingScrollPhysics(),
+                child: TweenAnimationBuilder(
+                  duration: const Duration(milliseconds: 800),
+                  tween: Tween<double>(begin: 0.0, end: 1.0),
+                  curve: Curves.easeOutCubic,
+                  builder: (context, double value, child) {
+                    return Opacity(
+                      opacity: value,
+                      child: Transform.translate(
+                        offset: Offset(0, 20 * (1 - value)),
+                        child: child,
                       ),
-                      child: const Text('Retry'),
+                    );
+                  },
+                  child: Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        // Data Collection Section
+                        _buildSectionHeader(context, 'Data Collection'),
+                        Card(
+                          margin: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          elevation: 2,
+                          color: theme.colorScheme.surface,
+                          child: Column(
+                            children: [
+                              SwitchListTile(
+                                title: Text('Analytics',
+                                  style: theme.textTheme.bodyLarge,
+                                ),
+                                subtitle: Text(
+                                  'Allow us to collect app usage data to improve our services',
+                                  style: theme.textTheme.bodyMedium?.copyWith(
+                                    color: theme.colorScheme.onSurface.withOpacity(0.7),
+                                  ),
+                                ),
+                                secondary: Icon(Icons.analytics_outlined,
+                                  color: AppTheme.primaryGreen,
+                                ),
+                                value: privacySettings.analyticsEnabled,
+                                activeColor: AppTheme.primaryGreen,
+                                activeTrackColor: AppTheme.primaryGreen.withOpacity(0.5),
+                                onChanged: (bool value) {
+                                  HapticFeedback.lightImpact();
+                                  ref.read(privacySettingsProvider.notifier).setAnalytics(value);
+                                },
+                              ),
+                              Divider(
+                                height: 1,
+                                thickness: 1,
+                                indent: 16,
+                                endIndent: 16,
+                                color: theme.colorScheme.outline.withOpacity(0.2),
+                              ),
+                              SwitchListTile(
+                                title: Text('Crash Reporting',
+                                  style: theme.textTheme.bodyLarge,
+                                ),
+                                subtitle: Text(
+                                  'Send crash reports to help us fix issues',
+                                  style: theme.textTheme.bodyMedium?.copyWith(
+                                    color: theme.colorScheme.onSurface.withOpacity(0.7),
+                                  ),
+                                ),
+                                secondary: Icon(Icons.bug_report_outlined,
+                                  color: AppTheme.primaryGreen,
+                                ),
+                                value: privacySettings.crashReportingEnabled,
+                                activeColor: AppTheme.primaryGreen,
+                                activeTrackColor: AppTheme.primaryGreen.withOpacity(0.5),
+                                onChanged: (bool value) {
+                                  HapticFeedback.lightImpact();
+                                  ref.read(privacySettingsProvider.notifier).setCrashReporting(value);
+                                },
+                              ),
+                            ],
+                          ),
+                        ),
+
+                        // Personalization Section
+                        _buildSectionHeader(context, 'Personalization'),
+                        Card(
+                          margin: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          elevation: 2,
+                          color: theme.colorScheme.surface,
+                          child: SwitchListTile(
+                            title: Text('Personalized Experience',
+                              style: theme.textTheme.bodyLarge,
+                            ),
+                            subtitle: Text(
+                              'Allow us to use your reading habits to personalize recommendations',
+                              style: theme.textTheme.bodyMedium?.copyWith(
+                                color: theme.colorScheme.onSurface.withOpacity(0.7),
+                              ),
+                            ),
+                            secondary: Icon(Icons.person_outline,
+                              color: AppTheme.primaryGreen,
+                            ),
+                            value: privacySettings.personalizationEnabled,
+                            activeColor: AppTheme.primaryGreen,
+                            activeTrackColor: AppTheme.primaryGreen.withOpacity(0.5),
+                            onChanged: (bool value) {
+                              HapticFeedback.lightImpact();
+                              ref.read(privacySettingsProvider.notifier).setPersonalization(value);
+                            },
+                          ),
+                        ),
+
+                        // Privacy Policy Button
+                        Padding(
+                          padding: const EdgeInsets.all(24),
+                          child: Center(
+                            child: ElevatedButton.icon(
+                              icon: const Icon(Icons.policy),
+                              label: const Text('View Privacy Policy'),
+                              onPressed: () => _showPrivacyPolicy(context),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: AppTheme.primaryGreen,
+                                foregroundColor: Colors.white,
+                                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                elevation: 2,
+                              ),
+                            ),
+                          ),
+                        ),
+
+                        // Privacy Information
+                        Card(
+                          margin: const EdgeInsets.symmetric(horizontal: 4, vertical: 16),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          elevation: 1,
+                          color: theme.colorScheme.surface,
+                          child: Padding(
+                            padding: const EdgeInsets.all(16),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  children: [
+                                    Icon(
+                                      Icons.shield,
+                                      color: AppTheme.primaryGreen,
+                                      size: 20,
+                                    ),
+                                    const SizedBox(width: 8),
+                                    Text(
+                                      'Your Privacy Matters',
+                                      style: theme.textTheme.titleMedium?.copyWith(
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 12),
+                                Text(
+                                  'You can request deletion of your data at any time by contacting our support team. '
+                                      'We are committed to protecting your privacy and providing a secure reading experience.',
+                                  style: theme.textTheme.bodyMedium?.copyWith(
+                                    height: 1.5,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
-                  ],
+                  ),
                 ),
               ),
             ),
           ],
         ),
-      );
-    }
-
-    // Main content when preferences are loaded successfully
-    return Scaffold(
-      body: Column(
-        children: [
-          const HeroBannerWidget(
-            icon: Icons.privacy_tip,
-            title: 'Privacy Settings',
-            subtitle: 'Manage your data and privacy preferences',
-          ),
-          Expanded(
-            child: SingleChildScrollView(
-              physics: const BouncingScrollPhysics(),
-              child: TweenAnimationBuilder(
-                duration: const Duration(milliseconds: 800),
-                tween: Tween<double>(begin: 0.0, end: 1.0),
-                curve: Curves.easeOutCubic,
-                builder: (context, double value, child) {
-                  return Opacity(
-                    opacity: value,
-                    child: Transform.translate(
-                      offset: Offset(0, 20 * (1 - value)),
-                      child: child,
-                    ),
-                  );
-                },
-                child: Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      // Data Collection Section
-                      _buildSectionHeader(context, 'Data Collection'),
-                      Card(
-                        margin: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        elevation: 2,
-                        color: theme.colorScheme.surface,
-                        child: Column(
-                          children: [
-                            SwitchListTile(
-                              title: Text('Analytics',
-                                style: theme.textTheme.bodyLarge,
-                              ),
-                              subtitle: Text(
-                                'Allow us to collect app usage data to improve our services',
-                                style: theme.textTheme.bodyMedium?.copyWith(
-                                  color: theme.colorScheme.onSurface.withOpacity(0.7),
-                                ),
-                              ),
-                              secondary: Icon(Icons.analytics_outlined,
-                                color: AppTheme.primaryGreen,
-                              ),
-                              value: privacySettings.analyticsEnabled,
-                              activeColor: AppTheme.primaryGreen,
-                              activeTrackColor: AppTheme.primaryGreen.withOpacity(0.5),
-                              onChanged: (bool value) {
-                                HapticFeedback.lightImpact();
-                                ref.read(privacySettingsProvider.notifier).setAnalytics(value);
-                              },
-                            ),
-                            Divider(
-                              height: 1,
-                              thickness: 1,
-                              indent: 16,
-                              endIndent: 16,
-                              color: theme.colorScheme.outline.withOpacity(0.2),
-                            ),
-                            SwitchListTile(
-                              title: Text('Crash Reporting',
-                                style: theme.textTheme.bodyLarge,
-                              ),
-                              subtitle: Text(
-                                'Send crash reports to help us fix issues',
-                                style: theme.textTheme.bodyMedium?.copyWith(
-                                  color: theme.colorScheme.onSurface.withOpacity(0.7),
-                                ),
-                              ),
-                              secondary: Icon(Icons.bug_report_outlined,
-                                color: AppTheme.primaryGreen,
-                              ),
-                              value: privacySettings.crashReportingEnabled,
-                              activeColor: AppTheme.primaryGreen,
-                              activeTrackColor: AppTheme.primaryGreen.withOpacity(0.5),
-                              onChanged: (bool value) {
-                                HapticFeedback.lightImpact();
-                                ref.read(privacySettingsProvider.notifier).setCrashReporting(value);
-                              },
-                            ),
-                          ],
-                        ),
-                      ),
-
-                      // Personalization Section
-                      _buildSectionHeader(context, 'Personalization'),
-                      Card(
-                        margin: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        elevation: 2,
-                        color: theme.colorScheme.surface,
-                        child: SwitchListTile(
-                          title: Text('Personalized Experience',
-                            style: theme.textTheme.bodyLarge,
-                          ),
-                          subtitle: Text(
-                            'Allow us to use your reading habits to personalize recommendations',
-                            style: theme.textTheme.bodyMedium?.copyWith(
-                              color: theme.colorScheme.onSurface.withOpacity(0.7),
-                            ),
-                          ),
-                          secondary: Icon(Icons.person_outline,
-                            color: AppTheme.primaryGreen,
-                          ),
-                          value: privacySettings.personalizationEnabled,
-                          activeColor: AppTheme.primaryGreen,
-                          activeTrackColor: AppTheme.primaryGreen.withOpacity(0.5),
-                          onChanged: (bool value) {
-                            HapticFeedback.lightImpact();
-                            ref.read(privacySettingsProvider.notifier).setPersonalization(value);
-                          },
-                        ),
-                      ),
-
-                      // Privacy Policy Button
-                      Padding(
-                        padding: const EdgeInsets.all(24),
-                        child: Center(
-                          child: ElevatedButton.icon(
-                            icon: const Icon(Icons.policy),
-                            label: const Text('View Privacy Policy'),
-                            onPressed: () => _showPrivacyPolicy(context),
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: AppTheme.primaryGreen,
-                              foregroundColor: Colors.white,
-                              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(8),
-                              ),
-                              elevation: 2,
-                            ),
-                          ),
-                        ),
-                      ),
-
-                      // Privacy Information
-                      Card(
-                        margin: const EdgeInsets.symmetric(horizontal: 4, vertical: 16),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        elevation: 1,
-                        color: theme.colorScheme.surface,
-                        child: Padding(
-                          padding: const EdgeInsets.all(16),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Row(
-                                children: [
-                                  Icon(
-                                    Icons.shield,
-                                    color: AppTheme.primaryGreen,
-                                    size: 20,
-                                  ),
-                                  const SizedBox(width: 8),
-                                  Text(
-                                    'Your Privacy Matters',
-                                    style: theme.textTheme.titleMedium?.copyWith(
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                              const SizedBox(height: 12),
-                              Text(
-                                'You can request deletion of your data at any time by contacting our support team. '
-                                'We are committed to protecting your privacy and providing a secure reading experience.',
-                                style: theme.textTheme.bodyMedium?.copyWith(
-                                  height: 1.5,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-          ),
-        ],
       ),
     );
   }

@@ -91,13 +91,14 @@ class NotificationsScreen extends ConsumerWidget {
     final theme = Theme.of(context);
 
     return Scaffold(
-      body: Column(
-        children: [
-          const HeroBannerWidget(
-            icon: Icons.notifications,
-            title: 'Notifications',
-            subtitle: 'Customize your notification preferences',
-          ),
+      body: SafeArea(
+        child: Column(
+          children: [
+            const HeroBannerWidget(
+              icon: Icons.notifications,
+              title: 'Notifications',
+              subtitle: 'Customize your notification preferences',
+            ),
           Expanded(
             child: SingleChildScrollView(
               physics: const BouncingScrollPhysics(),
@@ -551,6 +552,7 @@ class NotificationsScreen extends ConsumerWidget {
             ),
           ),
         ],
+      ),
       ),
     );
   }

@@ -152,13 +152,14 @@ class _AboutScreenState extends State<AboutScreen> with SingleTickerProviderStat
     final theme = Theme.of(context);
 
     return Scaffold(
-      body: Column(
-        children: [
-          const HeroBannerWidget(
-            icon: Icons.info_outline,
-            title: 'About VisuaLit',
-            subtitle: 'Your AI Powered Ebook Reader',
-          ),
+      body: SafeArea(
+        child: Column(
+          children: [
+            const HeroBannerWidget(
+              icon: Icons.info_outline,
+              title: 'About VisuaLit',
+              subtitle: 'Your AI Powered Ebook Reader',
+            ),
           Expanded(
             child: _isLoading
                 ? Center(
@@ -432,6 +433,7 @@ class _AboutScreenState extends State<AboutScreen> with SingleTickerProviderStat
             ),
           ),
         ],
+      ),
       ),
     );
   }

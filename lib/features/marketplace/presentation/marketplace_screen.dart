@@ -534,13 +534,34 @@ class _RetryNetworkImageState extends State<RetryNetworkImage> {
       fit: widget.fit,
       height: widget.height,
       width: widget.width,
+      loadingBuilder: (context, child, loadingProgress) {
+        if (loadingProgress == null) return child;
+
+        return Shimmer.fromColors(
+          baseColor: AppTheme.darkGrey,
+          highlightColor: AppTheme.black,
+          child: Container(
+            height: widget.height,
+            width: widget.width,
+            color: AppTheme.darkGrey,
+          ),
+        );
+      },
       errorBuilder: (context, error, stackTrace) {
         if (_retryCount < widget.maxRetries) {
           _retryCount++;
           Future.delayed(const Duration(milliseconds: 500), () {
             if (mounted) setState(() {});
           });
-          return const SizedBox.shrink();
+          return Shimmer.fromColors(
+            baseColor: AppTheme.darkGrey,
+            highlightColor: AppTheme.black,
+            child: Container(
+              height: widget.height,
+              width: widget.width,
+              color: AppTheme.darkGrey,
+            ),
+          );
         }
         return Container(
           color: Theme.of(context).colorScheme.surface,

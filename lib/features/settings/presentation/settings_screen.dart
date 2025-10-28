@@ -182,7 +182,7 @@ import 'package:flutter/material.dart';
                         context,
                         'Account Settings',
                         Icons.manage_accounts_outlined,
-                            () => Navigator.pushNamed(context, '/account-settings'),
+                            () => context.pushNamed('accountSettings'),
                       ),
                       const Divider(height: 1),
                       ListTile(

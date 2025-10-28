@@ -14,6 +14,9 @@ class MainShell extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: Colors.transparent,
+      extendBody: true,
+      extendBodyBehindAppBar: true,
       // The AppBar and endDrawer remain unchanged
       appBar: AppBar(
         title: Text(
@@ -26,7 +29,7 @@ class MainShell extends StatelessWidget {
           ),
         ),
         centerTitle: false,
-        backgroundColor: Theme.of(context).colorScheme.primary,
+        backgroundColor: Theme.of(context).colorScheme.primary.withOpacity(0.0),
         elevation: 0,
         actions: [
           IconButton(

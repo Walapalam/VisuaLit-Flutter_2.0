@@ -25,6 +25,7 @@ import 'package:visualit/features/marketplace/presentation/marketplace_screen.da
 import 'package:visualit/features/Cart/presentation/CartScreen.dart';
 import 'package:visualit/features/custom_reader/presentation/reading_screen.dart' as custom_reader;
 import 'package:visualit/features/marketplace/presentation/all_books_screen.dart'; // Add this import
+import 'package:visualit/features/settings/presentation/account_settings_screen.dart';
 
 final _rootNavigatorKey = GlobalKey<NavigatorState>();
 
@@ -73,11 +74,6 @@ final goRouterProvider = Provider<GoRouter>((ref) {
         },
       ),
       GoRoute(
-        path: '/storage-settings',
-        name: 'storageSettings',
-        builder: (context, state) => const StorageSettingsScreen(),),
-
-      GoRoute(
         path: '/cart',
         name: 'cart',
         builder: (context, state) => const CartScreen(),
@@ -119,11 +115,31 @@ final goRouterProvider = Provider<GoRouter>((ref) {
             ],
           ),
 
-          StatefulShellBranch(routes: [
-            GoRoute(path: '/settings', name: 'settings', builder: (context, state) => const SettingsScreen()),
-          ]),
+          StatefulShellBranch(
+            routes: [
+              GoRoute(
+                path: '/settings',
+                name: 'settings',
+                builder: (context, state) => const SettingsScreen(),
+                routes: [
+                  GoRoute(
+                    path: 'account',
+                    name: 'accountSettings',
+                    builder: (context, state) => const AccountSettingsScreen(),
+                  ),
+                  GoRoute(
+                    path: 'storage',
+                    name: 'storageSettings',
+                    builder: (context, state) => const StorageSettingsScreen(),
+                  ),
+                ],
+              ),
+            ],
+          ),
         ],
       ),
+
+
     ],
     redirect: (context, state) async {
       final status = authState.status;

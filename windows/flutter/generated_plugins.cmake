@@ -5,8 +5,10 @@
 list(APPEND FLUTTER_PLUGIN_LIST
   connectivity_plus
   desktop_webview_window
+  file_selector_windows
   firebase_auth
   firebase_core
+  firebase_storage
   isar_flutter_libs
   permission_handler_windows
   screen_brightness_windows

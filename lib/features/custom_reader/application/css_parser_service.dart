@@ -1,6 +1,7 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:csslib/parser.dart' as css_parser;
+import 'package:csslib/visitor.dart';
 import 'package:flutter_html/flutter_html.dart';
 
 class CssParserService {
@@ -12,15 +13,15 @@ class CssParserService {
       final cssContent = File(cssPath).readAsStringSync();
       final stylesheet = css_parser.parse(cssContent);
 
-      for (final rule in stylesheet.topLevels.whereType<css_parser.RuleSet>()) {
+      for (final rule in stylesheet.topLevels.whereType<RuleSet>()) {
         final selectorGroup = rule.selectorGroup;
         if (selectorGroup == null) continue;
 
         for (final selector in selectorGroup.selectors) {
           final fullSelector = selector.simpleSelectorSequences.map((seq) {
             final s = seq.simpleSelector;
-            if (s is css_parser.ClassSelector) return '.${s.name}';
-            if (s is css_parser.IdSelector) return '#${s.name}';
+            if (s is ClassSelector) return '.${s.name}';
+            if (s is IdSelector) return '#${s.name}';
             return s.name ?? '';
           }).join(' ');
 
@@ -33,7 +34,7 @@ class CssParserService {
           double? padding;
 
           for (final decl in rule.declarationGroup.declarations) {
-            if (decl is css_parser.Declaration) {
+            if (decl is Declaration) {
               switch (decl.property) {
                 case 'color':
                   color = _parseCssColor(decl.expression.toString());

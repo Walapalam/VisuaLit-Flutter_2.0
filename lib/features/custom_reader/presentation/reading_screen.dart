@@ -31,6 +31,7 @@ import 'package:visualit/features/custom_reader/presentation/widgets/reading_app
 import 'package:visualit/features/custom_reader/presentation/widgets/reading_navigation_bar.dart';
 import 'package:visualit/features/custom_reader/presentation/widgets/settings_speed_dial.dart';
 import 'package:visualit/features/custom_reader/presentation/widgets/visualization_speed_dial.dart';
+import 'package:flutter/services.dart';
 
 
 class ReadingScreen extends ConsumerStatefulWidget {
@@ -90,7 +91,7 @@ class _ReadingScreenState extends ConsumerState<ReadingScreen> {
         SystemChrome.setEnabledSystemUIMode(SystemUiMode.manual, overlays: SystemUiOverlay.values);
       } else {
         _cancelHideOverlayTimer();
-        SystemChrome.setEnabledSystemUiMode(SystemUiMode.immersive);
+        SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
       }
     });
   }
@@ -556,7 +557,7 @@ class _ReadingScreenState extends ConsumerState<ReadingScreen> {
                 },
               ),
             ),
-          ),
+          ),),
           // Overlay AppBar
           Positioned(
             top: 0,
@@ -588,11 +589,22 @@ class _ReadingScreenState extends ConsumerState<ReadingScreen> {
                 duration: const Duration(milliseconds: 300),
                 child: SafeArea(
                   child: ReadingNavigationBar(
-                    onPreviousChapter: _currentChapterIndex > 0 ? _previousChapter : null,
-                    onNextChapter: _currentChapterIndex < (_epubData?.chapters.length ?? 0) - 1
-                        ? _nextChapter
+                    onPreviousChapter: _currentChapterIndex > 0
+                        ? () {
+                      _cancelHideOverlayTimer();
+                      _previousChapter();
+                    }
                         : null,
-                    onChapterListTap: _showChapterBottomSheet,
+                    onNextChapter: _currentChapterIndex < (_epubData?.chapters.length ?? 0) - 1
+                        ? () {
+                      _cancelHideOverlayTimer();
+                      _nextChapter();
+                    }
+                        : null,
+                    onChapterListTap: () {
+                      _cancelHideOverlayTimer();
+                      _showChapterBottomSheet();
+                    },
                     currentChapterIndex: _currentChapterIndex,
                     totalChapters: _epubData?.chapters.length ?? 0,
                     settingsSpeedDial: SettingsSpeedDial(
@@ -655,7 +667,6 @@ class _ReadingScreenState extends ConsumerState<ReadingScreen> {
               onBack: _hideSettingsPanel,
               scrollController: ScrollController(), // <-- provide a controller
             )
-
         ],
       ),
     ),);
@@ -752,7 +763,7 @@ class _ReadingScreenState extends ConsumerState<ReadingScreen> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              _buildNavigationBar(backgroundColor: Colors.transparent),
+              // _buildNavigationBar(backgroundColor: Colors.transparent),
               Expanded(
                 child: Container(
                   decoration: BoxDecoration(
@@ -900,6 +911,7 @@ class _ReadingScreenState extends ConsumerState<ReadingScreen> {
   }
 
   void _previousChapter() {
+    _cancelHideOverlayTimer();
     if (_currentChapterIndex > 0) {
       _pageController.previousPage(
         duration: const Duration(milliseconds: 300),
@@ -909,6 +921,7 @@ class _ReadingScreenState extends ConsumerState<ReadingScreen> {
   }
 
   void _nextChapter() {
+    _cancelHideOverlayTimer();
     if (_currentChapterIndex < (_epubData?.chapters.length ?? 1) - 1) {
       _pageController.nextPage(
         duration: const Duration(milliseconds: 300),

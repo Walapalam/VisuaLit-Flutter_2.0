@@ -49,6 +49,7 @@ class _ReadingScreenState extends ConsumerState<ReadingScreen> {
 
   NewReadingController? _readingController;
   Timer? _saveDebounceTimer;
+  Timer? _hideOverlayTimer;
 
   EpubMetadata? _epubData;
   String? _epubPath;
@@ -70,6 +71,7 @@ class _ReadingScreenState extends ConsumerState<ReadingScreen> {
   void initState() {
     super.initState();
     _initializeController();
+    _startHideOverlayTimer();
     //_loadBookAndEpub();
     // Ensure the system UI is visible when the screen is first loaded
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.manual, overlays: SystemUiOverlay.values);
@@ -80,10 +82,33 @@ class _ReadingScreenState extends ConsumerState<ReadingScreen> {
     setState(() {
       _showOverlay = !_showOverlay;
       if (_showOverlay) {
-        // Show status bar and navigation bar
+        _startHideOverlayTimer();
         SystemChrome.setEnabledSystemUIMode(SystemUiMode.manual, overlays: SystemUiOverlay.values);
       } else {
-        // Hide status bar and navigation bar for immersive mode
+        _cancelHideOverlayTimer();
+        SystemChrome.setEnabledSystemUiMode(SystemUiMode.immersive);
+      }
+    });
+  }
+
+  void _startHideOverlayTimer() {
+    _cancelHideOverlayTimer();
+    _hideOverlayTimer = Timer(const Duration(seconds: 5), _hideOverlay);
+  }
+
+  void _cancelHideOverlayTimer() {
+    _hideOverlayTimer?.cancel();
+  }
+
+  void _resetHideOverlayTimer() {
+    _cancelHideOverlayTimer();
+    _startHideOverlayTimer();
+  }
+
+  void _hideOverlay() {
+    setState(() {
+      if (_showOverlay) {
+        _showOverlay = false;
         SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersive);
       }
     });
@@ -243,6 +268,9 @@ class _ReadingScreenState extends ConsumerState<ReadingScreen> {
   void _onScroll() {
     if (_scrollController.hasClients) {
       _currentScrollOffset = _scrollController.offset;
+      if (_showOverlay) {
+        _resetHideOverlayTimer();
+      }
 
       // Cancel previous debounce timer
       _saveDebounceTimer?.cancel();
@@ -316,11 +344,17 @@ class _ReadingScreenState extends ConsumerState<ReadingScreen> {
         children: [
           // Chapter content with tap to toggle overlay
           Positioned.fill(
-            child: GestureDetector(
-              onTap: _isLocked ? null : _toggleOverlay, // Use the new toggle method
-              child: PageView.builder(
-                controller: _pageController,
-                itemCount: _epubData?.chapters.length ?? 0,
+            child: Listener(
+              onPointerMove: (_) {
+                if (_showOverlay) {
+                  _resetHideOverlayTimer();
+                }
+              },
+              child: GestureDetector(
+                onTap: _isLocked ? null : _toggleOverlay, // Use the new toggle method
+                child: PageView.builder(
+                  controller: _pageController,
+                  itemCount: _epubData?.chapters.length ?? 0,
                 onPageChanged: (index) {
                   setState(() {
                     _currentChapterIndex = index;
@@ -653,11 +687,13 @@ class _ReadingScreenState extends ConsumerState<ReadingScreen> {
       direction: SpeedDialDirection.up,
       switchLabelPosition: true,
       spacing: 10,
+      onOpen: () => _cancelHideOverlayTimer(),
       children: [
         SpeedDialChild(
             child: const Icon(Icons.bookmark_border),
             label: 'Bookmark',
             onTap: () {
+              _cancelHideOverlayTimer();
               ScaffoldMessenger.of(context).showSnackBar(
                 const SnackBar(content: Text('Bookmark added')),
               );
@@ -667,6 +703,7 @@ class _ReadingScreenState extends ConsumerState<ReadingScreen> {
             child: const Icon(Icons.share_outlined),
             label: 'Share',
             onTap: () {
+              _cancelHideOverlayTimer();
               ScaffoldMessenger.of(context).showSnackBar(
                 const SnackBar(content: Text('Share feature coming soon')),
               );
@@ -675,12 +712,16 @@ class _ReadingScreenState extends ConsumerState<ReadingScreen> {
         SpeedDialChild(
           child: Icon(_isLocked ? Icons.lock_open_outlined : Icons.lock_outline),
           label: _isLocked ? 'Unlock' : 'Lock Screen',
-          onTap: () => setState(() => _isLocked = !_isLocked),
+          onTap: () {
+            _cancelHideOverlayTimer();
+            setState(() => _isLocked = !_isLocked);
+          },
         ),
         SpeedDialChild(
             child: const Icon(Icons.search),
             label: 'Search',
             onTap: () {
+              _cancelHideOverlayTimer();
               ScaffoldMessenger.of(context).showSnackBar(
                 const SnackBar(content: Text('Search feature coming soon')),
               );
@@ -785,6 +826,7 @@ class _ReadingScreenState extends ConsumerState<ReadingScreen> {
       childrenButtonSize: const Size(44, 44),
       curve: Curves.bounceIn,
       visible: _showOverlay,
+      onOpen: () => _cancelHideOverlayTimer(),
       children: [
         SpeedDialChild(
           child: const Icon(Icons.visibility),
@@ -796,6 +838,7 @@ class _ReadingScreenState extends ConsumerState<ReadingScreen> {
             child: const Icon(Icons.tune),
             label: 'Adjust Visualization Settings',
             onTap: () {
+              _cancelHideOverlayTimer();
               // Implement visualization settings
               ScaffoldMessenger.of(context).showSnackBar(
                 const SnackBar(content: Text('Visualization settings coming soon')),
@@ -888,6 +931,7 @@ class _ReadingScreenState extends ConsumerState<ReadingScreen> {
   }
 
   void _showChapterBottomSheet() {
+    _cancelHideOverlayTimer();
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent, // Make the sheet itself transparent
@@ -968,6 +1012,7 @@ class _ReadingScreenState extends ConsumerState<ReadingScreen> {
 
 
   void _showSettingsPanel() {
+    _cancelHideOverlayTimer();
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -988,6 +1033,7 @@ class _ReadingScreenState extends ConsumerState<ReadingScreen> {
   }
 
   void _showBookOverviewDialog() {
+    _cancelHideOverlayTimer();
     final bookTitle = _epubData?.title ?? 'Unknown';
     final chapterNumber = _currentChapterIndex + 1;
     final chapterContent = _epubData?.chapters[_currentChapterIndex].content ?? '';
@@ -1313,6 +1359,7 @@ class _ReadingScreenState extends ConsumerState<ReadingScreen> {
 
   @override
   void dispose() {
+    _hideOverlayTimer?.cancel();
     // First, cancel any pending debounced saves
     _saveDebounceTimer?.cancel();
 

@@ -53,6 +53,10 @@ class LocalLibraryService {
     return false;
   }
 
+  Future<bool> requestStoragePermission() async {
+    return await _requestPermission();
+  }
+
 
   /// Opens the platform's file picker to select one or more EPUB files.
   ///

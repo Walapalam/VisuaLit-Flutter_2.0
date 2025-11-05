@@ -60,14 +60,54 @@ class LibraryController extends StateNotifier<AsyncValue<List<db.Book>>> {
   }
 
   void _startFolderWatcher() async {
-    final visuaLitDir = await _getVisuaLitDirectory();
-    if (visuaLitDir == null || !await visuaLitDir.exists()) {
-      print("❌ [LibraryController] VisuaLit directory not found. File watcher not started.");
+    final visuaLitDir = await _ensureVisuaLitDirectory();
+    if (visuaLitDir == null) {
+      print("❌ [LibraryController] Failed to create/access VisuaLit directory. File watcher not started.");
       return;
     }
 
-    _fileWatcher = DirectoryWatcher(visuaLitDir.path);
-    _fileWatcher?.events.listen(_handleFileChange);
+    try {
+      _fileWatcher = DirectoryWatcher(visuaLitDir.path);
+      _fileWatcher?.events.listen(_handleFileChange);
+      print("✅ [LibraryController] Started watching VisuaLit directory: ${visuaLitDir.path}");
+    } catch (e) {
+      print("❌ [LibraryController] Failed to start directory watcher: $e");
+    }
+  }
+
+  Future<Directory?> _ensureVisuaLitDirectory() async {
+    try {
+      Directory? visuaLitDir;
+
+      if (Platform.isAndroid) {
+        // Check storage permission first
+        if (!await _localLibraryService.requestStoragePermission()) {
+          print("❌ [LibraryController] Storage permission denied for VisuaLit directory");
+          return null;
+        }
+
+        visuaLitDir = Directory('/storage/emulated/0/Download/VisuaLit');
+      } else {
+        final downloads = await getDownloadsDirectory();
+        if (downloads == null) {
+          print("❌ [LibraryController] Downloads directory not accessible");
+          return null;
+        }
+        visuaLitDir = Directory('${downloads.path}/VisuaLit');
+      }
+
+      // Create the directory if it doesn't exist
+      if (!await visuaLitDir.exists()) {
+        print("📁 [LibraryController] Creating VisuaLit directory: ${visuaLitDir.path}");
+        await visuaLitDir.create(recursive: true);
+      }
+
+      print("✅ [LibraryController] VisuaLit directory ready: ${visuaLitDir.path}");
+      return visuaLitDir;
+    } catch (e) {
+      print("❌ [LibraryController] Error ensuring VisuaLit directory: $e");
+      return null;
+    }
   }
 
   Future<void> _handleFileChange(WatchEvent event) async {
@@ -94,15 +134,8 @@ class LibraryController extends StateNotifier<AsyncValue<List<db.Book>>> {
   }
 
   Future<Directory?> _getVisuaLitDirectory() async {
-    Directory? visuaLitDir;
-    if (Platform.isAndroid) {
-      visuaLitDir = Directory('/storage/emulated/0/Download/VisuaLit');
-    } else {
-      final downloads = await getDownloadsDirectory();
-      if (downloads == null) return null;
-      visuaLitDir = Directory('${downloads.path}/VisuaLit');
-    }
-    return visuaLitDir;
+    // Update this method to use the same logic
+    return await _ensureVisuaLitDirectory();
   }
 
 

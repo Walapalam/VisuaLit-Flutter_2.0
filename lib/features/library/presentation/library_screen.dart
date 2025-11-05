@@ -26,11 +26,6 @@ class LibraryScreen extends ConsumerWidget {
         title: const Text('My Library'),
         actions: [
           IconButton(
-            icon: const Icon(Icons.refresh),
-            tooltip: 'Refresh Library',
-            onPressed: () => libraryController.rescanVisuaLitFolder(),
-          ),
-          IconButton(
             icon: const Icon(Icons.add),
             onPressed: () => libraryController.pickAndProcessBooks(),
           ),

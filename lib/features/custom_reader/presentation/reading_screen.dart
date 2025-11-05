@@ -14,8 +14,7 @@ import 'dart:io';
 import 'dart:async';
 import 'package:path/path.dart' as p;
 import 'package:html/parser.dart' as html_parser;
-import 'package:csslib/parser.dart' as css_parser;
-import 'package:csslib/visitor.dart';
+import 'package:visualit/features/custom_reader/application/css_parser_service.dart';
 import 'package:visualit/features/custom_reader/application/epub_parser_service.dart';
 import 'package:visualit/features/custom_reader/new_reading_controller.dart';
 import 'package:visualit/features/custom_reader/model/new_reading_progress.dart';
@@ -28,6 +27,11 @@ import 'package:visualit/features/custom_reader/presentation/widgets/custom_read
 import 'package:visualit/features/custom_reader/presentation/reading_preferences_controller.dart';
 import 'package:visualit/features/custom_reader/presentation/widgets/book_visualization_overlay.dart';
 import 'package:flutter_svg/flutter_svg.dart';
+import 'package:visualit/features/custom_reader/presentation/widgets/reading_app_bar.dart';
+import 'package:visualit/features/custom_reader/presentation/widgets/reading_navigation_bar.dart';
+import 'package:visualit/features/custom_reader/presentation/widgets/settings_speed_dial.dart';
+import 'package:visualit/features/custom_reader/presentation/widgets/visualization_speed_dial.dart';
+import 'package:flutter/services.dart';
 
 
 class ReadingScreen extends ConsumerStatefulWidget {
@@ -44,11 +48,13 @@ class ReadingScreen extends ConsumerStatefulWidget {
 
 class _ReadingScreenState extends ConsumerState<ReadingScreen> {
   final EpubParserService _epubParser = EpubParserService();
+  final CssParserService _cssParser = CssParserService();
   late PageController _pageController;
   final ScrollController _scrollController = ScrollController();
 
   NewReadingController? _readingController;
   Timer? _saveDebounceTimer;
+  Timer? _hideOverlayTimer;
 
   EpubMetadata? _epubData;
   String? _epubPath;
@@ -71,6 +77,7 @@ class _ReadingScreenState extends ConsumerState<ReadingScreen> {
   void initState() {
     super.initState();
     _initializeController();
+    _startHideOverlayTimer();
     //_loadBookAndEpub();
     // Ensure the system UI is visible when the screen is first loaded
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.manual, overlays: SystemUiOverlay.values);
@@ -81,10 +88,33 @@ class _ReadingScreenState extends ConsumerState<ReadingScreen> {
     setState(() {
       _showOverlay = !_showOverlay;
       if (_showOverlay) {
-        // Show status bar and navigation bar
+        _startHideOverlayTimer();
         SystemChrome.setEnabledSystemUIMode(SystemUiMode.manual, overlays: SystemUiOverlay.values);
       } else {
-        // Hide status bar and navigation bar for immersive mode
+        _cancelHideOverlayTimer();
+        SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
+      }
+    });
+  }
+
+  void _startHideOverlayTimer() {
+    _cancelHideOverlayTimer();
+    _hideOverlayTimer = Timer(const Duration(seconds: 5), _hideOverlay);
+  }
+
+  void _cancelHideOverlayTimer() {
+    _hideOverlayTimer?.cancel();
+  }
+
+  void _resetHideOverlayTimer() {
+    _cancelHideOverlayTimer();
+    _startHideOverlayTimer();
+  }
+
+  void _hideOverlay() {
+    setState(() {
+      if (_showOverlay) {
+        _showOverlay = false;
         SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersive);
       }
     });
@@ -244,6 +274,9 @@ class _ReadingScreenState extends ConsumerState<ReadingScreen> {
   void _onScroll() {
     if (_scrollController.hasClients) {
       _currentScrollOffset = _scrollController.offset;
+      if (_showOverlay) {
+        _resetHideOverlayTimer();
+      }
 
       // Cancel previous debounce timer
       _saveDebounceTimer?.cancel();
@@ -317,11 +350,17 @@ class _ReadingScreenState extends ConsumerState<ReadingScreen> {
         children: [
           // Chapter content with tap to toggle overlay
           Positioned.fill(
-            child: GestureDetector(
-              onTap: _isLocked ? null : _toggleOverlay, // Use the new toggle method
-              child: PageView.builder(
-                controller: _pageController,
-                itemCount: _epubData?.chapters.length ?? 0,
+            child: Listener(
+              onPointerMove: (_) {
+                if (_showOverlay) {
+                  _resetHideOverlayTimer();
+                }
+              },
+              child: GestureDetector(
+                onTap: _isLocked ? null : _toggleOverlay, // Use the new toggle method
+                child: PageView.builder(
+                  controller: _pageController,
+                  itemCount: _epubData?.chapters.length ?? 0,
                 onPageChanged: (index) {
                   setState(() {
                     _currentChapterIndex = index;
@@ -347,7 +386,7 @@ class _ReadingScreenState extends ConsumerState<ReadingScreen> {
                   final prefs = ref.watch(readingPreferencesProvider);
 
                   // Parse CSS styles as fallback
-                  Map<String, Style> htmlStyles = _parseCssToHtmlStyles(_epubData!.cssFiles);
+                  Map<String, Style> htmlStyles = _cssParser.parseCssToHtmlStyles(_epubData!.cssFiles);
 
                   if (prefs.fontSize != 18.0 || prefs.fontFamily != 'Georgia' || prefs.lineHeight != 1.6 || prefs.brightness != 1.0) {
                     // Base style with preferences
@@ -519,7 +558,7 @@ class _ReadingScreenState extends ConsumerState<ReadingScreen> {
                 },
               ),
             ),
-          ),
+          ),),
           // Overlay AppBar
           Positioned(
             top: 0,
@@ -530,7 +569,12 @@ class _ReadingScreenState extends ConsumerState<ReadingScreen> {
               child: AnimatedOpacity(
                 opacity: _showOverlay ? 1.0 : 0.0,
                 duration: const Duration(milliseconds: 300),
-                child: _buildAppBarOverlay(),
+                child: ReadingAppBar(
+                  bookTitle: _epubData?.title ?? 'Unknown',
+                  chapterTitle: _currentChapterIndex < (_epubData?.chapters.length ?? 0)
+                      ? _epubData!.chapters[_currentChapterIndex].title
+                      : 'Chapter ${_currentChapterIndex + 1}',
+                ),
               ),
             ),
           ),
@@ -545,7 +589,64 @@ class _ReadingScreenState extends ConsumerState<ReadingScreen> {
                 opacity: _showOverlay ? 1.0 : 0.0,
                 duration: const Duration(milliseconds: 300),
                 child: SafeArea(
-                  child: _buildNavigationBar(backgroundColor: Colors.transparent),
+                  child: ReadingNavigationBar(
+                    onPreviousChapter: _currentChapterIndex > 0
+                        ? () {
+                      _cancelHideOverlayTimer();
+                      _previousChapter();
+                    }
+                        : null,
+                    onNextChapter: _currentChapterIndex < (_epubData?.chapters.length ?? 0) - 1
+                        ? () {
+                      _cancelHideOverlayTimer();
+                      _nextChapter();
+                    }
+                        : null,
+                    onChapterListTap: () {
+                      _cancelHideOverlayTimer();
+                      _showChapterBottomSheet();
+                    },
+                    currentChapterIndex: _currentChapterIndex,
+                    totalChapters: _epubData?.chapters.length ?? 0,
+                    settingsSpeedDial: SettingsSpeedDial(
+                      isLocked: _isLocked,
+                      onToggleLock: () {
+                        _cancelHideOverlayTimer();
+                        setState(() => _isLocked = !_isLocked);
+                      },
+                      onShowSettingsPanel: _showSettingsPanel,
+                      onShowBookmark: () {
+                        _cancelHideOverlayTimer();
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('Bookmark added')),
+                        );
+                      },
+                      onShare: () {
+                        _cancelHideOverlayTimer();
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('Share feature coming soon')),
+                        );
+                      },
+                      onSearch: () {
+                        _cancelHideOverlayTimer();
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('Search feature coming soon')),
+                        );
+                      },
+                      isVisible: _showOverlay,
+                    ),
+                    visualizationSpeedDial: VisualizationSpeedDial(
+                      isVisible: _showOverlay,
+                      onToggleVisualization: _showBookOverviewDialog,
+                      onAdjustVisualization: () {
+                        _cancelHideOverlayTimer();
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('Visualization settings coming soon')),
+                        );
+                      },
+                    ),
+                    backgroundColor: Colors.transparent,
+                  ),
                 ),
               ),
             ),
@@ -584,129 +685,6 @@ class _ReadingScreenState extends ConsumerState<ReadingScreen> {
         ],
       ),
     ),);
-  }
-
-  Widget _buildNavigationBar({Color? backgroundColor}) {
-    return Container(
-      padding: const EdgeInsets.symmetric(vertical: 16.0),
-      color: backgroundColor ?? Colors.black.withOpacity(0.8),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          // Left FAB (Settings)
-          Padding(
-            padding: const EdgeInsets.only(left: 16.0),
-            child: _buildSettingsSpeedDial(),
-          ),
-
-          // Center pill with navigation
-          Expanded(
-            child: Center(
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 4.0),
-                decoration: BoxDecoration(
-                  color: Colors.black.withOpacity(0.8),
-                  borderRadius: BorderRadius.circular(30.0),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    // Previous chapter button
-                    IconButton(
-                      icon: const Icon(Icons.arrow_back_ios, color: AppTheme.primaryGreen, size: 20),
-                      onPressed: _currentChapterIndex > 0 ? _previousChapter : null,
-                    ),
-
-                    // Chapter indicator - tappable to show chapter list
-                    GestureDetector(
-                      onTap: _showChapterBottomSheet,
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 8.0),
-                        child: Text(
-                          'Chapter ${_currentChapterIndex + 1} of ${_epubData?.chapters.length ?? 0}',
-                          style: const TextStyle(color: Colors.white),
-                        ),
-                      ),
-                    ),
-
-                    // Next chapter button
-                    IconButton(
-                      icon: const Icon(Icons.arrow_forward_ios, color: AppTheme.primaryGreen, size: 20),
-                      onPressed: _currentChapterIndex < (_epubData?.chapters.length ?? 0) - 1
-                          ? _nextChapter
-                          : null,
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ),
-
-          // Right FAB (Visualization)
-          Padding(
-            padding: const EdgeInsets.only(right: 16.0),
-            child: _buildVisualizationSpeedDial(),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildSettingsSpeedDial() {
-    return SpeedDial(
-      icon: Icons.more_horiz,
-      activeIcon: Icons.close,
-      backgroundColor: AppTheme.primaryGreen,
-      foregroundColor: Colors.black,
-      overlayColor: Colors.black,
-      overlayOpacity: 0.5,
-      buttonSize: const Size(48, 48),
-      childrenButtonSize: const Size(44, 44),
-      curve: Curves.bounceIn,
-      visible: _showOverlay,
-      direction: SpeedDialDirection.up,
-      switchLabelPosition: true,
-      spacing: 10,
-      children: [
-        SpeedDialChild(
-            child: const Icon(Icons.bookmark_border),
-            label: 'Bookmark',
-            onTap: () {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Bookmark added')),
-              );
-            }
-        ),
-        SpeedDialChild(
-            child: const Icon(Icons.share_outlined),
-            label: 'Share',
-            onTap: () {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Share feature coming soon')),
-              );
-            }
-        ),
-        SpeedDialChild(
-          child: Icon(_isLocked ? Icons.lock_open_outlined : Icons.lock_outline),
-          label: _isLocked ? 'Unlock' : 'Lock Screen',
-          onTap: () => setState(() => _isLocked = !_isLocked),
-        ),
-        SpeedDialChild(
-            child: const Icon(Icons.search),
-            label: 'Search',
-            onTap: () {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Search feature coming soon')),
-              );
-            }
-        ),
-        SpeedDialChild(
-          child: const Icon(Icons.tune_outlined),
-          label: 'Theme & Settings',
-          onTap: _showSettingsPanel,
-        ),
-      ],
-    );
   }
 
   Widget _buildImageWidget(String src, String chapterHref) {
@@ -785,123 +763,8 @@ class _ReadingScreenState extends ConsumerState<ReadingScreen> {
     );
   }
 
-
-
-  Widget _buildVisualizationSpeedDial() {
-    return SpeedDial(
-      icon: Icons.visibility,
-      activeIcon: Icons.visibility_off,
-      backgroundColor: AppTheme.primaryGreen,
-      foregroundColor: Colors.black,
-      overlayColor: Colors.black,
-      overlayOpacity: 0.5,
-      buttonSize: const Size(48, 48),
-      childrenButtonSize: const Size(44, 44),
-      curve: Curves.bounceIn,
-      visible: _showOverlay,
-      children: [
-        SpeedDialChild(
-          child: const Icon(Icons.visibility),
-          label: 'Toggle Visualization',
-          onTap: _showBookOverviewDialog,
-        ),
-
-        SpeedDialChild(
-            child: const Icon(Icons.tune),
-            label: 'Adjust Visualization Settings',
-            onTap: () {
-              // Implement visualization settings
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Visualization settings coming soon')),
-              );
-            }
-        ),
-      ],
-    );
-  }
-
-  Widget _buildAppBarOverlay() {
-    final String bookTitle = _epubData?.title ?? 'Unknown';
-    final String chapterTitle = _currentChapterIndex < (_epubData?.chapters.length ?? 0)
-        ? _epubData!.chapters[_currentChapterIndex].title
-        : 'Chapter ${_currentChapterIndex + 1}';
-
-    final double titleSize = 18.0;
-    final double subtitleSize = 14.0;
-
-    return Container(
-      decoration: BoxDecoration(
-        // Use a gradient for fading effect
-        gradient: LinearGradient(
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-          colors: [
-            Colors.black.withOpacity(0.9),  // More opaque at top
-            Colors.black.withOpacity(0.6),  // Medium opacity
-            Colors.black.withOpacity(0.0),  // Completely transparent at bottom
-          ],
-          stops: const [0.0, 0.7, 1.0],
-        ),
-      ),
-      child: SafeArea(
-        bottom: false, // Only apply safe area to top
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(16.0, 8.0, 16.0, 16.0), // Add bottom padding
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              // Book title with wrapping
-              Text(
-                bookTitle.toUpperCase(),
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: titleSize,
-                  fontWeight: FontWeight.bold,
-                  letterSpacing: 0.5,
-                ),
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-                textAlign: TextAlign.center,
-              ),
-              const SizedBox(height: 2),
-              // Chapter name
-              Text(
-                chapterTitle,
-                style: TextStyle(
-                  color: Colors.grey[300],
-                  fontSize: subtitleSize,
-                  fontWeight: FontWeight.normal,
-                ),
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-                textAlign: TextAlign.center,
-              ),
-              // Close button circle
-              Padding(
-                padding: const EdgeInsets.only(top: 4.0, bottom: 2.0),
-                child: Container(
-                  width: 20,
-                  height: 20,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: Colors.grey.withOpacity(0.3),
-                  ),
-                  child: IconButton(
-                    icon: const Icon(Icons.close, color: Colors.white, size: 10),
-                    padding: EdgeInsets.zero,
-                    constraints: const BoxConstraints(),
-                    onPressed: () => context.go("/home"),
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
   void _showChapterBottomSheet() {
+    _cancelHideOverlayTimer();
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent, // Make the sheet itself transparent
@@ -915,7 +778,7 @@ class _ReadingScreenState extends ConsumerState<ReadingScreen> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              _buildNavigationBar(backgroundColor: Colors.transparent),
+              // _buildNavigationBar(backgroundColor: Colors.transparent),
               Expanded(
                 child: Container(
                   decoration: BoxDecoration(
@@ -982,6 +845,7 @@ class _ReadingScreenState extends ConsumerState<ReadingScreen> {
 
 
   void _showSettingsPanel() {
+    _cancelHideOverlayTimer();
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -1048,6 +912,7 @@ class _ReadingScreenState extends ConsumerState<ReadingScreen> {
   }
 
   void _previousChapter() {
+    _cancelHideOverlayTimer();
     if (_currentChapterIndex > 0) {
       _pageController.previousPage(
         duration: const Duration(milliseconds: 300),
@@ -1057,6 +922,7 @@ class _ReadingScreenState extends ConsumerState<ReadingScreen> {
   }
 
   void _nextChapter() {
+    _cancelHideOverlayTimer();
     if (_currentChapterIndex < (_epubData?.chapters.length ?? 1) - 1) {
       _pageController.nextPage(
         duration: const Duration(milliseconds: 300),
@@ -1136,184 +1002,9 @@ class _ReadingScreenState extends ConsumerState<ReadingScreen> {
     }
   }
 
-  Map<String, Style> _parseCssToHtmlStyles(Map<String, String> cssFiles) {
-    final styles = <String, Style>{};
-    final selectorStyles = <String, Style>{};
-
-    for (final cssPath in cssFiles.values) {
-      final cssContent = File(cssPath).readAsStringSync();
-      final stylesheet = css_parser.parse(cssContent);
-
-      for (final rule in stylesheet.topLevels.whereType<RuleSet>()) {
-        final selectorGroup = rule.selectorGroup;
-        if (selectorGroup == null) continue;
-
-        for (final selector in selectorGroup.selectors) {
-          final selectorText = selector.simpleSelectorSequences.map((seq) {
-            final s = seq.simpleSelector;
-            if (s is ClassSelector) return '.${s.name}';
-            if (s is IdSelector) return '#${s.name}';
-            return s.name ?? '';
-          }).join('');
-
-          // Compound/descendant selectors
-          final fullSelector = selector.simpleSelectorSequences.map((seq) {
-            final s = seq.simpleSelector;
-            if (s is ClassSelector) return '.${s.name}';
-            if (s is IdSelector) return '#${s.name}';
-            return s.name ?? '';
-          }).join(' ');
-
-          // Parse declarations
-          Color? color;
-          FontSize? fontSize;
-          FontWeight? fontWeight;
-          Color? backgroundColor;
-          TextAlign? textAlign;
-          double? margin;
-          double? padding;
-
-          for (final decl in rule.declarationGroup.declarations) {
-            if (decl is Declaration) {
-              switch (decl.property) {
-                case 'color':
-                  color = _parseCssColor(decl.expression.toString());
-                  break;
-                case 'font-size':
-                  fontSize = _parseCssFontSize(decl.expression.toString());
-                  break;
-                case 'font-weight':
-                  fontWeight = _parseCssFontWeight(decl.expression.toString());
-                  break;
-                case 'background-color':
-                  backgroundColor = _parseCssColor(decl.expression.toString());
-                  break;
-                case 'text-align':
-                  textAlign = _parseCssTextAlign(decl.expression.toString());
-                  break;
-                case 'margin':
-                  margin = _parseCssSpacing(decl.expression.toString());
-                  break;
-                case 'padding':
-                  padding = _parseCssSpacing(decl.expression.toString());
-                  break;
-              }
-            }
-          }
-
-          selectorStyles[fullSelector] = Style(
-            color: color,
-            fontSize: fontSize,
-            fontWeight: fontWeight,
-            backgroundColor: backgroundColor,
-            textAlign: TextAlign.justify,
-            margin: margin != null ? Margins.all(margin) : null,
-            padding: padding != null ? HtmlPaddings.all(padding) : null,
-          );
-        }
-      }
-    }
-
-    // Ensure h1 to h6 and img tags are center-aligned
-    for (var i = 1; i <= 6; i++) {
-      selectorStyles['h$i'] = Style(textAlign: TextAlign.center);
-    }
-    selectorStyles['img'] = Style(textAlign: TextAlign.center);
-
-    // Merge selectorStyles into styles, prioritizing specificity
-    styles.addAll(selectorStyles);
-
-    return styles;
-  }
-
-  // Helper to parse CSS color strings
-  Color? _parseCssColor(String value) {
-    value = value.trim();
-    if (value.startsWith('#')) {
-      final hex = value.substring(1);
-      if (hex.length == 6) {
-        return Color(int.parse('FF$hex', radix: 16));
-      } else if (hex.length == 3) {
-        final r = hex[0] * 2, g = hex[1] * 2, b = hex[2] * 2;
-        return Color(int.parse('FF$r$g$b', radix: 16));
-      }
-    }
-    // Add more named color support if needed
-    return null;
-  }
-
-// Helper to parse CSS font-size strings
-  FontSize? _parseCssFontSize(String value) {
-    value = value.trim();
-    if (value.endsWith('px')) {
-      final numStr = value.replaceAll('px', '');
-      final size = double.tryParse(numStr);
-      if (size != null) return FontSize(size);
-    }
-    if (value.endsWith('em')) {
-      final numStr = value.replaceAll('em', '');
-      final size = double.tryParse(numStr);
-      if (size != null) return FontSize(size * 16); // 1em = 16px default
-    }
-    final size = double.tryParse(value);
-    if (size != null) return FontSize(size);
-    return null;
-  }
-
-
-// Helper for font-weight
-  FontWeight? _parseCssFontWeight(String value) {
-    value = value.trim();
-    switch (value) {
-      case 'bold':
-      case '700':
-        return FontWeight.bold;
-      case 'normal':
-      case '400':
-        return FontWeight.normal;
-      case '300':
-        return FontWeight.w300;
-      case '500':
-        return FontWeight.w500;
-      case '900':
-        return FontWeight.w900;
-      default:
-        return null;
-    }
-  }
-
-// Helper for text-align
-  TextAlign? _parseCssTextAlign(String value) {
-    value = value.trim();
-    switch (value) {
-      case 'center':
-        return TextAlign.center;
-      case 'right':
-        return TextAlign.right;
-      case 'left':
-        return TextAlign.left;
-      case 'justify':
-        return TextAlign.justify;
-      default:
-        return null;
-    }
-  }
-
-// Helper for margin/padding
-  double? _parseCssSpacing(String value) {
-    value = value.trim();
-    if (value.endsWith('px')) {
-      return double.tryParse(value.replaceAll('px', ''));
-    }
-    if (value.endsWith('em')) {
-      final size = double.tryParse(value.replaceAll('em', ''));
-      if (size != null) return size * 16;
-    }
-    return double.tryParse(value);
-  }
-
   @override
   void dispose() {
+    _hideOverlayTimer?.cancel();
     // First, cancel any pending debounced saves
     _saveDebounceTimer?.cancel();
 

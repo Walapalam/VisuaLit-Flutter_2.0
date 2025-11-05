@@ -107,7 +107,6 @@ class BookVisualizationOverlay extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    // Call debug prints at the start of build
     _debugPrintInfo();
     print('📚 DEBUG: Building BookVisualizationOverlay');
 
@@ -121,44 +120,47 @@ class BookVisualizationOverlay extends ConsumerWidget {
     });
 
     return Scaffold(
-      backgroundColor: Colors.transparent,
-      body: LiquidGlassContainer(
-        borderRadius: BorderRadius.zero,
-        padding: EdgeInsets.zero,
-        backgroundColor: Theme.of(context).colorScheme.surface.withOpacity(0.1),
-        child: Stack(
-          children: [
-            Column(
-              children: [
-                const SizedBox(height: 40), // Space for close button
-                Expanded(
-                  child: appwriteBookAsyncValue.when(
-                    data: (appwriteBook) {
-                      if (appwriteBook == null) {
-                        return _buildGenerationRequestUI(context, ref, isGenerating);
-                      } else {
-                        return _buildVisualsDisplay(context, ref, appwriteBook.id, appwriteBook.title);
-                      }
-                    },
-                    loading: () => const Center(child: CircularProgressIndicator(color: Colors.white)),
-                    error: (error, stack) => Center(
-                      child: _buildErrorWidget(context, "Error looking up book: $error", () {
-                        ref.invalidate(bookDetailsByTitleProvider(bookTitleForLookup));
-                      }),
+      backgroundColor: Colors.black.withOpacity(0.0),
+      body: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 4.0),
+        child: LiquidGlassContainer(
+          borderRadius: BorderRadius.circular(20.0),
+          padding: EdgeInsets.zero,
+          backgroundColor: Theme.of(context).colorScheme.surface.withOpacity(0.1),
+          child: Stack(
+            children: [
+              Column(
+                children: [
+                  const SizedBox(height: 40),
+                  Expanded(
+                    child: appwriteBookAsyncValue.when(
+                      data: (appwriteBook) {
+                        if (appwriteBook == null) {
+                          return _buildGenerationRequestUI(context, ref, isGenerating);
+                        } else {
+                          return _buildVisualsDisplay(context, ref, appwriteBook.id, appwriteBook.title);
+                        }
+                      },
+                      loading: () => const Center(child: CircularProgressIndicator(color: Colors.white)),
+                      error: (error, stack) => Center(
+                        child: _buildErrorWidget(context, "Error looking up book: $error", () {
+                          ref.invalidate(bookDetailsByTitleProvider(bookTitleForLookup));
+                        }),
+                      ),
                     ),
                   ),
-                ),
-              ],
-            ),
-            Positioned(
-              top: 10,
-              right: 10,
-              child: IconButton(
-                icon: const Icon(Icons.close, color: Colors.white),
-                onPressed: onClose,
+                ],
               ),
-            ),
-          ],
+              Positioned(
+                top: 10,
+                right: 10,
+                child: IconButton(
+                  icon: const Icon(Icons.close, color: Colors.white),
+                  onPressed: onClose,
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );

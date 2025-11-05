@@ -568,12 +568,18 @@ class _ReadingScreenState extends ConsumerState<ReadingScreen> {
               scrollController: ScrollController(), // <-- provide a controller
             ),
           if (_isVisualizationOverlayVisible)
-            BookVisualizationOverlay(
-              bookTitleForLookup: _epubData?.title ?? 'Unknown',
-              localBookISBN: null,
-              localChapterNumber: _currentChapterIndex + 1,
-              localChapterContent: _epubData?.chapters[_currentChapterIndex].content ?? '',
-              onClose: _hideVisualizationOverlay,
+            Positioned(
+              top: 130, // Adjust based on your app bar height
+              left: 0,
+              right: 0,
+              bottom: 80, // Adjust based on your navigation bar height
+              child: BookVisualizationOverlay(
+                bookTitleForLookup: _epubData?.title ?? 'Unknown',
+                localBookISBN: null,
+                localChapterNumber: _currentChapterIndex + 1,
+                localChapterContent: _epubData?.chapters[_currentChapterIndex].content ?? '',
+                onClose: _hideVisualizationOverlay,
+              ),
             ),
         ],
       ),

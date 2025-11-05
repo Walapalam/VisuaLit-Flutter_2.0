@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:visualit/core/theme/app_theme.dart';
 import 'package:visualit/core/utils/responsive_helper.dart';
+import 'package:visualit/core/theme/theme_extensions.dart';
 
 class HeroBanner extends StatelessWidget {
   final VoidCallback onSeeAllBooks;

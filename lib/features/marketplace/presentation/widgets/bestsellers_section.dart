@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:visualit/core/utils/responsive_helper.dart';
+import 'package:visualit/core/theme/theme_extensions.dart';
+import 'package:visualit/core/theme/app_theme.dart';
 import 'package:visualit/features/marketplace/presentation/marketplace_notifier.dart';
 import 'package:visualit/features/marketplace/presentation/marketplace_providers.dart';
 import 'package:visualit/features/marketplace/presentation/widgets/horizontal_book_card.dart';

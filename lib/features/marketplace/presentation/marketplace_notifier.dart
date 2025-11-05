@@ -5,7 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'package:isar/isar.dart';
-import 'package.visualit/features/marketplace/data/marketplace_repository.dart';
+import 'package:visualit/features/marketplace/data/marketplace_repository.dart';
 import '../data/cached_book.dart';
 
 class MarketplaceState {

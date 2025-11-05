@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:visualit/core/utils/responsive_helper.dart';
+import 'package:visualit/core/theme/theme_extensions.dart';
+import 'package:visualit/core/theme/app_theme.dart';
 import 'package:visualit/features/marketplace/presentation/marketplace_notifier.dart';
 import 'package:visualit/features/marketplace/presentation/marketplace_providers.dart';
 import 'package:visualit/features/marketplace/presentation/widgets/horizontal_book_card.dart';
@@ -18,7 +20,7 @@ class CategoryRow extends ConsumerWidget {
 
     if (books.isEmpty) {
       return SizedBox(
-        height: context.bookShelfHeight,
+        height: ResponsiveHelper.getBookShelfHeight(context),
         child: ListView.builder(
           scrollDirection: Axis.horizontal,
           itemCount: 6,
@@ -31,14 +33,14 @@ class CategoryRow extends ConsumerWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Padding(
-          padding: EdgeInsets.symmetric(horizontal: context.isMobile ? AppSpacing.md : AppSpacing.lg, vertical: AppSpacing.md),
+          padding: EdgeInsets.symmetric(horizontal: ResponsiveHelper.isMobile(context) ? AppSpacing.md : AppSpacing.lg, vertical: AppSpacing.md),
           child: Text(title, style: Theme.of(context).textTheme.headlineMedium),
         ),
         SizedBox(
-          height: context.bookShelfHeight,
+          height: ResponsiveHelper.getBookShelfHeight(context),
           child: ListView.builder(
             scrollDirection: Axis.horizontal,
-            padding: EdgeInsets.symmetric(horizontal: context.isMobile ? AppSpacing.md : AppSpacing.lg),
+            padding: EdgeInsets.symmetric(horizontal: ResponsiveHelper.isMobile(context) ? AppSpacing.md : AppSpacing.lg),
             itemCount: books.length,
             itemBuilder: (context, index) => HorizontalBookCard(book: books[index]),
           ),

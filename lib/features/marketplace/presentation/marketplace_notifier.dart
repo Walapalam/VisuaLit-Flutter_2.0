@@ -19,6 +19,7 @@ class MarketplaceState {
   final String? errorMessage;
   final List<dynamic> bestsellers;
   final Map<String, List<dynamic>> categorizedBooks;
+  final List<String> loadedCategories; // tracks which categories have been loaded/cached
 
   MarketplaceState({
     required this.books,
@@ -31,6 +32,7 @@ class MarketplaceState {
     this.errorMessage,
     this.bestsellers = const [],
     this.categorizedBooks = const {},
+    this.loadedCategories = const [],
   });
 
   MarketplaceState copyWith({
@@ -44,6 +46,7 @@ class MarketplaceState {
     String? errorMessage,
     List<dynamic>? bestsellers,
     Map<String, List<dynamic>>? categorizedBooks,
+    List<String>? loadedCategories,
   }) {
     return MarketplaceState(
       books: books ?? this.books,
@@ -56,6 +59,7 @@ class MarketplaceState {
       errorMessage: errorMessage ?? this.errorMessage,
       bestsellers: bestsellers ?? this.bestsellers,
       categorizedBooks: categorizedBooks ?? this.categorizedBooks,
+      loadedCategories: loadedCategories ?? this.loadedCategories,
     );
   }
 }
@@ -81,6 +85,7 @@ class MarketplaceNotifier extends StateNotifier<MarketplaceState> {
       isInitialLoading: true,
       errorMessage: null,
       isOffline: false,
+      loadedCategories: [],
     );
     _loadInitialData();
   }
@@ -108,6 +113,13 @@ class MarketplaceNotifier extends StateNotifier<MarketplaceState> {
           },
           isLoadingFromCache: true,
           isInitialLoading: false,
+          loadedCategories: [
+            if (cachedBestsellers.isNotEmpty) 'bestsellers',
+            if (cachedFiction.isNotEmpty) 'fiction',
+            if (cachedScience.isNotEmpty) 'science',
+            if (cachedHistory.isNotEmpty) 'history',
+            if (cachedPhilosophy.isNotEmpty) 'philosophy',
+          ],
         );
         debugPrint('Loaded books from cache.');
       }
@@ -141,6 +153,7 @@ class MarketplaceNotifier extends StateNotifier<MarketplaceState> {
         isInitialLoading: false,
         isLoading: false,
         isLoadingFromCache: false,
+        loadedCategories: ['bestsellers', 'fiction', 'science', 'history', 'philosophy'],
       );
       debugPrint('Finished loading and caching initial data.');
     } catch (e) {
@@ -159,11 +172,29 @@ class MarketplaceNotifier extends StateNotifier<MarketplaceState> {
     await _saveToCache(bestsellers, 'bestsellers');
     debugPrint('Fetched and cached ${bestsellers.length} bestsellers.');
 
+    // Update UI immediately for bestsellers
+    state = state.copyWith(
+      bestsellers: bestsellers,
+      loadedCategories: [...state.loadedCategories, 'bestsellers'],
+      isLoadingFromCache: true,
+    );
+
     // 2. Fetch for each category
     final categories = ['fiction', 'science', 'history', 'philosophy'];
     for (final category in categories) {
       final categoryBooks = await _repository.fetchBooksByTopic(category);
       await _saveToCache(categoryBooks['results'], category);
+      // Update UI immediately for this category so the shelf appears before moving on
+      final updatedCategorized = Map<String, List<dynamic>>.from(state.categorizedBooks);
+      updatedCategorized[category] = categoryBooks['results'];
+      final updatedLoaded = List<String>.from(state.loadedCategories);
+      if (!updatedLoaded.contains(category)) updatedLoaded.add(category);
+
+      state = state.copyWith(
+        categorizedBooks: updatedCategorized,
+        loadedCategories: updatedLoaded,
+        isLoadingFromCache: true,
+      );
       debugPrint('Fetched and cached ${categoryBooks['results'].length} books for $category.');
     }
   }

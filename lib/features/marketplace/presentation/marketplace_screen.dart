@@ -2,9 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:visualit/features/Cart/presentation/CartNotifier.dart';
-import 'package:visualit/core/utils/responsive_helper.dart';
 import 'package:visualit/core/theme/theme_extensions.dart';
-import 'package:visualit/core/providers/isar_provider.dart';
 import 'package:visualit/core/theme/app_theme.dart';
 import 'package:visualit/features/marketplace/presentation/marketplace_notifier.dart';
 import 'marketplace_providers.dart';
@@ -14,6 +12,7 @@ import 'widgets/bestsellers_section.dart';
 import 'widgets/book_card.dart';
 import 'widgets/categories_section.dart';
 import 'widgets/hero_banner.dart';
+import 'widgets/loading_banner.dart';
 import 'widgets/horizontal_book_card_skeleton.dart';
 import 'widgets/loading_overlay.dart';
 
@@ -86,7 +85,6 @@ class _MarketplaceScreenState extends ConsumerState<MarketplaceScreen> {
   @override
   Widget build(BuildContext context) {
     final state = ref.watch(marketplaceProvider);
-    final notifier = ref.read(marketplaceProvider.notifier);
     final cartBooks = ref.watch(cartProvider);
 
     // Compose the main content separately to avoid complex inline ternary nesting
@@ -127,7 +125,7 @@ class _MarketplaceScreenState extends ConsumerState<MarketplaceScreen> {
                     ),
                     prefixIcon: Icon(
                       Icons.search,
-                      color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6),
+                      color: Theme.of(context).colorScheme.onSurface.withAlpha(153),
                     ),
                     suffixIcon: Stack(
                       children: [
@@ -182,8 +180,18 @@ class _MarketplaceScreenState extends ConsumerState<MarketplaceScreen> {
                 ),
               ),
 
-              // Hero Banner (if not searching)
-              if (state.searchQuery.isEmpty) SliverToBoxAdapter(child: HeroBanner(onSeeAllBooks: _showAllBooks)),
+              // Top banner: show loading banner during initial caching/loading-from-cache, otherwise hero banner
+              if (state.searchQuery.isEmpty)
+                SliverToBoxAdapter(
+                  child: state.isInitialLoading || state.isLoadingFromCache
+                      ? LoadingBanner(
+                          loaded: state.loadedCategories.length,
+                          total: 5,
+                          fromCache: state.isLoadingFromCache,
+                          onRetry: state.errorMessage != null ? () => ref.read(marketplaceProvider.notifier).retryInitialLoad() : null,
+                        )
+                      : HeroBanner(onSeeAllBooks: _showAllBooks),
+                ),
 
               if (state.isInitialLoading)
                 SliverToBoxAdapter(
@@ -234,13 +242,9 @@ class _MarketplaceScreenState extends ConsumerState<MarketplaceScreen> {
                   ),
                 ),
 
-              // Bestsellers Section (if not searching)
-              if (state.searchQuery.isEmpty && !state.isInitialLoading)
-                const SliverToBoxAdapter(child: BestsellersSection()),
-
-              // Categories Section (if not searching)
-              if (state.searchQuery.isEmpty && !state.isInitialLoading)
-                SliverToBoxAdapter(child: CategoriesSection()),
+              // Bestsellers and Categories: render them even during initial loading so cached shelves show up
+              if (state.searchQuery.isEmpty) const SliverToBoxAdapter(child: BestsellersSection()),
+              if (state.searchQuery.isEmpty) SliverToBoxAdapter(child: CategoriesSection()),
 
               // Search Results Grid (if searching)
               if (state.searchQuery.isNotEmpty)
@@ -269,17 +273,19 @@ class _MarketplaceScreenState extends ConsumerState<MarketplaceScreen> {
 
               // Loading Indicator
               if (state.isLoading)
-                SliverToBoxAdapter(
-                  child: Center(child: Padding(
-                    padding: const EdgeInsets.all(16.0),
-                    child: const CircularProgressIndicator(),
-                  )),
+                const SliverToBoxAdapter(
+                  child: Center(
+                    child: Padding(
+                      padding: EdgeInsets.all(16.0),
+                      child: CircularProgressIndicator(),
+                    ),
+                  ),
                 ),
             ],
           );
 
     return Scaffold(
-      backgroundColor: Theme.of(context).colorScheme.background,
+      backgroundColor: Theme.of(context).colorScheme.surface,
       body: SafeArea(
         child: LoadingOverlay(
           isLoading: state.isInitialLoading,

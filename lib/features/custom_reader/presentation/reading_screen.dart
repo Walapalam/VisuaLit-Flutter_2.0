@@ -25,7 +25,7 @@ import 'package:flutter_speed_dial/flutter_speed_dial.dart';
 import 'dart:ui';
 import 'package:visualit/features/custom_reader/presentation/widgets/custom_reading_settings_panel.dart';
 import 'package:visualit/features/custom_reader/presentation/reading_preferences_controller.dart';
-import 'package:visualit/features/reader/presentation/widgets/book_overview_dialog.dart';
+import 'package:visualit/features/custom_reader/presentation/widgets/book_visualization_overlay.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:visualit/features/custom_reader/presentation/widgets/reading_app_bar.dart';
 import 'package:visualit/features/custom_reader/presentation/widgets/reading_navigation_bar.dart';
@@ -70,6 +70,7 @@ class _ReadingScreenState extends ConsumerState<ReadingScreen> {
 
 // Add to _ReadingScreenState in reading_screen.dart
   bool _isSettingsOverlayVisible = false;
+  bool _isVisualizationOverlayVisible = false;
   String? _activeSettingsCategory; // null, 'text', 'theme', or 'layout'
 
   @override
@@ -666,7 +667,21 @@ class _ReadingScreenState extends ConsumerState<ReadingScreen> {
               category: 'text',
               onBack: _hideSettingsPanel,
               scrollController: ScrollController(), // <-- provide a controller
-            )
+            ),
+          if (_isVisualizationOverlayVisible)
+            Positioned(
+              top: 130, // Adjust based on your app bar height
+              left: 0,
+              right: 0,
+              bottom: 80, // Adjust based on your navigation bar height
+              child: BookVisualizationOverlay(
+                bookTitleForLookup: _epubData?.title ?? 'Unknown',
+                localBookISBN: null,
+                localChapterNumber: _currentChapterIndex + 1,
+                localChapterContent: _epubData?.chapters[_currentChapterIndex].content ?? '',
+                onClose: _hideVisualizationOverlay,
+              ),
+            ),
         ],
       ),
     ),);
@@ -851,29 +866,15 @@ class _ReadingScreenState extends ConsumerState<ReadingScreen> {
   }
 
   void _showBookOverviewDialog() {
-    _cancelHideOverlayTimer();
-    final bookTitle = _epubData?.title ?? 'Unknown';
-    final chapterNumber = _currentChapterIndex + 1;
-    final chapterContent = _epubData?.chapters[_currentChapterIndex].content ?? '';
+    setState(() {
+      _isVisualizationOverlayVisible = true;
+    });
+  }
 
-    showGeneralDialog(
-      context: context,
-      barrierColor: Colors.transparent,
-      barrierDismissible: true,
-      barrierLabel: 'Book Visualizations',
-      transitionDuration: const Duration(milliseconds: 300),
-      pageBuilder: (context, animation, secondaryAnimation) {
-        return FadeTransition(
-          opacity: animation,
-          child: BookOverviewDialog(
-            bookTitleForLookup: bookTitle,
-            localBookISBN: null, // Add ISBN lookup if needed
-            localChapterNumber: chapterNumber,
-            localChapterContent: chapterContent,
-          ),
-        );
-      },
-    );
+  void _hideVisualizationOverlay() {
+    setState(() {
+      _isVisualizationOverlayVisible = false;
+    });
   }
 
   void _hideSettingsPanel() {

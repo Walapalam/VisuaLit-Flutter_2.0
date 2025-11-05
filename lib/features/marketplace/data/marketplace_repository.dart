@@ -34,4 +34,27 @@ class MarketplaceRepository {
   Future<Map<String, dynamic>> fetchAllBooks({int page = 1}) async {
     return fetchBooks('$baseUrl?page=$page');
   }
+
+  Future<List<dynamic>> fetchBestsellers() async {
+    List<dynamic> allBooks = [];
+    String? nextUrl = '$baseUrl?sort=popular';
+
+    for (int i = 0; i < 4 && nextUrl != null; i++) {
+      try {
+        final response = await http.get(Uri.parse(nextUrl));
+        if (response.statusCode == 200) {
+          final data = json.decode(response.body);
+          allBooks.addAll(data['results']);
+          nextUrl = data['next'];
+        } else {
+          // Stop if there's an error
+          break;
+        }
+      } catch (e) {
+        // Stop on network error
+        break;
+      }
+    }
+    return allBooks;
+  }
 }

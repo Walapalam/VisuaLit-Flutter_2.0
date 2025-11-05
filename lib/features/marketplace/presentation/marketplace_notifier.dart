@@ -7,6 +7,7 @@ import 'dart:convert';
 import 'package:isar/isar.dart';
 import 'package:visualit/features/marketplace/data/marketplace_repository.dart';
 import '../data/cached_book.dart';
+import 'dart:math';
 
 class MarketplaceState {
   final List<dynamic> books;
@@ -103,21 +104,29 @@ class MarketplaceNotifier extends StateNotifier<MarketplaceState> {
       final cachedPhilosophy = await _loadFromCache('philosophy');
 
       if (cachedBestsellers.isNotEmpty) {
-        // Mark which categories are available from cache so the UI can show them immediately
+        // Build categorized map and dedupe/shuffle so the same book doesn't appear in multiple shelves
+        final rawCategorized = {
+          'bestsellers': List<dynamic>.from(cachedBestsellers),
+          'fiction': List<dynamic>.from(cachedFiction),
+          'science': List<dynamic>.from(cachedScience),
+          'history': List<dynamic>.from(cachedHistory),
+          'philosophy': List<dynamic>.from(cachedPhilosophy),
+        };
+
+        final shuffled = _dedupeAndShuffleCategorized(rawCategorized, ['bestsellers', 'fiction', 'science', 'history', 'philosophy']);
+
         final loaded = <String>[];
-        if (cachedBestsellers.isNotEmpty) loaded.add('bestsellers');
-        if (cachedFiction.isNotEmpty) loaded.add('fiction');
-        if (cachedScience.isNotEmpty) loaded.add('science');
-        if (cachedHistory.isNotEmpty) loaded.add('history');
-        if (cachedPhilosophy.isNotEmpty) loaded.add('philosophy');
+        shuffled.forEach((k, v) {
+          if (v.isNotEmpty) loaded.add(k);
+        });
 
         state = state.copyWith(
-          bestsellers: cachedBestsellers,
+          bestsellers: shuffled['bestsellers']!,
           categorizedBooks: {
-            'fiction': cachedFiction,
-            'science': cachedScience,
-            'history': cachedHistory,
-            'philosophy': cachedPhilosophy,
+            'fiction': shuffled['fiction']!,
+            'science': shuffled['science']!,
+            'history': shuffled['history']!,
+            'philosophy': shuffled['philosophy']!,
           },
           isLoadingFromCache: true,
           isInitialLoading: false,
@@ -144,13 +153,22 @@ class MarketplaceNotifier extends StateNotifier<MarketplaceState> {
       final history = await _loadFromCache('history');
       final philosophy = await _loadFromCache('philosophy');
 
+      // Final dedupe & shuffle across all categories before assigning
+      final finalCategorized = _dedupeAndShuffleCategorized({
+        'bestsellers': List<dynamic>.from(bestsellers),
+        'fiction': List<dynamic>.from(fiction),
+        'science': List<dynamic>.from(science),
+        'history': List<dynamic>.from(history),
+        'philosophy': List<dynamic>.from(philosophy),
+      }, ['bestsellers', 'fiction', 'science', 'history', 'philosophy']);
+
       state = state.copyWith(
-        bestsellers: bestsellers,
+        bestsellers: finalCategorized['bestsellers']!,
         categorizedBooks: {
-          'fiction': fiction,
-          'science': science,
-          'history': history,
-          'philosophy': philosophy,
+          'fiction': finalCategorized['fiction']!,
+          'science': finalCategorized['science']!,
+          'history': finalCategorized['history']!,
+          'philosophy': finalCategorized['philosophy']!,
         },
         isInitialLoading: false,
         isLoading: false,
@@ -179,6 +197,21 @@ class MarketplaceNotifier extends StateNotifier<MarketplaceState> {
     for (final category in categories) {
       final categoryBooks = await _repository.fetchBooksByTopic(category);
       await _saveToCache(categoryBooks['results'], category);
+      // Update UI immediately for this category so the shelf appears before moving on
+      final updatedCategorized = Map<String, List<dynamic>>.from(state.categorizedBooks);
+      updatedCategorized[category] = categoryBooks['results'];
+
+      // Dedupe & shuffle across known categories including bestsellers
+      final deduped = _dedupeAndShuffleCategorized(updatedCategorized, ['bestsellers', 'fiction', 'science', 'history', 'philosophy']);
+
+      final updatedLoaded = List<String>.from(state.loadedCategories);
+      if (!updatedLoaded.contains(category)) updatedLoaded.add(category);
+
+      state = state.copyWith(
+        categorizedBooks: deduped,
+        loadedCategories: updatedLoaded,
+        isLoadingFromCache: true,
+      );
       debugPrint('Fetched and cached ${categoryBooks['results'].length} books for $category.');
     }
   }
@@ -324,4 +357,116 @@ class MarketplaceNotifier extends StateNotifier<MarketplaceState> {
     await loadBooks(reset: true);
   }
 
+  void clearSearch() {
+    // Simply clear the search query and books - keep existing bestsellers and categories
+    state = state.copyWith(
+      searchQuery: '',
+      books: [],
+      nextUrl: 'https://gutendex.com/books/',
+      isLoading: false,
+      isLoadingFromCache: false,
+      errorMessage: null,
+    );
+  }
+
+  // Helper: dedupe books across categories and shuffle each category's list.
+  // Uses improved randomization to fairly distribute books across categories
+  Map<String, List<dynamic>> _dedupeAndShuffleCategorized(Map<String, List<dynamic>> input, List<String> order) {
+    final out = <String, List<dynamic>>{};
+    final seen = <int>{};
+    final rng = Random();
+
+    // First, shuffle the order of categories to make distribution more fair
+    final shuffledOrder = List<String>.from(order);
+    shuffledOrder.shuffle(rng);
+
+    // Create a map to track which books belong to multiple categories
+    final bookCategories = <int, List<String>>{};
+
+    // Build a mapping of which categories each book belongs to
+    for (final category in input.keys) {
+      final books = input[category] ?? [];
+      for (final book in books) {
+        try {
+          final id = (book['id'] is int) ? book['id'] as int : int.parse(book['id'].toString());
+          bookCategories.putIfAbsent(id, () => []).add(category);
+        } catch (_) {
+          // Skip books without valid IDs
+        }
+      }
+    }
+
+    // Now process books, giving priority to books that appear in fewer categories
+    final bookAssignments = <int, String>{}; // Track which category each book is assigned to
+
+    // Sort books by how many categories they appear in (fewer categories = higher priority)
+    final bookPriorities = bookCategories.entries.toList()
+      ..sort((a, b) => a.value.length.compareTo(b.value.length));
+
+    // Assign books to categories, prioritizing books that appear in fewer categories
+    for (final entry in bookPriorities) {
+      final bookId = entry.key;
+      final categories = entry.value;
+
+      if (!bookAssignments.containsKey(bookId)) {
+        // Randomly choose one of the categories this book belongs to
+        final availableCategories = categories.where((cat) => order.contains(cat)).toList();
+        if (availableCategories.isNotEmpty) {
+          availableCategories.shuffle(rng);
+          bookAssignments[bookId] = availableCategories.first;
+        }
+      }
+    }
+
+    // Now build the output lists based on assignments
+    for (final category in order) {
+      final books = List<dynamic>.from(input[category] ?? []);
+      final assigned = <dynamic>[];
+
+      for (final book in books) {
+        try {
+          final id = (book['id'] is int) ? book['id'] as int : int.parse(book['id'].toString());
+          if (bookAssignments[id] == category) {
+            assigned.add(book);
+          }
+        } catch (_) {
+          // Add books without valid IDs as-is
+          assigned.add(book);
+        }
+      }
+
+      // Shuffle the final list for this category
+      assigned.shuffle(rng);
+      out[category] = assigned;
+    }
+
+    // Handle any categories not in the order list
+    for (final category in input.keys) {
+      if (!out.containsKey(category)) {
+        final books = List<dynamic>.from(input[category] ?? []);
+        final assigned = <dynamic>[];
+
+        for (final book in books) {
+          try {
+            final id = (book['id'] is int) ? book['id'] as int : int.parse(book['id'].toString());
+            if (bookAssignments[id] == category) {
+              assigned.add(book);
+            }
+          } catch (_) {
+            assigned.add(book);
+          }
+        }
+
+        assigned.shuffle(rng);
+        out[category] = assigned;
+      }
+    }
+
+    // Ensure all categories exist in output, even if empty
+    for (final category in order) {
+      out.putIfAbsent(category, () => []);
+    }
+
+    return out;
+  }
 }

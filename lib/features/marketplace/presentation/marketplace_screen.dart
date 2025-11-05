@@ -4,7 +4,6 @@ import 'package:go_router/go_router.dart';
 import 'package:visualit/features/Cart/presentation/CartNotifier.dart';
 import 'package:visualit/core/theme/theme_extensions.dart';
 import 'package:visualit/core/theme/app_theme.dart';
-import 'package:visualit/features/marketplace/presentation/marketplace_notifier.dart';
 import 'marketplace_providers.dart';
 
 import 'widgets/all_books_view.dart';
@@ -12,7 +11,6 @@ import 'widgets/bestsellers_section.dart';
 import 'widgets/book_card.dart';
 import 'widgets/categories_section.dart';
 import 'widgets/hero_banner.dart';
-import 'widgets/loading_banner.dart';
 import 'widgets/horizontal_book_card_skeleton.dart';
 import 'widgets/loading_overlay.dart';
 
@@ -49,6 +47,73 @@ class _MarketplaceScreenState extends ConsumerState<MarketplaceScreen> {
       // Optionally reset search
       ref.read(marketplaceProvider.notifier).searchBooks('');
     });
+  }
+
+  void _clearSearch() {
+    print('DEBUG: Clear search button tapped!'); // Debug log
+    _searchController.clear();
+    ref.read(marketplaceProvider.notifier).clearSearch();
+    setState(() {}); // ensure UI rebuilds to hide search tag / show main content
+  }
+
+  Widget _buildSearchTag() {
+    final state = ref.watch(marketplaceProvider);
+
+    if (state.searchQuery.isEmpty) {
+      return const SizedBox.shrink();
+    }
+
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      child: Row(
+        children: [
+          Chip(
+            backgroundColor: Theme.of(context).colorScheme.secondaryContainer,
+            label: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  Icons.search,
+                  size: 16,
+                  color: Theme.of(context).colorScheme.onSecondaryContainer,
+                ),
+                const SizedBox(width: 6),
+                Text(
+                  'Search: "${state.searchQuery}"',
+                  style: TextStyle(
+                    color: Theme.of(context).colorScheme.onSecondaryContainer,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+                const SizedBox(width: 6),
+                GestureDetector(
+                  onTap: () {
+                    print('DEBUG: GestureDetector tapped!');
+                    _clearSearch();
+                  },
+                  child: Container(
+                    padding: const EdgeInsets.all(8), // Increased padding for better tap area
+                    child: Icon(
+                      Icons.close,
+                      size: 18, // Slightly larger icon
+                      color: Theme.of(context).colorScheme.onSecondaryContainer,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const Spacer(),
+          if (state.books.isNotEmpty)
+            Text(
+              '${state.books.length} result${state.books.length == 1 ? '' : 's'}',
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
+              ),
+            ),
+        ],
+      ),
+    );
   }
 
   @override
@@ -90,16 +155,19 @@ class _MarketplaceScreenState extends ConsumerState<MarketplaceScreen> {
     // Compose the main content separately to avoid complex inline ternary nesting
     final Widget bodyContent = showAllBooks
         ? AllBooksView(
-            searchController: _searchController,
-            scrollController: _scrollController,
-            ref: ref,
-            cartBooks: cartBooks,
-            onBack: () {
-              setState(() {
-                showAllBooks = false;
-              });
-            },
-          )
+      searchController: _searchController,
+      scrollController: _scrollController,
+      ref: ref,
+      cartBooks: cartBooks,
+      onBack: () {
+        // return to main view and clear any search so main marketplace shows
+        setState(() {
+          showAllBooks = false;
+        });
+        _searchController.clear();
+        ref.read(marketplaceProvider.notifier).clearSearch();
+      },
+    )
         : CustomScrollView(
             controller: _scrollController,
             slivers: [
@@ -180,17 +248,15 @@ class _MarketplaceScreenState extends ConsumerState<MarketplaceScreen> {
                 ),
               ),
 
+              // Search Tag/Chip
+              SliverToBoxAdapter(
+                child: _buildSearchTag(),
+              ),
+
               // Top banner: show loading banner during initial caching/loading-from-cache, otherwise hero banner
               if (state.searchQuery.isEmpty)
                 SliverToBoxAdapter(
-                  child: state.isInitialLoading || state.isLoadingFromCache
-                      ? LoadingBanner(
-                          loaded: state.loadedCategories.length,
-                          total: 5,
-                          fromCache: state.isLoadingFromCache,
-                          onRetry: state.errorMessage != null ? () => ref.read(marketplaceProvider.notifier).retryInitialLoad() : null,
-                        )
-                      : HeroBanner(onSeeAllBooks: _showAllBooks),
+                  child: HeroBanner(onSeeAllBooks: _showAllBooks),
                 ),
 
               if (state.isInitialLoading)

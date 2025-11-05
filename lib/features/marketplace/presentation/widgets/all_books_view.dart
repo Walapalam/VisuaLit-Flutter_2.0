@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -29,6 +30,49 @@ class AllBooksView extends StatefulWidget {
 class _AllBooksViewState extends State<AllBooksView> {
   int columns = 3;
   String sortOption = 'Default';
+
+  // Scroll indicator state
+  double _indicatorPercent = 0.0; // 0..1 across scroll extent
+  double _lastPixels = 0.0;
+  bool _scrollingDown = true;
+  bool _isIndicatorVisible = false;
+  Timer? _hideIndicatorTimer;
+
+  @override
+  void initState() {
+    super.initState();
+    widget.scrollController.addListener(_onScroll);
+  }
+
+  @override
+  void dispose() {
+    _hideIndicatorTimer?.cancel();
+    widget.scrollController.removeListener(_onScroll);
+    super.dispose();
+  }
+
+  void _onScroll() {
+    if (!mounted) return;
+    final sc = widget.scrollController;
+    if (!sc.hasClients) return;
+    final pos = sc.position;
+    final pixels = pos.pixels;
+    final max = pos.maxScrollExtent;
+
+    setState(() {
+      _indicatorPercent = max > 0 ? (pixels / max).clamp(0.0, 1.0) : 0.0;
+      _scrollingDown = pixels >= _lastPixels;
+      _isIndicatorVisible = true;
+    });
+
+    _lastPixels = pixels;
+
+    _hideIndicatorTimer?.cancel();
+    _hideIndicatorTimer = Timer(const Duration(milliseconds: 900), () {
+      if (!mounted) return;
+      setState(() => _isIndicatorVisible = false);
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -65,7 +109,7 @@ class _AllBooksViewState extends State<AllBooksView> {
                 contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                 prefixIcon: Icon(
                   Icons.search,
-                  color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6),
+                  color: Theme.of(context).colorScheme.onSurface.withAlpha(153),
                 ),
               ),
               onSubmitted: (query) {
@@ -145,8 +189,59 @@ class _AllBooksViewState extends State<AllBooksView> {
             ],
           ),
         ),
+        // Content area with overlayed scroll indicator
         Expanded(
-          child: _buildContent(state),
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              final height = constraints.maxHeight;
+              // Compute top position for indicator with a small margin
+              final topPos = 8.0 + (_indicatorPercent * (height - 88.0));
+
+              Widget content = _buildContent(state);
+
+              return Stack(
+                children: [
+                  Positioned.fill(child: content),
+
+                  // Scroll-following indicator (visible while user scrolls or while loading)
+                  if ((_isIndicatorVisible || state.isLoading) && widget.scrollController.hasClients)
+                    Positioned(
+                      right: 12,
+                      top: topPos,
+                      child: AnimatedOpacity(
+                        duration: const Duration(milliseconds: 250),
+                        opacity: (_isIndicatorVisible || state.isLoading) ? 1.0 : 0.0,
+                        child: Container(
+                          padding: const EdgeInsets.all(6),
+                          decoration: BoxDecoration(
+                            color: Theme.of(context).colorScheme.onSurface.withAlpha(20), // ~0.08 * 255
+                            borderRadius: BorderRadius.circular(12),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withAlpha(38), // ~0.15 * 255
+                                blurRadius: 6,
+                                offset: const Offset(0, 2),
+                              )
+                            ],
+                          ),
+                          child: state.isLoading
+                              ? const SizedBox(
+                                  width: 20,
+                                  height: 20,
+                                  child: CircularProgressIndicator(strokeWidth: 2),
+                                )
+                              : Icon(
+                                  _scrollingDown ? Icons.arrow_downward : Icons.arrow_upward,
+                                  size: 18,
+                                  color: Theme.of(context).colorScheme.onSurface,
+                                ),
+                        ),
+                      ),
+                    ),
+                ],
+              );
+            },
+          ),
         ),
       ],
     );
@@ -203,19 +298,31 @@ class _AllBooksViewState extends State<AllBooksView> {
       );
     }
 
-    return GridView.builder(
-      controller: widget.scrollController,
-      padding: const EdgeInsets.all(16),
-      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: columns,
-        childAspectRatio: 0.7,
-        crossAxisSpacing: 16,
-        mainAxisSpacing: 16,
-      ),
-      itemCount: state.books.length,
-      itemBuilder: (context, index) {
-        return BookCard(book: state.books[index]);
+    return NotificationListener<ScrollNotification>(
+      onNotification: (scrollNotification) {
+        // If user scrolled near the end, attempt to load more (the notifier will handle locking)
+        if (scrollNotification.metrics.pixels >= scrollNotification.metrics.maxScrollExtent * 0.8) {
+          final stateLocal = widget.ref.read(marketplaceProvider);
+          if (!stateLocal.isLoading && stateLocal.nextUrl != null) {
+            widget.ref.read(marketplaceProvider.notifier).loadBooks();
+          }
+        }
+        return false;
       },
+      child: GridView.builder(
+        controller: widget.scrollController,
+        padding: const EdgeInsets.all(16),
+        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+          crossAxisCount: columns,
+          childAspectRatio: 0.7,
+          crossAxisSpacing: 16,
+          mainAxisSpacing: 16,
+        ),
+        itemCount: state.books.length,
+        itemBuilder: (context, index) {
+          return BookCard(book: state.books[index]);
+        },
+      ),
     );
   }
 }

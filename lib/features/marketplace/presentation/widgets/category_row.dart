@@ -16,33 +16,76 @@ class CategoryRow extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final books = ref.watch(marketplaceProvider).categorizedBooks[subject] ?? [];
+    final state = ref.watch(marketplaceProvider);
+    final books = state.categorizedBooks[subject] ?? [];
+    final loaded = state.loadedCategories.contains(subject);
 
-    if (books.isEmpty) {
-      return SizedBox(
-        height: ResponsiveHelper.getBookShelfHeight(context),
-        child: ListView.builder(
-          scrollDirection: Axis.horizontal,
-          itemCount: 6,
-          itemBuilder: (context, index) => const HorizontalBookCardSkeleton(),
-        ),
+    // If category loaded and has books, show the actual row
+    if (loaded && books.isNotEmpty) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: EdgeInsets.symmetric(horizontal: context.isMobile ? AppSpacing.md : AppSpacing.lg, vertical: AppSpacing.md),
+            child: Text(title, style: Theme.of(context).textTheme.headlineMedium),
+          ),
+          SizedBox(
+            height: context.bookShelfHeight,
+            child: ListView.builder(
+              scrollDirection: Axis.horizontal,
+              padding: EdgeInsets.symmetric(horizontal: context.isMobile ? AppSpacing.md : AppSpacing.lg),
+              itemCount: books.length,
+              itemBuilder: (context, index) => HorizontalBookCard(book: books[index]),
+            ),
+          ),
+        ],
       );
     }
+
+    // Not loaded: show skeleton with overlay
+    final showOverlay = state.isInitialLoading || state.isLoadingFromCache || (!loaded && books.isEmpty);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Padding(
-          padding: EdgeInsets.symmetric(horizontal: ResponsiveHelper.isMobile(context) ? AppSpacing.md : AppSpacing.lg, vertical: AppSpacing.md),
+          padding: EdgeInsets.symmetric(horizontal: context.isMobile ? AppSpacing.md : AppSpacing.lg, vertical: AppSpacing.md),
           child: Text(title, style: Theme.of(context).textTheme.headlineMedium),
         ),
         SizedBox(
-          height: ResponsiveHelper.getBookShelfHeight(context),
-          child: ListView.builder(
-            scrollDirection: Axis.horizontal,
-            padding: EdgeInsets.symmetric(horizontal: ResponsiveHelper.isMobile(context) ? AppSpacing.md : AppSpacing.lg),
-            itemCount: books.length,
-            itemBuilder: (context, index) => HorizontalBookCard(book: books[index]),
+          height: context.bookShelfHeight,
+          child: Stack(
+            children: [
+              ListView.builder(
+                scrollDirection: Axis.horizontal,
+                padding: EdgeInsets.symmetric(horizontal: context.isMobile ? AppSpacing.md : AppSpacing.lg),
+                itemCount: 6,
+                itemBuilder: (context, index) => const HorizontalBookCardSkeleton(),
+              ),
+              if (showOverlay)
+                Positioned(
+                  left: context.isMobile ? AppSpacing.md : AppSpacing.lg,
+                  top: 8,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: Colors.black.withOpacity(0.6),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Row(
+                      children: const [
+                        SizedBox(
+                          width: 14,
+                          height: 14,
+                          child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                        ),
+                        SizedBox(width: 8),
+                        Text('Loading...', style: TextStyle(color: Colors.white)),
+                      ],
+                    ),
+                  ),
+                ),
+            ],
           ),
         ),
       ],

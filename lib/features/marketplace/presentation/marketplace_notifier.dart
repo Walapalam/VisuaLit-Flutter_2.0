@@ -19,6 +19,7 @@ class MarketplaceState {
   final String? errorMessage;
   final List<dynamic> bestsellers;
   final Map<String, List<dynamic>> categorizedBooks;
+  final List<String> loadedCategories;
 
   MarketplaceState({
     required this.books,
@@ -31,6 +32,7 @@ class MarketplaceState {
     this.errorMessage,
     this.bestsellers = const [],
     this.categorizedBooks = const {},
+    this.loadedCategories = const [],
   });
 
   MarketplaceState copyWith({
@@ -44,6 +46,7 @@ class MarketplaceState {
     String? errorMessage,
     List<dynamic>? bestsellers,
     Map<String, List<dynamic>>? categorizedBooks,
+    List<String>? loadedCategories,
   }) {
     return MarketplaceState(
       books: books ?? this.books,
@@ -56,6 +59,7 @@ class MarketplaceState {
       errorMessage: errorMessage ?? this.errorMessage,
       bestsellers: bestsellers ?? this.bestsellers,
       categorizedBooks: categorizedBooks ?? this.categorizedBooks,
+      loadedCategories: loadedCategories ?? this.loadedCategories,
     );
   }
 }
@@ -81,6 +85,7 @@ class MarketplaceNotifier extends StateNotifier<MarketplaceState> {
       isInitialLoading: true,
       errorMessage: null,
       isOffline: false,
+      loadedCategories: [],
     );
     _loadInitialData();
   }
@@ -98,6 +103,14 @@ class MarketplaceNotifier extends StateNotifier<MarketplaceState> {
       final cachedPhilosophy = await _loadFromCache('philosophy');
 
       if (cachedBestsellers.isNotEmpty) {
+        // Mark which categories are available from cache so the UI can show them immediately
+        final loaded = <String>[];
+        if (cachedBestsellers.isNotEmpty) loaded.add('bestsellers');
+        if (cachedFiction.isNotEmpty) loaded.add('fiction');
+        if (cachedScience.isNotEmpty) loaded.add('science');
+        if (cachedHistory.isNotEmpty) loaded.add('history');
+        if (cachedPhilosophy.isNotEmpty) loaded.add('philosophy');
+
         state = state.copyWith(
           bestsellers: cachedBestsellers,
           categorizedBooks: {
@@ -108,6 +121,7 @@ class MarketplaceNotifier extends StateNotifier<MarketplaceState> {
           },
           isLoadingFromCache: true,
           isInitialLoading: false,
+          loadedCategories: loaded,
         );
         debugPrint('Loaded books from cache.');
       }
@@ -141,6 +155,7 @@ class MarketplaceNotifier extends StateNotifier<MarketplaceState> {
         isInitialLoading: false,
         isLoading: false,
         isLoadingFromCache: false,
+        loadedCategories: ['bestsellers', 'fiction', 'science', 'history', 'philosophy'],
       );
       debugPrint('Finished loading and caching initial data.');
     } catch (e) {
@@ -172,7 +187,7 @@ class MarketplaceNotifier extends StateNotifier<MarketplaceState> {
     if (_isar == null) return [];
 
     final expiredDate = DateTime.now().subtract(_cacheExpiry);
-    final cached = await _isar!.cachedBooks
+    final cached = await _isar.cachedBooks
         .where()
         .searchQueryEqualTo(query.isEmpty ? null : query)
         .filter()
@@ -188,9 +203,9 @@ class MarketplaceNotifier extends StateNotifier<MarketplaceState> {
     final now = DateTime.now();
     final newBookIds = books.map((b) => b['id'] as int).toSet();
 
-    await _isar!.writeTxn(() async {
+    await _isar.writeTxn(() async {
       // Efficiently delete old entries for this query that are not in the new list
-      final oldEntries = await _isar!.cachedBooks
+      final oldEntries = await _isar.cachedBooks
           .where()
           .searchQueryEqualTo(query)
           .filter()
@@ -198,12 +213,12 @@ class MarketplaceNotifier extends StateNotifier<MarketplaceState> {
           .anyOf(newBookIds, (q, int id) => q.bookIdEqualTo(id))
           .findAll();
       if (oldEntries.isNotEmpty) {
-        await _isar!.cachedBooks.deleteAll(oldEntries.map((e) => e.id).toList());
+        await _isar.cachedBooks.deleteAll(oldEntries.map((e) => e.id).toList());
       }
 
       for (final book in books) {
-        // Check if a book with the same ID and query already exists
-        final existing = await _isar!.cachedBooks
+        // Upsert: if existing record present for (bookId, query) update it; otherwise insert
+        final existing = await _isar.cachedBooks
             .where()
             .bookIdEqualTo(book['id'])
             .filter()
@@ -224,7 +239,22 @@ class MarketplaceNotifier extends StateNotifier<MarketplaceState> {
             ..searchQuery = query.isEmpty ? null : query
             ..downloadCount = book['download_count'] ?? 0
             ..isBestseller = query == 'bestsellers' || (book['download_count'] ?? 0) > 10000;
-          await _isar!.cachedBooks.put(cached);
+          await _isar.cachedBooks.put(cached);
+        } else {
+          // Update fields on existing record to refresh cache
+          existing.title = book['title'] ?? existing.title;
+          existing.author = book['authors']?.isNotEmpty == true ? book['authors'][0]['name'] : existing.author;
+          existing.coverUrl = book['formats']?['image/jpeg'] ?? existing.coverUrl;
+          existing.downloadUrl = book['formats']?['application/epub+zip'] ?? existing.downloadUrl;
+          existing.language = book['languages']?.isNotEmpty == true ? book['languages'][0] : existing.language;
+          existing.subjects = List<String>.from(book['subjects'] ?? existing.subjects ?? []);
+          existing.cachedAt = now;
+          existing.rawData = json.encode(book);
+          existing.searchQuery = query.isEmpty ? null : query;
+          existing.downloadCount = book['download_count'] ?? existing.downloadCount;
+          existing.isBestseller = query == 'bestsellers' || (book['download_count'] ?? 0) > 10000;
+
+          await _isar.cachedBooks.put(existing);
         }
       }
     });
@@ -235,8 +265,8 @@ class MarketplaceNotifier extends StateNotifier<MarketplaceState> {
     if (_isar == null) return;
 
     final expiredDate = DateTime.now().subtract(_cacheExpiry);
-    await _isar!.writeTxn(() async {
-      await _isar!.cachedBooks
+    await _isar.writeTxn(() async {
+      await _isar.cachedBooks
           .where()
           .filter()
           .cachedAtLessThan(expiredDate)

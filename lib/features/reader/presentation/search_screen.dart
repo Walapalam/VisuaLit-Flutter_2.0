@@ -1,9 +1,9 @@
-import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:visualit/features/reader/application/search_service.dart';
 import 'package:visualit/features/reader/data/book_data.dart';
+import 'package:visualit/core/utils/debouncer.dart';
 
 class SearchScreen extends ConsumerStatefulWidget {
   const SearchScreen({super.key});
@@ -173,22 +173,5 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
         ],
       ),
     );
-  }
-}
-
-// Debouncer to prevent excessive searches while typing
-class Debouncer {
-  final int milliseconds;
-  Timer? _timer;
-
-  Debouncer({required this.milliseconds});
-
-  void run(VoidCallback action) {
-    _timer?.cancel();
-    _timer = Timer(Duration(milliseconds: milliseconds), action);
-  }
-
-  void dispose() {
-    _timer?.cancel();
   }
 }

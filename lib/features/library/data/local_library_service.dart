@@ -1,8 +1,6 @@
 import 'dart:io';
-import 'dart:typed_data'; // Import this
+import 'dart:typed_data';
 import 'package:file_picker/file_picker.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:permission_handler/permission_handler.dart';
 
 // A new class to hold our picked file data securely
 class PickedFileData {
@@ -14,61 +12,10 @@ class PickedFileData {
 
 
 class LocalLibraryService {
-  /// Requests necessary storage permissions for mobile platforms.
-  ///
-  /// Returns `true` if permission is granted, otherwise `false`.
-  /// Requests necessary storage permissions for mobile platforms.
-  Future<bool> _requestPermission() async {
-    print('LocalLibraryService: Requesting storage permission...');
-
-    if (!Platform.isAndroid && !Platform.isIOS) {
-      print('LocalLibraryService: Running on non-mobile platform, skipping permission request');
-      return true;
-    }
-
-    print('LocalLibraryService: Running on mobile platform (${Platform.operatingSystem}), requesting storage permission');
-
-    // Check if MANAGE_EXTERNAL_STORAGE is already granted
-    if (await Permission.manageExternalStorage.isGranted) {
-      print('LocalLibraryService: MANAGE_EXTERNAL_STORAGE permission already granted');
-      return true;
-    }
-
-    // Request the more powerful permission
-    final status = await Permission.manageExternalStorage.request();
-    print('LocalLibraryService: Permission status: ${status.toString()}');
-
-    if (status.isGranted) {
-      print('LocalLibraryService: Storage permission granted');
-      return true;
-    }
-
-    if (status.isPermanentlyDenied) {
-      print('LocalLibraryService: Permission permanently denied, opening app settings');
-      await openAppSettings();
-    } else {
-      print('LocalLibraryService: Permission denied');
-    }
-
-    return false;
-  }
-
-  Future<bool> requestStoragePermission() async {
-    return await _requestPermission();
-  }
-
-
   /// Opens the platform's file picker to select one or more EPUB files.
-  ///
-  /// This method handles storage permissions and returns a list of selected [PickedFileData] objects.
-  /// It returns an empty list if no files are selected or if permissions are denied.
+  /// Uses withData to avoid direct filesystem reads and permissions.
   Future<List<PickedFileData>> pickFiles() async {
     print('LocalLibraryService: Starting file picker...');
-
-    if (!await _requestPermission()) {
-      print('LocalLibraryService: Permission denied, returning empty list');
-      return [];
-    }
 
     try {
       // Ask for the file bytes directly
@@ -76,7 +23,7 @@ class LocalLibraryService {
         allowMultiple: true,
         type: FileType.custom,
         allowedExtensions: ['epub'],
-        withData: true, // This is the crucial change!
+        withData: true, // Crucial: get file bytes via picker channel
       );
 
       if (result == null) {
@@ -87,10 +34,10 @@ class LocalLibraryService {
       final List<PickedFileData> pickedFiles = [];
       for (final file in result.files) {
         if (file.path != null && file.bytes != null) {
-          print('LocalLibraryService: Successfully read ${file.bytes!.lengthInBytes} bytes from ${file.name}');
+          print('LocalLibraryService: Read ${file.bytes!.lengthInBytes} bytes from ${file.name}');
           pickedFiles.add(PickedFileData(path: file.path!, bytes: file.bytes!));
         } else {
-          print('LocalLibraryService: Warning - picked file ${file.name} was missing path or data.');
+          print('LocalLibraryService: Warning - picked file ${file.name} missing path or data.');
         }
       }
 
@@ -114,15 +61,10 @@ class LocalLibraryService {
     return null; // User canceled or no file selected
   }
 
-  // --- ADDED METHOD for AUDIOBOOKS ---
   /// Opens the directory picker for selecting an audiobook folder.
-  /// This is the new, preferred method for the multi-chapter audiobook feature.
+  /// No broad storage permission is requested.
   Future<String?> pickDirectory() async {
     print('LocalLibraryService: Executing pickDirectory() for audiobooks...');
-    if (!await _requestPermission()) {
-      print('LocalLibraryService: Permission denied.');
-      return null;
-    }
     try {
       // Returns the path of the selected directory as a String.
       return await FilePicker.platform.getDirectoryPath();
@@ -134,16 +76,9 @@ class LocalLibraryService {
 
 
   /// Opens the platform's directory picker and scans for all EPUB files within.
-  ///
-  /// This method recursively finds all files with the '.epub' extension
-  /// in the selected directory and its subdirectories.
+  /// Requires the user to select a directory; no broad storage permission needed.
   Future<List<PickedFileData>> scanAndLoadBooks() async {
     print('LocalLibraryService: Starting directory scan...');
-
-    if (!await _requestPermission()) {
-      print('LocalLibraryService: Permission denied, returning empty list');
-      return [];
-    }
 
     try {
       final directoryPath = await FilePicker.platform.getDirectoryPath();
@@ -179,15 +114,9 @@ class LocalLibraryService {
   }
 
   /// Opens the platform's file picker to select one or more MP3 files.
-  ///
-  /// Returns a list of selected audio files, or an empty list if no files are selected
-  /// or if permissions are denied.
+  /// Returns a list of selected audio files via direct paths (no broad perms).
   Future<List<File>> pickAudiobooks() async {
     print('LocalLibraryService: Executing legacy pickAudiobooks()...');
-    if (!await _requestPermission()) {
-      print('LocalLibraryService: Permission denied for audiobook picking');
-      return [];
-    }
 
     try {
       final result = await FilePicker.platform.pickFiles(
@@ -215,8 +144,7 @@ class LocalLibraryService {
   }
 
   /// Loads a file from the given path and returns a PickedFileData object.
-  ///
-  /// This is useful for retrying processing of a book that previously failed.
+  /// Works for files inside app library and for picked files reachable by path.
   Future<PickedFileData?> loadFileFromPath(String filePath) async {
     print('LocalLibraryService: Loading file from path: $filePath');
 

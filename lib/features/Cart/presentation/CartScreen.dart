@@ -1,15 +1,11 @@
-import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:visualit/features/Cart/presentation/CartNotifier.dart';
-import 'package:visualit/features/library/presentation/library_controller.dart';
 import 'package:go_router/go_router.dart';
 import 'package:http/http.dart' as http;
 import 'dart:io';
 import 'package:path_provider/path_provider.dart';
-import 'package:permission_handler/permission_handler.dart';
 import 'package:visualit/core/theme/theme_extensions.dart';
-import 'package:device_info_plus/device_info_plus.dart';
 
 
 class CartScreen extends ConsumerStatefulWidget {
@@ -22,34 +18,69 @@ class CartScreen extends ConsumerStatefulWidget {
 class _CartScreenState extends ConsumerState<CartScreen> {
   final Set<int> downloadingIds = {};
 
-  Future<bool> _isBookDownloaded(String title) async {
-    Directory? downloadsDir;
-    if (Platform.isAndroid) {
-      downloadsDir = Directory('/storage/emulated/0/Download');
-    } else {
-      downloadsDir = await getDownloadsDirectory();
+  Future<Directory?> _getAppLibraryDir() async {
+    try {
+      if (Platform.isAndroid) {
+        // App-scoped external storage (no permission required)
+        final dir = await getExternalStorageDirectory();
+        if (dir == null) return null;
+        final visuaLitDir = Directory('${dir.path}/VisuaLit');
+        if (!await visuaLitDir.exists()) {
+          await visuaLitDir.create(recursive: true);
+        }
+        return visuaLitDir;
+      } else {
+        final base = await getApplicationDocumentsDirectory();
+        final visuaLitDir = Directory('${base.path}/VisuaLit');
+        if (!await visuaLitDir.exists()) {
+          await visuaLitDir.create(recursive: true);
+        }
+        return visuaLitDir;
+      }
+    } catch (_) {
+      return null;
     }
-    if (downloadsDir == null) return false;
-    final visuaLitDir = Directory('${downloadsDir.path}/VisuaLit');
-    final file = File('${visuaLitDir.path}/$title.epub');
+  }
+
+  Future<bool> _isBookDownloaded(String title) async {
+    final dir = await _getAppLibraryDir();
+    if (dir == null) return false;
+    final file = File('${dir.path}/$title.epub');
     return file.exists();
   }
 
-  Future<bool> _requestStoragePermission() async {
-    if (Platform.isAndroid) {
-      final androidInfo = await DeviceInfoPlugin().androidInfo;
+  String _sanitizeFileName(String name) {
+    final invalidChars = RegExp(r'[<>:"/\\|?*]');
+    return name.replaceAll(invalidChars, '_').trim();
+  }
 
-      if (androidInfo.version.sdkInt >= 30) {
-        // Android 11+ requires MANAGE_EXTERNAL_STORAGE
-        final status = await Permission.manageExternalStorage.request();
-        return status.isGranted;
-      } else {
-        // Android 10 and below
-        final status = await Permission.storage.request();
-        return status.isGranted;
-      }
+  Future<void> _downloadBook(Map<String, dynamic> book) async {
+    final bookTitle = book['title']?.toString() ?? 'book';
+    final downloadUrl = book['formats']?['application/epub+zip']?.toString();
+    if (downloadUrl == null) {
+      throw Exception('Download URL not available');
     }
-    return true; // iOS doesn't need these permissions for app documents
+
+    final targetDir = await _getAppLibraryDir();
+    if (targetDir == null) {
+      throw Exception('Cannot access app library');
+    }
+
+    final safeTitle = _sanitizeFileName(bookTitle);
+    final filePath = '${targetDir.path}/$safeTitle.epub';
+    final file = File(filePath);
+
+    final response = await http.get(Uri.parse(downloadUrl));
+    if (response.statusCode != 200) {
+      throw Exception('Failed to download the book');
+    }
+    await file.writeAsBytes(response.bodyBytes);
+
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('$bookTitle saved to Library')),
+    );
+    setState(() {});
   }
 
   @override
@@ -102,66 +133,27 @@ class _CartScreenState extends ConsumerState<CartScreen> {
                     if (!isDownloaded)
                       downloadingIds.contains(bookId)
                           ? const SizedBox(
-                        width: 24,
-                        height: 24,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
+                              width: 24,
+                              height: 24,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
                           : IconButton(
-                        icon: const Icon(Icons.download, color: Colors.blue),
-                        onPressed: () async {
-                          setState(() => downloadingIds.add(bookId));
-                          try {
-                            final downloadUrl = book['formats']['application/epub+zip'];
-                            if (downloadUrl == null) {
-                              throw Exception('Download URL not available');
-                            }
-
-                            final status = await _requestStoragePermission();
-                            if (!status) {
-                              throw Exception('Storage permission denied. Some Error');
-                            }
-
-                            Directory? downloadsDir;
-                            if (Platform.isAndroid) {
-                              downloadsDir = Directory('/storage/emulated/0/Download');
-                            } else {
-                              downloadsDir = await getDownloadsDirectory();
-                            }
-                            if (downloadsDir == null) throw Exception('Cannot access Downloads folder');
-
-                            final visuaLitDir = Directory('${downloadsDir.path}/VisuaLit');
-                            if (!await visuaLitDir.exists()) {
-                              await visuaLitDir.create(recursive: true);
-                            }
-
-                            final fileName = '$bookTitle.epub';
-                            final filePath = '${visuaLitDir.path}/$fileName';
-                            final file = File(filePath);
-
-                            final response = await http.get(Uri.parse(downloadUrl));
-                            if (response.statusCode == 200) {
-                              await file.writeAsBytes(response.bodyBytes);
-
-                              if (!mounted) return;
-
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(content: Text('$bookTitle saved to VisuaLit folder in Downloads')),
-                              );
-                              setState(() {}); // Refresh UI to hide download button
-                            } else {
-                              throw Exception('Failed to download the book');
-                            }
-                          } catch (e) {
-                            if (mounted) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(content: Text('Error downloading $bookTitle: $e')),
-                              );
-                            }
-                          } finally {
-                            if (mounted) setState(() => downloadingIds.remove(bookId));
-                          }
-                        },
-                      ),
+                              icon: const Icon(Icons.download, color: Colors.blue),
+                              onPressed: () async {
+                                setState(() => downloadingIds.add(bookId));
+                                try {
+                                  await _downloadBook(book as Map<String, dynamic>);
+                                } catch (e) {
+                                  if (mounted) {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      SnackBar(content: Text('Error downloading ${book['title']}: $e')),
+                                    );
+                                  }
+                                } finally {
+                                  if (mounted) setState(() => downloadingIds.remove(bookId));
+                                }
+                              },
+                            ),
                     IconButton(
                       icon: const Icon(Icons.delete, color: Colors.red),
                       onPressed: () {

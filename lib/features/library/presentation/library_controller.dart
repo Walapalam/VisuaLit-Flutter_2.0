@@ -1,11 +1,10 @@
 import 'dart:convert';
 import 'dart:typed_data';
-import 'dart:math' as math; // Not used in this specific feature, but present in original file
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:isar/isar.dart';
 import 'package:visualit/core/providers/isar_provider.dart';
-import 'package:visualit/features/library/data/background_task_queue.dart'; // Not directly used in this feature, but present in original file
-import 'package:visualit/features/library/data/book_processing_task.dart'; // Not directly used in this feature, but present in original file
+import 'package:visualit/features/library/data/background_task_queue.dart';
+import 'package:visualit/features/library/data/book_processing_task.dart';
 import 'package:visualit/features/library/data/local_library_service.dart';
 import 'package:visualit/features/reader/data/book_data.dart' as db;
 import 'package:visualit/features/reader/data/toc_entry.dart';
@@ -14,7 +13,6 @@ import 'package:xml/xml.dart';
 import 'package:html/parser.dart' as html_parser;
 import 'package:html/dom.dart' as dom;
 import 'package:path/path.dart' as p;
-import 'package:visualit/core/models/book.dart';
 import 'package:path_provider/path_provider.dart';
 import 'dart:async';
 import 'dart:io';
@@ -80,19 +78,15 @@ class LibraryController extends StateNotifier<AsyncValue<List<db.Book>>> {
       Directory? visuaLitDir;
 
       if (Platform.isAndroid) {
-        // Check storage permission first
-        if (!await _localLibraryService.requestStoragePermission()) {
-          print("❌ [LibraryController] Storage permission denied for VisuaLit directory");
+        // Use app-scoped external storage; no runtime permission needed
+        final base = await getExternalStorageDirectory();
+        if (base == null) {
+          print("❌ [LibraryController] App external storage not accessible");
           return null;
         }
-
-        visuaLitDir = Directory('/storage/emulated/0/Download/VisuaLit');
+        visuaLitDir = Directory('${base.path}/VisuaLit');
       } else {
-        final downloads = await getDownloadsDirectory();
-        if (downloads == null) {
-          print("❌ [LibraryController] Downloads directory not accessible");
-          return null;
-        }
+        final downloads = await getApplicationDocumentsDirectory();
         visuaLitDir = Directory('${downloads.path}/VisuaLit');
       }
 
@@ -132,12 +126,6 @@ class LibraryController extends StateNotifier<AsyncValue<List<db.Book>>> {
       await loadBooksFromDb();
     }
   }
-
-  Future<Directory?> _getVisuaLitDirectory() async {
-    // Update this method to use the same logic
-    return await _ensureVisuaLitDirectory();
-  }
-
 
   Future<void> loadBooksFromDb() async {
     print("🔄 [LibraryController] Loading all books from database...");
@@ -623,42 +611,6 @@ class LibraryController extends StateNotifier<AsyncValue<List<db.Book>>> {
   }
 
 
-  /// Process a single chapter and extract its content blocks
-  Future<void> _processChapter({
-    required List<String> spine,
-    required int i,
-    required Map<String, String> manifest,
-    required Archive archive,
-    required int bookId,
-    required List<db.ContentBlock> allBlocks,
-  }) async {
-    final idref = spine[i];
-    final chapterPath = manifest[idref];
-    if (chapterPath == null) return;
-
-    final chapterFile = archive.findFile(chapterPath);
-    if (chapterFile == null) return;
-
-    final chapterContent = String.fromCharCodes(chapterFile.content);
-    final document = html_parser.parse(chapterContent);
-    final body = document.body;
-    if (body == null) return;
-
-    int blockCounter = 0;
-
-    // Use the robust recursive function to process the chapter body
-    _flattenAndParseElements(
-      elements: body.children,
-      targetBlockList: allBlocks,
-      bookId: bookId,
-      chapterIndex: i,
-      chapterPath: chapterPath,
-      archive: archive,
-      getNextBlockIndex: () => blockCounter++,
-    );
-
-    print("  ✅ [LibraryController] Processed chapter $i with ${blockCounter} blocks");
-  }
 
   db.BlockType _getBlockType(String? tagName) {
     switch (tagName?.toLowerCase()) {

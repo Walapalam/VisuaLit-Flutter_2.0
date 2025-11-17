@@ -351,7 +351,7 @@ class _MarketplaceScreenState extends ConsumerState<MarketplaceScreen> {
           );
 
     return Scaffold(
-      backgroundColor: Theme.of(context).colorScheme.surface,
+      backgroundColor: Theme.of(context).colorScheme.primary,
       body: SafeArea(
         child: LoadingOverlay(
           isLoading: state.isInitialLoading,

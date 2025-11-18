@@ -51,6 +51,9 @@ dependencies:
   flutter_html_table: ^3.0.0
   flutter_html_svg: ^3.0.0
   flutter_svg: ^2.0.9
+  image_picker: ^1.2.0
+  firebase_storage: ^13.0.3
+  watcher: ^1.1.0
 
 dev_dependencies:
   flutter_test:

@@ -104,6 +104,65 @@ class LibraryController extends StateNotifier<AsyncValue<List<db.Book>>> {
     }
   }
 
+  /// Copies files from temporary file picker cache to permanent app storage
+  /// Returns a new list of PickedFileData with permanent paths
+  Future<List<PickedFileData>> _copyFilesToPermanentStorage(List<PickedFileData> tempFiles) async {
+    if (tempFiles.isEmpty) return [];
+
+    print("📋 [LibraryController] Copying ${tempFiles.length} file(s) to permanent storage...");
+
+    final visuaLitDir = await _ensureVisuaLitDirectory();
+    if (visuaLitDir == null) {
+      print("❌ [LibraryController] Cannot access VisuaLit directory for permanent storage");
+      return [];
+    }
+
+    // Create books subdirectory for organized storage
+    final booksDir = Directory('${visuaLitDir.path}/books');
+    if (!await booksDir.exists()) {
+      await booksDir.create(recursive: true);
+      print("📁 [LibraryController] Created books directory: ${booksDir.path}");
+    }
+
+    final permanentFiles = <PickedFileData>[];
+
+    for (final tempFile in tempFiles) {
+      try {
+        // Extract original filename from temporary path
+        final originalFileName = p.basename(tempFile.path);
+
+        // Generate a unique filename to avoid collisions
+        // Format: originalname_timestamp_randomid.epub
+        final timestamp = DateTime.now().millisecondsSinceEpoch;
+        final randomId = timestamp.hashCode.abs() % 10000;
+        final sanitizedName = originalFileName.replaceAll(RegExp(r'[^\w\s\-\.]'), '_');
+        final nameWithoutExt = p.basenameWithoutExtension(sanitizedName);
+        final ext = p.extension(sanitizedName);
+        final uniqueFileName = '${nameWithoutExt}_${timestamp}_$randomId$ext';
+
+        final permanentPath = p.join(booksDir.path, uniqueFileName);
+        final permanentFile = File(permanentPath);
+
+        // Write the bytes to permanent storage
+        await permanentFile.writeAsBytes(tempFile.bytes);
+
+        print("✅ [LibraryController] Saved to permanent storage: $permanentPath (${tempFile.bytes.length} bytes)");
+
+        // Create new PickedFileData with permanent path
+        permanentFiles.add(PickedFileData(
+          path: permanentPath,
+          bytes: tempFile.bytes,
+        ));
+      } catch (e, s) {
+        print("❌ [LibraryController] Failed to copy ${tempFile.path} to permanent storage: $e\n$s");
+        // Continue with other files even if one fails
+      }
+    }
+
+    print("✅ [LibraryController] Successfully copied ${permanentFiles.length}/${tempFiles.length} files to permanent storage");
+    return permanentFiles;
+  }
+
   Future<void> _handleFileChange(WatchEvent event) async {
     if (event.path.toLowerCase().endsWith('.epub')) {
       if (event.type == ChangeType.ADD) {
@@ -133,6 +192,21 @@ class LibraryController extends StateNotifier<AsyncValue<List<db.Book>>> {
     try {
       final books = await _isar.books.where().sortByTitle().findAll();
       print("  [LibraryController] Found ${books.length} books in DB.");
+
+      // Check for books with temporary cache paths
+      final booksWithCachePaths = books.where((book) =>
+        book.epubFilePath.contains('/cache/file_picker/') ||
+        book.epubFilePath.contains('/cache/')
+      ).toList();
+
+      if (booksWithCachePaths.isNotEmpty) {
+        print("⚠️ [LibraryController] Found ${booksWithCachePaths.length} books with temporary cache paths:");
+        for (final book in booksWithCachePaths) {
+          print("   - ${book.title ?? 'Unknown'} (ID: ${book.id})");
+        }
+        print("   These books need to be re-imported to work properly.");
+      }
+
       state = AsyncValue.data(books);
     } catch (e, st) {
       print("❌ [LibraryController] FATAL ERROR loading books: $e");
@@ -140,16 +214,95 @@ class LibraryController extends StateNotifier<AsyncValue<List<db.Book>>> {
     }
   }
 
+  /// Check if a book has a temporary cache path that may no longer exist
+  Future<bool> hasTemporaryCachePath(int bookId) async {
+    final book = await _isar.books.get(bookId);
+    if (book == null) return false;
+    return book.epubFilePath.contains('/cache/file_picker/') ||
+           book.epubFilePath.contains('/cache/');
+  }
+
+  /// Delete a book from the library (useful for removing books with cache paths)
+  Future<void> deleteBook(int bookId) async {
+    print("🗑️ [LibraryController] Deleting book ID: $bookId");
+    try {
+      await _isar.writeTxn(() async {
+        // Delete the book
+        await _isar.books.delete(bookId);
+        // Delete associated content blocks
+        final blocks = await _isar.contentBlocks.filter().bookIdEqualTo(bookId).findAll();
+        for (final block in blocks) {
+          await _isar.contentBlocks.delete(block.id);
+        }
+      });
+      print("✅ [LibraryController] Successfully deleted book ID: $bookId");
+      await loadBooksFromDb();
+    } catch (e, s) {
+      print("❌ [LibraryController] Error deleting book: $e\n$s");
+    }
+  }
+
+  /// Scan and mark books with missing files (e.g., temporary cache paths)
+  /// This helps identify pre-loaded books that need re-importing
+  Future<List<db.Book>> findBooksWithMissingFiles() async {
+    print("🔍 [LibraryController] Scanning for books with missing files...");
+    final allBooks = await _isar.books.where().findAll();
+    final booksWithMissingFiles = <db.Book>[];
+
+    for (final book in allBooks) {
+      // Skip books downloaded from marketplace (they have empty epubFilePath initially)
+      if (book.epubFilePath.isEmpty) continue;
+
+      // Check if file exists
+      final file = File(book.epubFilePath);
+      final exists = await file.exists();
+
+      if (!exists) {
+        print("   ⚠️ Missing file: ${book.title ?? 'Unknown'} (${book.epubFilePath})");
+        booksWithMissingFiles.add(book);
+
+        // Mark as error if not already
+        if (book.status != db.ProcessingStatus.error) {
+          await _isar.writeTxn(() async {
+            book.status = db.ProcessingStatus.error;
+            book.errorMessage = 'File not found. This book needs to be re-imported.';
+            await _isar.books.put(book);
+          });
+        }
+      }
+    }
+
+    print("✅ [LibraryController] Found ${booksWithMissingFiles.length} books with missing files");
+    return booksWithMissingFiles;
+  }
+
+  /// Delete all books with missing files
+  Future<int> deleteAllBooksWithMissingFiles() async {
+    print("🗑️ [LibraryController] Deleting all books with missing files...");
+    final booksToDelete = await findBooksWithMissingFiles();
+
+    for (final book in booksToDelete) {
+      await deleteBook(book.id);
+    }
+
+    print("✅ [LibraryController] Deleted ${booksToDelete.length} books with missing files");
+    return booksToDelete.length;
+  }
+
   Future<void> pickAndProcessBooks() async {
     print("ℹ️ [LibraryController] User initiated 'pickAndProcessBooks'.");
     final files = await _localLibraryService.pickFiles();
-    await _processFiles(files);
+    // Convert temporary file picker paths to permanent storage
+    final permanentFiles = await _copyFilesToPermanentStorage(files);
+    await _processFiles(permanentFiles);
   }
 
   Future<void> scanAndProcessBooks() async {
     print("ℹ️ [LibraryController] User initiated 'scanAndProcessBooks'.");
     final files = await _localLibraryService.scanAndLoadBooks();
-    await _processFiles(files);
+    // Convert to permanent storage for consistency and safety
+    final permanentFiles = await _copyFilesToPermanentStorage(files);
+    await _processFiles(permanentFiles);
   }
 
   Future<void> retryProcessingBook(int bookId) async {

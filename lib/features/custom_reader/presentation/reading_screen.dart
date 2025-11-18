@@ -134,6 +134,25 @@ class _ReadingScreenState extends ConsumerState<ReadingScreen> {
       }
 
       _epubPath = book.epubFilePath;
+
+      // Check if the file exists before trying to parse it
+      final file = File(_epubPath!);
+      if (!await file.exists()) {
+        // Check if this is a temporary cache path that no longer exists
+        if (_epubPath!.contains('/cache/file_picker/') || _epubPath!.contains('/cache/')) {
+          setState(() {
+            _error = 'FILE_NOT_FOUND_CACHE'; // Special error code for UI handling
+            _isLoading = false;
+          });
+        } else {
+          setState(() {
+            _error = 'FILE_NOT_FOUND'; // Generic file not found
+            _isLoading = false;
+          });
+        }
+        return;
+      }
+
       final epubData = await _epubParser.parseEpub(_epubPath!);
 
       setState(() {
@@ -326,9 +345,113 @@ class _ReadingScreenState extends ConsumerState<ReadingScreen> {
 
     if (_error != null) {
       return Scaffold(
-        appBar: AppBar(title: const Text('Error')),
+        appBar: AppBar(
+          title: const Text('Cannot Open Book'),
+          leading: IconButton(
+            icon: const Icon(Icons.arrow_back),
+            onPressed: () => context.pop(),
+          ),
+        ),
         body: Center(
-          child: Text('Error loading EPUB: $_error'),
+          child: Padding(
+            padding: const EdgeInsets.all(24.0),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(
+                  Icons.error_outline,
+                  size: 64,
+                  color: Theme.of(context).colorScheme.error,
+                ),
+                const SizedBox(height: 24),
+                if (_error == 'FILE_NOT_FOUND_CACHE') ...[
+                  const Text(
+                    'Book File Missing',
+                    style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 16),
+                  const Text(
+                    'This book was imported before the storage fix and the temporary file has been cleaned up by the system.',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(fontSize: 14),
+                  ),
+                  const SizedBox(height: 8),
+                  const Text(
+                    'Please remove this book and re-import it to store it permanently.',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
+                  ),
+                  const SizedBox(height: 32),
+                  ElevatedButton.icon(
+                    onPressed: () async {
+                      final isar = await ref.read(isarInstanceProvider.future);
+                      await isar.writeTxn(() async {
+                        await isar.books.delete(widget.bookId);
+                      });
+                      if (context.mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('Book removed. You can now re-import it.'),
+                            duration: Duration(seconds: 3),
+                          ),
+                        );
+                        context.pop();
+                      }
+                    },
+                    icon: const Icon(Icons.delete_outline),
+                    label: const Text('Remove This Book'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Theme.of(context).colorScheme.error,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  TextButton(
+                    onPressed: () => context.pop(),
+                    child: const Text('Go Back'),
+                  ),
+                ] else if (_error == 'FILE_NOT_FOUND') ...[
+                  const Text(
+                    'File Not Found',
+                    style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 16),
+                  Text(
+                    'The book file may have been moved or deleted:\n\n$_epubPath',
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(fontSize: 13),
+                  ),
+                  const SizedBox(height: 32),
+                  ElevatedButton.icon(
+                    onPressed: () => context.pop(),
+                    icon: const Icon(Icons.arrow_back),
+                    label: const Text('Go Back'),
+                  ),
+                ] else ...[
+                  const Text(
+                    'Error Loading Book',
+                    style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 16),
+                  Text(
+                    _error!,
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(fontSize: 13),
+                  ),
+                  const SizedBox(height: 32),
+                  ElevatedButton.icon(
+                    onPressed: () => context.pop(),
+                    icon: const Icon(Icons.arrow_back),
+                    label: const Text('Go Back'),
+                  ),
+                ],
+              ],
+            ),
+          ),
         ),
       );
     }

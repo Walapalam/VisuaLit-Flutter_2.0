@@ -11,6 +11,69 @@ import '../../../core/providers/isar_provider.dart';
 class HomeScreen extends ConsumerWidget {
   const HomeScreen({super.key});
 
+  void _showMissingFilesDialog(BuildContext context, List<db.Book> missingBooks, dynamic libraryController) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Books Need Re-importing'),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Found ${missingBooks.length} book(s) with missing files. These were likely imported before the storage fix and need to be re-imported:',
+                style: const TextStyle(fontSize: 14),
+              ),
+              const SizedBox(height: 12),
+              ...missingBooks.take(5).map((book) => Padding(
+                padding: const EdgeInsets.symmetric(vertical: 4),
+                child: Text(
+                  '• ${book.title ?? 'Unknown Book'}',
+                  style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500),
+                ),
+              )),
+              if (missingBooks.length > 5)
+                Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 4),
+                  child: Text(
+                    '... and ${missingBooks.length - 5} more',
+                    style: const TextStyle(fontSize: 13, fontStyle: FontStyle.italic),
+                  ),
+                ),
+              const SizedBox(height: 12),
+              const Text(
+                'Would you like to remove these books from your library? You can then re-import them to store them permanently.',
+                style: TextStyle(fontSize: 13),
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('Later'),
+          ),
+          TextButton(
+            onPressed: () async {
+              Navigator.of(context).pop();
+              final count = await libraryController.deleteAllBooksWithMissingFiles();
+              if (context.mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text('Removed $count book(s). You can now re-import them.'),
+                    duration: const Duration(seconds: 4),
+                  ),
+                );
+              }
+            },
+            child: const Text('Remove All'),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final isarAsync = ref.watch(isarDBProvider);
@@ -21,6 +84,14 @@ class HomeScreen extends ConsumerWidget {
       data: (isar) {
         final libraryState = ref.watch(libraryControllerProvider);
         final libraryController = ref.read(libraryControllerProvider.notifier);
+
+        // Check for books with missing files on first load
+        WidgetsBinding.instance.addPostFrameCallback((_) async {
+          final booksWithMissingFiles = await libraryController.findBooksWithMissingFiles();
+          if (booksWithMissingFiles.isNotEmpty && context.mounted) {
+            _showMissingFilesDialog(context, booksWithMissingFiles, libraryController);
+          }
+        });
 
         final streakHistory = List<bool>.generate(42, (i) => i % 3 != 0);
 

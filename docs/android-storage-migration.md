@@ -29,6 +29,7 @@ This app migrates away from MANAGE_EXTERNAL_STORAGE and legacy external storage 
 ## Import EPUBs
 
 - Pick files (multiple) using FilePicker with withData=true.
+- Files are automatically copied to permanent app-scoped storage (`<externalFilesDir>/VisuaLit/books/`) to avoid temporary cache cleanup issues.
 - Optional: "Import Directory" lets users pick a directory and we recursively load .epub files (no broad permission).
 
 ## Export EPUBs (optional, planned)
@@ -56,6 +57,7 @@ This app migrates away from MANAGE_EXTERNAL_STORAGE and legacy external storage 
 ## Troubleshooting
 
 - If downloads fail, check network permissions and connectivity.
-- If imports don’t appear in the Library, confirm the files are valid .epub and try re-importing.
+- If imports don't appear in the Library, confirm the files are valid .epub and try re-importing.
 - On Android 13+, ensure READ_MEDIA_AUDIO is granted when scanning audiobooks via MediaStore.
+- **If books show "File not found" errors**: This can happen with books imported before the permanent storage fix. Re-import the book using the file picker to copy it to permanent storage.
 

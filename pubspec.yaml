@@ -2,7 +2,7 @@ name: visualit
 description: "An AI Powered Ebook Reader Experience"
 publish_to: 'none'
 
-version: 0.1.0+12
+version: 0.1.0+13
 environment:
   sdk: ^3.8.1
 

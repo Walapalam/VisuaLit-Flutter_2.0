@@ -313,16 +313,24 @@ class BookOverviewDialog extends ConsumerWidget {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(Icons.auto_awesome, size: 80, color: Theme.of(context).colorScheme.secondary),
+          Icon(
+            isGenerating ? Icons.hourglass_empty : Icons.auto_awesome,
+            size: 80,
+            color: Theme.of(context).colorScheme.secondary,
+          ),
           const SizedBox(height: 24),
           Text(
-            'Visualizations for "$bookTitleForLookup" not found in Appwrite.',
+            isGenerating
+                ? 'Generating Visuals...'
+                : 'Visualizations for "$bookTitleForLookup" not found in Appwrite.',
             textAlign: TextAlign.center,
             style: Theme.of(context).textTheme.headlineSmall?.copyWith(color: Colors.white),
           ),
           const SizedBox(height: 16),
           Text(
-            'Do you want to request the backend to generate them?',
+            isGenerating
+                ? 'Processing chapter, extracting entities, generating images, and uploading to Appwrite.\n\nThis may take 1-2 minutes...'
+                : 'Do you want to request the backend to generate them?',
             textAlign: TextAlign.center,
             style: Theme.of(context).textTheme.bodyLarge?.copyWith(color: Colors.white70),
           ),
@@ -330,34 +338,92 @@ class BookOverviewDialog extends ConsumerWidget {
           isGenerating
               ? Column(
             children: [
-              const CircularProgressIndicator(color: Colors.white),
+              const CircularProgressIndicator(color: Colors.white, strokeWidth: 3),
               const SizedBox(height: 16),
               Text(
-                'Requesting generation...',
-                style: Theme.of(context).textTheme.bodyLarge?.copyWith(color: Colors.white),
+                'Please wait, backend is processing...',
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: Colors.white60),
               ),
             ],
           )
               : ElevatedButton.icon(
             onPressed: () async {
               ref.read(generationLoadingProvider.notifier).state = true;
+
               try {
-                // Call your backend endpoint here with chapter data
-                await appwriteService.requestVisualGeneration(
+                print('📚 DEBUG: Starting generation request from UI');
+                print('📚 DEBUG: Using ISBN: ${localBookISBN ?? "Not available"}');
+
+                final result = await appwriteService.requestVisualGeneration(
                   bookTitle: bookTitleForLookup,
-                  bookISBN: localBookISBN, // Pass local book's ISBN
-                  chapterNumber: localChapterNumber, // Pass current chapter number
-                  chapterContent: localChapterContent, // Pass current chapter content
+                  bookISBN: localBookISBN,
+                  chapterNumber: localChapterNumber,
+                  chapterContent: localChapterContent,
                 );
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Generation request sent! Visuals should appear soon. Try reopening this dialog in a bit.')),
-                );
-                // Invalidate the provider to force a re-check after generation request
-                // This assumes your backend pushes generated visuals to Appwrite
-                ref.invalidate(bookDetailsByTitleProvider(bookTitleForLookup));
+
+                print('📚 DEBUG: Received result: $result');
+
+                if (result['success'] == true) {
+                  // Success - extract analytics if available
+                  final analysis = result['analysis'] as Map<String, dynamic>?;
+                  final durationSec = analysis?['pipeline']?['duration_sec'] as num?;
+                  final chapterId = result['chapter_id'] as String?;
+
+                  final successMessage = durationSec != null
+                      ? '✓ Visuals generated in ${durationSec.toInt()} seconds!'
+                      : '✓ Visuals generated successfully!';
+
+                  if (!context.mounted) return;
+
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text(successMessage),
+                      backgroundColor: Colors.green,
+                      duration: const Duration(seconds: 3),
+                    ),
+                  );
+
+                  print('📚 DEBUG: Chapter ID: $chapterId');
+                  print('📚 DEBUG: Invalidating provider to refresh UI');
+
+                  // Invalidate to trigger immediate refresh to visuals display
+                  ref.invalidate(bookDetailsByTitleProvider(bookTitleForLookup));
+
+                } else {
+                  // Failure - show specific error
+                  final errorMessage = result['error'] as String? ?? 'Unknown error occurred';
+                  final errorCode = result['error_code'] as String? ?? 'UNKNOWN';
+
+                  print('📚 DEBUG: Generation failed - Code: $errorCode, Message: $errorMessage');
+
+                  if (!context.mounted) return;
+
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('✗ Generation failed: $errorMessage'),
+                      backgroundColor: Colors.red,
+                      duration: const Duration(seconds: 5),
+                      action: SnackBarAction(
+                        label: 'Retry',
+                        textColor: Colors.white,
+                        onPressed: () {
+                          // User can tap generate button again
+                        },
+                      ),
+                    ),
+                  );
+                }
               } catch (e) {
+                print('📚 DEBUG: Exception during generation: $e');
+
+                if (!context.mounted) return;
+
                 ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text('Failed to request generation: $e')),
+                  SnackBar(
+                    content: Text('✗ Error: $e'),
+                    backgroundColor: Colors.red,
+                    duration: const Duration(seconds: 5),
+                  ),
                 );
               } finally {
                 ref.read(generationLoadingProvider.notifier).state = false;

@@ -32,6 +32,7 @@ import 'package:visualit/features/custom_reader/presentation/widgets/reading_nav
 import 'package:visualit/features/custom_reader/presentation/widgets/settings_speed_dial.dart';
 import 'package:visualit/features/custom_reader/presentation/widgets/visualization_speed_dial.dart';
 import 'package:flutter/services.dart';
+import 'package:visualit/core/services/isbn_lookup_service.dart';
 
 
 class ReadingScreen extends ConsumerStatefulWidget {
@@ -72,6 +73,7 @@ class _ReadingScreenState extends ConsumerState<ReadingScreen> {
   bool _isSettingsOverlayVisible = false;
   bool _isVisualizationOverlayVisible = false;
   String? _activeSettingsCategory; // null, 'text', 'theme', or 'layout'
+  String? _currentBookIsbn; // Store fetched ISBN for visualization requests
 
   @override
   void initState() {
@@ -139,6 +141,9 @@ class _ReadingScreenState extends ConsumerState<ReadingScreen> {
       setState(() {
         _epubData = epubData;
       });
+
+      // Fetch ISBN for visualization requests
+      await _fetchBookIsbn();
 
       // We'll handle navigation to the correct chapter elsewhere
     } catch (e) {
@@ -676,7 +681,7 @@ class _ReadingScreenState extends ConsumerState<ReadingScreen> {
               bottom: 80, // Adjust based on your navigation bar height
               child: BookVisualizationOverlay(
                 bookTitleForLookup: _epubData?.title ?? 'Unknown',
-                localBookISBN: null,
+                localBookISBN: _currentBookIsbn, // Pass the fetched ISBN
                 localChapterNumber: _currentChapterIndex + 1,
                 localChapterContent: _epubData?.chapters[_currentChapterIndex].content ?? '',
                 onClose: _hideVisualizationOverlay,
@@ -863,6 +868,22 @@ class _ReadingScreenState extends ConsumerState<ReadingScreen> {
         ),
       ),
     );
+  }
+
+  Future<void> _fetchBookIsbn() async {
+    if (_epubData?.title != null && _epubData!.title.isNotEmpty) {
+      try {
+        print('📚 DEBUG: Fetching ISBN for book: "${_epubData!.title}"');
+        _currentBookIsbn = await IsbnLookupService.lookupIsbnByTitle(_epubData!.title);
+        print('📚 DEBUG: Fetched ISBN: $_currentBookIsbn');
+        setState(() {}); // Update UI with fetched ISBN
+      } catch (e) {
+        print('📚 DEBUG: Failed to fetch ISBN: $e');
+        _currentBookIsbn = null;
+      }
+    } else {
+      print('📚 DEBUG: No book title available for ISBN lookup');
+    }
   }
 
   void _showBookOverviewDialog() {

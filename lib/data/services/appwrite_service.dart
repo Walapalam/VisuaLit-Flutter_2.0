@@ -6,6 +6,7 @@ import 'package:visualit/data/models/chapter.dart';
 import 'package:visualit/data/models/generated_visual.dart';
 import 'package:visualit/core/api/appwrite_client.dart';
 import 'dart:convert'; // For jsonEncode
+import 'dart:async'; // For TimeoutException
 import 'package:http/http.dart' as http; // For making HTTP requests
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 
@@ -148,7 +149,7 @@ class AppwriteService {
     return url;
   }
 
-  Future<void> requestVisualGeneration({
+  Future<Map<String, dynamic>> requestVisualGeneration({
     required String bookTitle,
     String? bookISBN,
     required int chapterNumber,
@@ -174,21 +175,79 @@ class AppwriteService {
           'chapter_number': chapterNumber,
           'chapter_content': chapterContent,
         }),
-      );
+      ).timeout(const Duration(seconds: 180)); // 3 minute timeout for long backend processing
 
       print('📚 DEBUG: Response received:');
       print('  - Status Code: ${response.statusCode}');
       print('  - Response Body: ${response.body}');
 
-      if (response.statusCode == 200 || response.statusCode == 202) {
+      if (response.statusCode == 200) {
         print('📚 DEBUG: Generation request successful');
+        try {
+          final responseData = jsonDecode(response.body) as Map<String, dynamic>;
+
+          // Check if response indicates success
+          if (responseData['status'] == 'success') {
+            return {
+              'success': true,
+              'chapter_id': responseData['chapter_id'],
+              'analysis': responseData['analysis'],
+            };
+          } else {
+            // Backend returned 200 but with error status
+            return {
+              'success': false,
+              'error': responseData['error'] ?? responseData['analysis']?['error'] ?? 'Unknown error occurred',
+              'error_code': 'BACKEND_ERROR',
+            };
+          }
+        } catch (e) {
+          // Failed to parse JSON response
+          print('📚 DEBUG: Failed to parse response JSON: $e');
+          return {
+            'success': false,
+            'error': 'Invalid response format from backend',
+            'error_code': 'PARSE_ERROR',
+          };
+        }
+      } else if (response.statusCode == 400) {
+        print('📚 DEBUG: Generation failed with status 400');
+        try {
+          final errorData = jsonDecode(response.body) as Map<String, dynamic>;
+          return {
+            'success': false,
+            'error': errorData['error'] ?? errorData['message'] ?? 'Bad request',
+            'error_code': 'VALIDATION_ERROR',
+          };
+        } catch (e) {
+          return {
+            'success': false,
+            'error': response.body.isNotEmpty ? response.body : 'Bad request error',
+            'error_code': 'VALIDATION_ERROR',
+          };
+        }
       } else {
-        print('📚 DEBUG: Generation request failed with status ${response.statusCode}');
-        throw Exception('Failed to trigger visual generation from backend (${response.statusCode}): ${response.body}');
+        print('📚 DEBUG: Unexpected status code: ${response.statusCode}');
+        return {
+          'success': false,
+          'error': 'Unexpected error (Status ${response.statusCode}): ${response.body}',
+          'error_code': 'HTTP_ERROR',
+        };
       }
+    } on TimeoutException {
+      print('📚 DEBUG: Request timed out after 180 seconds');
+      return {
+        'success': false,
+        'error': 'Request timed out after 3 minutes. The backend may still be processing.',
+        'error_code': 'TIMEOUT',
+      };
     } catch (e) {
-      print('📚 DEBUG: Error during generation request: $e');
-      rethrow;
+      print('📚 DEBUG: Network/connection error: $e');
+      return {
+        'success': false,
+        'error': 'Network error: $e',
+        'error_code': 'NETWORK_ERROR',
+      };
     }
   }
 }

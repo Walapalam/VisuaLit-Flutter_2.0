@@ -51,3 +51,7 @@ app.*.map.json
 /firebase.json
 /lib/firebase_options.dart
 /ss
+
+# Generated files
+*.g.dart
+*.freezed.dart

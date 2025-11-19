@@ -18,13 +18,52 @@ class PrivacySettingsScreen extends StatelessWidget {
         future: rootBundle.loadString('lib/features/settings/data/privacyPolicy.md'),
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
+            return const Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  CircularProgressIndicator(),
+                  SizedBox(height: 16),
+                  Text('Loading Privacy Policy...'),
+                ],
+              ),
+            );
           }
 
           if (snapshot.hasError) {
             return Center(
+              child: Padding(
+                padding: const EdgeInsets.all(24.0),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(
+                      Icons.error_outline,
+                      size: 64,
+                      color: theme.colorScheme.error,
+                    ),
+                    const SizedBox(height: 16),
+                    Text(
+                      'Error loading privacy policy',
+                      style: theme.textTheme.titleLarge?.copyWith(
+                        color: theme.colorScheme.error,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      'Please try again later',
+                      style: theme.textTheme.bodyMedium,
+                    ),
+                  ],
+                ),
+              ),
+            );
+          }
+
+          if (!snapshot.hasData || snapshot.data!.isEmpty) {
+            return Center(
               child: Text(
-                'Error loading privacy policy',
+                'No privacy policy available',
                 style: theme.textTheme.bodyLarge,
               ),
             );
@@ -37,7 +76,7 @@ class PrivacySettingsScreen extends StatelessWidget {
               children: [
                 _buildHeader(context),
                 const SizedBox(height: 24),
-                _buildPrivacyContent(context, snapshot.data ?? ''),
+                _buildPrivacyContent(context, snapshot.data!),
               ],
             ),
           );
@@ -342,4 +381,3 @@ class PrivacySettingsScreen extends StatelessWidget {
     );
   }
 }
-

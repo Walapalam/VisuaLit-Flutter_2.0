@@ -39,7 +39,7 @@ class AppwriteService {
 
   // NEW: FastAPI Backend Endpoint for triggering generation
   // Set to http://localhost:8080/parse/parse/initiate as per your instruction.
-  static const String _fastApiGenerateVisualsEndpoint = 'http://localhost:8080/parse/parse/initiate';
+  static const String _fastApiGenerateVisualsEndpoint = 'https://fastapi-backend-714527045715.asia-southeast1.run.app/parse/parse/initiate';
 
   Future<Book?> getBookByTitle(String title) async {
     print('📚 DEBUG: Attempting to fetch book by title: "$title"');

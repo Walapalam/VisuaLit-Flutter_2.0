@@ -1,6 +1,10 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-final fontSizeProvider = StateNotifierProvider<FontSizeNotifier, String>((ref) {
+final fontSizeProvider = StateProvider<double>((ref) => 16.0);
+
+final selectedFontProvider = StateProvider<String>((ref) => 'Roboto');
+
+final fontSizeNotifierProvider = StateNotifierProvider<FontSizeNotifier, String>((ref) {
   return FontSizeNotifier();
 });
 

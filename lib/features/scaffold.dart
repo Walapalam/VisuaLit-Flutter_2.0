@@ -17,46 +17,48 @@ class MainShell extends StatelessWidget {
       backgroundColor: Colors.transparent,
       extendBody: true,
       extendBodyBehindAppBar: true,
-      // The AppBar and endDrawer remain unchanged
-      appBar: AppBar(
-        title: Text(
-          'Visualit',
-          style: TextStyle(
-            fontFamily: 'Jersey20',
-            color: Theme.of(context).colorScheme.onPrimary,
-            fontSize: 35.0,
-            fontWeight: FontWeight.normal,
-          ),
-        ),
-        centerTitle: false,
-        backgroundColor: Theme.of(context).colorScheme.primary.withOpacity(0.0),
-        elevation: 0,
-        actions: [
-          IconButton(
-            icon: Icon(
-              Icons.search,
-              color: Theme.of(context).colorScheme.onPrimary,
-            ),
-            onPressed: () {
-              showSearch(
-                context: context,
-                delegate: MySearchDelegate(),
-              );
-            },
-          ),
-          Builder(
-            builder: (context) => IconButton(
-              icon: CircleAvatar(
-                backgroundColor: Theme.of(context).colorScheme.surface,
-                radius: 16,
+      // The AppBar is now conditional
+      appBar: navigationShell.currentIndex == 0
+          ? AppBar(
+              title: Text(
+                'Visualit',
+                style: TextStyle(
+                  fontFamily: 'Jersey20',
+                  color: Theme.of(context).colorScheme.onPrimary,
+                  fontSize: 35.0,
+                  fontWeight: FontWeight.normal,
+                ),
               ),
-              onPressed: () {
-                Scaffold.of(context).openEndDrawer();
-              },
-            ),
-          ),
-        ],
-      ),
+              centerTitle: false,
+              backgroundColor: Theme.of(context).colorScheme.primary.withOpacity(0.0),
+              elevation: 0,
+              actions: [
+                IconButton(
+                  icon: Icon(
+                    Icons.search,
+                    color: Theme.of(context).colorScheme.onPrimary,
+                  ),
+                  onPressed: () {
+                    showSearch(
+                      context: context,
+                      delegate: MySearchDelegate(),
+                    );
+                  },
+                ),
+                Builder(
+                  builder: (context) => IconButton(
+                    icon: CircleAvatar(
+                      backgroundColor: Theme.of(context).colorScheme.surface,
+                      radius: 16,
+                    ),
+                    onPressed: () {
+                      Scaffold.of(context).openEndDrawer();
+                    },
+                  ),
+                ),
+              ],
+            )
+          : null,
       endDrawer: const AppDrawer(),
 
       // +++ THIS IS THE MAIN CHANGE +++

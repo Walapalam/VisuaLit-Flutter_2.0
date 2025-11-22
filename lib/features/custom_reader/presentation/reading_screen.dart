@@ -682,7 +682,11 @@ class _ReadingScreenState extends ConsumerState<ReadingScreen> {
               child: BookVisualizationOverlay(
                 bookTitleForLookup: _epubData?.title ?? 'Unknown',
                 localBookISBN: _currentBookIsbn, // Pass the fetched ISBN
-                localChapterNumber: _currentChapterIndex + 1,
+                localChapterNumber: () {
+                  final chapterNum = _epubData?.chapters[_currentChapterIndex].chapterNumber ?? (_currentChapterIndex + 1);
+                  print('📖 DEBUG: Using uniform chapter number for backend: $chapterNum (Index: $_currentChapterIndex)');
+                  return chapterNum;
+                }(),
                 localChapterContent: _epubData?.chapters[_currentChapterIndex].content ?? '',
                 onClose: _hideVisualizationOverlay,
               ),

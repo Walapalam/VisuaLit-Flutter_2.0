@@ -13,12 +13,14 @@ class EpubChapter {
   final String title;
   final String href; // full path inside EPUB (normalized)
   final String content;
+  final int chapterNumber; // Uniform chapter number (1-based index)
 
   EpubChapter({
     required this.id,
     required this.title,
     required this.href,
     required this.content,
+    required this.chapterNumber,
   });
 }
 
@@ -170,6 +172,7 @@ class EpubParserService {
 
     // Step 3: Load chapter content in spine order
     final chapters = <EpubChapter>[];
+    print('📖 DEBUG: Starting chapter parsing from EPUB spine');
     for (int i = 0; i < spineItems.length; i++) {
       final itemId = spineItems[i];
       final fullPath = manifestHrefById[itemId];
@@ -179,14 +182,18 @@ class EpubParserService {
       if (chapterFile != null) {
         final content = safeDecode(chapterFile.content as List<int>);
         final chapterTitle = chapterTitles[fullPath] ?? 'Chapter ${i + 1}';
+        final chapterNum = i + 1;
+        print('📖 DEBUG: Parsed Chapter #$chapterNum - Title: "$chapterTitle"');
         chapters.add(EpubChapter(
           id: itemId,
           title: chapterTitle,
           href: fullPath,
           content: content,
+          chapterNumber: chapterNum, // 1-based chapter numbering
         ));
       }
     }
+    print('📖 DEBUG: Completed parsing ${chapters.length} chapters with uniform numbering');
 
     final cssFiles = <String, String>{};
     for (final entry in manifestMediaTypeByHref.entries) {

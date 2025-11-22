@@ -155,39 +155,69 @@ class AppwriteService {
     required int chapterNumber,
     required String chapterContent,
   }) async {
-    print('📚 DEBUG: Starting visual generation request');
-    print('📚 DEBUG: Parameters:');
-    print('  - Book Title: $bookTitle');
-    print('  - ISBN: ${bookISBN ?? "N/A"}');
-    print('  - Chapter Number: $chapterNumber');
-    print('  - Content Length: ${chapterContent.length} characters');
-    print('📚 DEBUG: Sending request to: $_fastApiGenerateVisualsEndpoint');
+
+    print('\n╔═══════════════════════════════════════════════════════════════');
+    print('║ 🚀 POST REQUEST: Visual Generation Initiated');
+    print('╠═══════════════════════════════════════════════════════════════');
+    print('║ 📍 Endpoint: $_fastApiGenerateVisualsEndpoint');
+    print('║ 📖 Book Title: $bookTitle');
+    print('║ 📚 ISBN: ${bookISBN ?? "N/A"}');
+    print('║ 📄 Chapter Number: $chapterNumber');
+    print('║ 📝 Content Length: ${chapterContent.length} characters');
+    print('║ ⏱️  Timeout: None (unlimited)');
+    print('╚═══════════════════════════════════════════════════════════════\n');
+
+    // Prepare request body
+    final requestBody = <String, dynamic>{
+      'isbn': bookISBN ?? "",
+      'book_title': bookTitle,
+      'chapter_number': chapterNumber,
+      'chapter_content': chapterContent,
+    };
+
+    print('📤 POST REQUEST BODY:');
+    print('   ${jsonEncode(requestBody).substring(0, requestBody.toString().length > 500 ? 500 : requestBody.toString().length)}${requestBody.toString().length > 500 ? '...' : ''}');
+    print('');
 
     try {
+      print('⏳ Sending POST request...');
+      final requestStartTime = DateTime.now();
+
       final response = await http.post(
         Uri.parse(_fastApiGenerateVisualsEndpoint),
         headers: <String, String>{
           'Content-Type': 'application/json; charset=UTF-8',
         },
-        body: jsonEncode(<String, dynamic>{
-          'isbn': bookISBN ?? "",
-          'book_title': bookTitle,
-          'chapter_number': chapterNumber,
-          'chapter_content': chapterContent,
-        }),
-      ).timeout(const Duration(seconds: 180)); // 3 minute timeout for long backend processing
+        body: jsonEncode(requestBody),
+      );
 
-      print('📚 DEBUG: Response received:');
-      print('  - Status Code: ${response.statusCode}');
-      print('  - Response Body: ${response.body}');
+      final requestDuration = DateTime.now().difference(requestStartTime);
+
+      print('\n╔═══════════════════════════════════════════════════════════════');
+      print('║ 📨 POST RESPONSE RECEIVED');
+      print('╠═══════════════════════════════════════════════════════════════');
+      print('║ ⏱️  Duration: ${requestDuration.inSeconds}s ${requestDuration.inMilliseconds % 1000}ms');
+      print('║ 📊 Status Code: ${response.statusCode}');
+      print('║ 📏 Response Size: ${response.body.length} bytes');
+      print('╠═══════════════════════════════════════════════════════════════');
+      print('║ 📄 Response Body:');
+      print('║ ${response.body}');
+      print('╚═══════════════════════════════════════════════════════════════\n');
 
       if (response.statusCode == 200) {
-        print('📚 DEBUG: Generation request successful');
+        print('✅ SUCCESS: Status 200 - Processing response...\n');
         try {
           final responseData = jsonDecode(response.body) as Map<String, dynamic>;
 
           // Check if response indicates success
           if (responseData['status'] == 'success') {
+            print('╔═══════════════════════════════════════════════════════════════');
+            print('║ ✅ GENERATION SUCCESSFUL');
+            print('╠═══════════════════════════════════════════════════════════════');
+            print('║ 📍 Chapter ID: ${responseData['chapter_id']}');
+            print('║ 📊 Analysis Data: ${responseData['analysis'] != null ? 'Present' : 'Missing'}');
+            print('╚═══════════════════════════════════════════════════════════════\n');
+
             return {
               'success': true,
               'chapter_id': responseData['chapter_id'],
@@ -195,6 +225,12 @@ class AppwriteService {
             };
           } else {
             // Backend returned 200 but with error status
+            print('╔═══════════════════════════════════════════════════════════════');
+            print('║ ⚠️  BACKEND ERROR (Status: ${responseData['status']})');
+            print('╠═══════════════════════════════════════════════════════════════');
+            print('║ 📄 Error: ${responseData['error'] ?? responseData['analysis']?['error'] ?? 'Unknown error'}');
+            print('╚═══════════════════════════════════════════════════════════════\n');
+
             return {
               'success': false,
               'error': responseData['error'] ?? responseData['analysis']?['error'] ?? 'Unknown error occurred',
@@ -203,7 +239,13 @@ class AppwriteService {
           }
         } catch (e) {
           // Failed to parse JSON response
-          print('📚 DEBUG: Failed to parse response JSON: $e');
+          print('╔═══════════════════════════════════════════════════════════════');
+          print('║ ❌ PARSE ERROR');
+          print('╠═══════════════════════════════════════════════════════════════');
+          print('║ 📄 Error: Failed to parse JSON response');
+          print('║ 🔍 Details: $e');
+          print('╚═══════════════════════════════════════════════════════════════\n');
+
           return {
             'success': false,
             'error': 'Invalid response format from backend',
@@ -211,15 +253,23 @@ class AppwriteService {
           };
         }
       } else if (response.statusCode == 400) {
-        print('📚 DEBUG: Generation failed with status 400');
+        print('╔═══════════════════════════════════════════════════════════════');
+        print('║ ❌ VALIDATION ERROR (Status 400)');
+        print('╠═══════════════════════════════════════════════════════════════');
         try {
           final errorData = jsonDecode(response.body) as Map<String, dynamic>;
+          print('║ 📄 Error: ${errorData['error'] ?? errorData['message'] ?? 'Bad request'}');
+          print('╚═══════════════════════════════════════════════════════════════\n');
+
           return {
             'success': false,
             'error': errorData['error'] ?? errorData['message'] ?? 'Bad request',
             'error_code': 'VALIDATION_ERROR',
           };
         } catch (e) {
+          print('║ 📄 Raw Error: ${response.body.isNotEmpty ? response.body : 'Empty response body'}');
+          print('╚═══════════════════════════════════════════════════════════════\n');
+
           return {
             'success': false,
             'error': response.body.isNotEmpty ? response.body : 'Bad request error',
@@ -227,22 +277,26 @@ class AppwriteService {
           };
         }
       } else {
-        print('📚 DEBUG: Unexpected status code: ${response.statusCode}');
+        print('╔═══════════════════════════════════════════════════════════════');
+        print('║ ❌ HTTP ERROR (Status ${response.statusCode})');
+        print('╠═══════════════════════════════════════════════════════════════');
+        print('║ 📄 Response: ${response.body}');
+        print('╚═══════════════════════════════════════════════════════════════\n');
+
         return {
           'success': false,
           'error': 'Unexpected error (Status ${response.statusCode}): ${response.body}',
           'error_code': 'HTTP_ERROR',
         };
       }
-    } on TimeoutException {
-      print('📚 DEBUG: Request timed out after 180 seconds');
-      return {
-        'success': false,
-        'error': 'Request timed out after 3 minutes. The backend may still be processing.',
-        'error_code': 'TIMEOUT',
-      };
     } catch (e) {
-      print('📚 DEBUG: Network/connection error: $e');
+      print('╔═══════════════════════════════════════════════════════════════');
+      print('║ ❌ NETWORK/CONNECTION ERROR');
+      print('╠═══════════════════════════════════════════════════════════════');
+      print('║ 📄 Error: $e');
+      print('║ 🔍 Type: ${e.runtimeType}');
+      print('╚═══════════════════════════════════════════════════════════════\n');
+
       return {
         'success': false,
         'error': 'Network error: $e',

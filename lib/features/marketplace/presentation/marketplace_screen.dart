@@ -340,8 +340,8 @@ class _MarketplaceScreenState extends ConsumerState<MarketplaceScreen> {
 
                     // Main Content (Hero + Carousel + Sections)
                     if (state.searchQuery.isEmpty) ...[
-                      // Hero Carousel (New Feature)
-                      if (state.recentBooks.isNotEmpty)
+                      // Hero Carousel - Show Bestsellers
+                      if (state.bestsellers.isNotEmpty)
                         SliverToBoxAdapter(
                           child: Padding(
                             padding: const EdgeInsets.only(
@@ -349,15 +349,35 @@ class _MarketplaceScreenState extends ConsumerState<MarketplaceScreen> {
                               bottom: 10.0,
                             ),
                             child: HeroCarousel(
-                              books: state.recentBooks.take(5).toList(),
+                              books: state.bestsellers
+                                  .where((book) {
+                                    // Only show books with cover images
+                                    final formats =
+                                        book['formats']
+                                            as Map<String, dynamic>?;
+                                    return formats != null &&
+                                        (formats['image/jpeg'] != null ||
+                                            formats.containsKey('image/jpeg'));
+                                  })
+                                  .take(5)
+                                  .toList(),
                             ),
                           ),
                         ),
 
-                      // New & Trending (Overlapped Carousel)
+                      // New & Trending (Overlapped Carousel) - Filter books without covers
                       if (state.recentBooks.isNotEmpty)
                         SliverToBoxAdapter(
-                          child: _buildCarousel(state.recentBooks),
+                          child: _buildCarousel(
+                            state.recentBooks.where((book) {
+                              // Only show books with cover images
+                              final formats =
+                                  book['formats'] as Map<String, dynamic>?;
+                              return formats != null &&
+                                  (formats['image/jpeg'] != null ||
+                                      formats.containsKey('image/jpeg'));
+                            }).toList(),
+                          ),
                         ),
 
                       // Bestsellers List (Horizontal)

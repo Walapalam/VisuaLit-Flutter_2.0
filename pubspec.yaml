@@ -55,6 +55,9 @@ dependencies:
   watcher: ^1.1.0
   overlay_support: ^1.2.1
   provider: ^6.0.5
+  flutter_markdown: ^0.7.3
+  shared_preferences: ^2.2.2
+
 
 dev_dependencies:
   flutter_test:
@@ -88,7 +91,6 @@ flutter:
     - assets/fonts/
     - assets/images/AppLogo.png
     - lib/features/settings/data/privacyPolicy.md
-
 flutter_icons:
   android: "launcher_icon"
   ios: true

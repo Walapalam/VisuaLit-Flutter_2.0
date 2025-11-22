@@ -1,8 +1,73 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_markdown/flutter_markdown.dart';
 
-class PrivacySettingsScreen extends StatelessWidget {
+class PrivacySettingsScreen extends StatefulWidget {
   const PrivacySettingsScreen({super.key});
+
+  @override
+  State<PrivacySettingsScreen> createState() => _PrivacySettingsScreenState();
+}
+
+class _PolicySectionData {
+  final String title;
+  final String content;
+  _PolicySectionData(this.title, this.content);
+}
+
+class _PrivacySettingsScreenState extends State<PrivacySettingsScreen> {
+  late Future<List<_PolicySectionData>> _policyFuture;
+  String _mainTitle = "Privacy Policy";
+  String _lastUpdated = "";
+
+  @override
+  void initState() {
+    super.initState();
+    _policyFuture = _loadAndParsePolicy();
+  }
+
+  Future<List<_PolicySectionData>> _loadAndParsePolicy() async {
+    final rawText = await rootBundle.loadString('lib/features/settings/data/privacyPolicy.md');
+    final lines = rawText.split('\n');
+
+    if (mounted) {
+      setState(() {
+        _mainTitle = lines.isNotEmpty ? lines.first.trim() : "Privacy Policy";
+        _lastUpdated = lines.length > 1 ? lines[1].trim() : "";
+      });
+    }
+
+    final List<_PolicySectionData> sections = [];
+    StringBuffer currentContent = StringBuffer();
+    String? currentTitle;
+
+    // Start parsing after the header
+    for (int i = 2; i < lines.length; i++) {
+      String line = lines[i]; // Use untrimmed line to preserve formatting
+      // Regex to find section titles like "1. Data We Collect"
+      final titleMatch = RegExp(r'^\d+\.\s+(.+)').firstMatch(line.trim());
+
+      if (titleMatch != null) {
+        // If we have content for the previous section, save it
+        if (currentTitle != null && currentContent.toString().trim().isNotEmpty) {
+          sections.add(_PolicySectionData(currentTitle, currentContent.toString().trim()));
+        }
+        // Start a new section
+        currentTitle = titleMatch.group(1)!.trim();
+        currentContent = StringBuffer();
+      } else if (currentTitle != null) {
+        // Add line to the content of the current section
+        currentContent.writeln(line);
+      }
+    }
+
+    // Add the last section
+    if (currentTitle != null && currentContent.toString().trim().isNotEmpty) {
+      sections.add(_PolicySectionData(currentTitle, currentContent.toString().trim()));
+    }
+
+    return sections;
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -11,373 +76,119 @@ class PrivacySettingsScreen extends StatelessWidget {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Privacy Policy'),
-        centerTitle: true,
         elevation: 0,
       ),
-      body: FutureBuilder<String>(
-        future: rootBundle.loadString('lib/features/settings/data/privacyPolicy.md'),
+      body: FutureBuilder<List<_PolicySectionData>>(
+        future: _policyFuture,
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  CircularProgressIndicator(),
-                  SizedBox(height: 16),
-                  Text('Loading Privacy Policy...'),
-                ],
-              ),
-            );
+            return const Center(child: CircularProgressIndicator());
+          }
+          if (snapshot.hasError || !snapshot.hasData || snapshot.data!.isEmpty) {
+            return const Center(child: Text("Could not load privacy policy."));
           }
 
-          if (snapshot.hasError) {
-            return Center(
-              child: Padding(
-                padding: const EdgeInsets.all(24.0),
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(
-                      Icons.error_outline,
-                      size: 64,
-                      color: theme.colorScheme.error,
-                    ),
-                    const SizedBox(height: 16),
-                    Text(
-                      'Error loading privacy policy',
-                      style: theme.textTheme.titleLarge?.copyWith(
-                        color: theme.colorScheme.error,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      'Please try again later',
-                      style: theme.textTheme.bodyMedium,
-                    ),
-                  ],
+          final sections = snapshot.data!;
+
+          return ListView(
+            padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 10),
+            children: [
+              Text(
+                _mainTitle,
+                style: theme.textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                _lastUpdated,
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  color: theme.colorScheme.onSurface.withOpacity(0.6),
                 ),
               ),
-            );
-          }
-
-          if (!snapshot.hasData || snapshot.data!.isEmpty) {
-            return Center(
-              child: Text(
-                'No privacy policy available',
-                style: theme.textTheme.bodyLarge,
-              ),
-            );
-          }
-
-          return SingleChildScrollView(
-            padding: const EdgeInsets.all(20.0),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                _buildHeader(context),
-                const SizedBox(height: 24),
-                _buildPrivacyContent(context, snapshot.data!),
-              ],
-            ),
+              const SizedBox(height: 24),
+              ...sections.map((section) => _PolicySection(
+                    title: section.title,
+                    content: section.content,
+                  )),
+              const SizedBox(height: 30),
+            ],
           );
         },
       ),
     );
   }
+}
 
-  Widget _buildHeader(BuildContext context) {
+class _PolicySection extends StatefulWidget {
+  final String title;
+  final String content;
+
+  const _PolicySection({required this.title, required this.content});
+
+  @override
+  State<_PolicySection> createState() => _PolicySectionState();
+}
+
+class _PolicySectionState extends State<_PolicySection> {
+  bool _isExpanded = false;
+  static const int _trimLength = 250; // Character limit before "See more"
+
+  @override
+  Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final bool isLongText = widget.content.length > _trimLength;
+
+    String displayedContent;
+    if (isLongText && !_isExpanded) {
+      int lastSpace = widget.content.lastIndexOf(' ', _trimLength);
+      displayedContent = '${widget.content.substring(0, lastSpace != -1 ? lastSpace : _trimLength)}...';
+    } else {
+      displayedContent = widget.content;
+    }
 
     return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: [
-            theme.colorScheme.primaryContainer,
-            theme.colorScheme.secondaryContainer,
-          ],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        borderRadius: BorderRadius.circular(16),
-      ),
-      child: Row(
+      margin: const EdgeInsets.only(bottom: 16),
+      padding: const EdgeInsets.symmetric(vertical: 8),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: theme.colorScheme.surface.withOpacity(0.9),
-              shape: BoxShape.circle,
-            ),
-            child: Icon(
-              Icons.privacy_tip,
-              color: theme.colorScheme.primary,
-              size: 32,
-            ),
+          Text(
+            widget.title,
+            style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
           ),
-          const SizedBox(width: 16),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Your Privacy Matters',
-                  style: theme.textTheme.titleLarge?.copyWith(
-                    fontWeight: FontWeight.bold,
-                    color: theme.colorScheme.onPrimaryContainer,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  'Learn how we protect your data',
-                  style: theme.textTheme.bodyMedium?.copyWith(
-                    color: theme.colorScheme.onPrimaryContainer.withOpacity(0.8),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildPrivacyContent(BuildContext context, String content) {
-    final theme = Theme.of(context);
-    final lines = content.split('\n');
-    final List<Widget> widgets = [];
-
-    String currentSection = '';
-    List<String> currentSectionContent = [];
-
-    for (var line in lines) {
-      line = line.trim();
-
-      if (line.isEmpty) continue;
-
-      // Check if it's a main section (numbered)
-      if (RegExp(r'^\d+\.').hasMatch(line)) {
-        // Add previous section if exists
-        if (currentSection.isNotEmpty) {
-          widgets.add(_buildSection(
-            context,
-            currentSection,
-            currentSectionContent.join('\n'),
-          ));
-          widgets.add(const SizedBox(height: 16));
-        }
-
-        currentSection = line;
-        currentSectionContent = [];
-      } else if (line.startsWith('VisuaLit Privacy Policy')) {
-        // Title
-        widgets.add(_buildTitle(context, line));
-        widgets.add(const SizedBox(height: 8));
-      } else if (line.startsWith('Last Updated:')) {
-        // Last updated date
-        widgets.add(_buildLastUpdated(context, line));
-        widgets.add(const SizedBox(height: 24));
-      } else {
-        currentSectionContent.add(line);
-      }
-    }
-
-    // Add last section
-    if (currentSection.isNotEmpty) {
-      widgets.add(_buildSection(
-        context,
-        currentSection,
-        currentSectionContent.join('\n'),
-      ));
-    }
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: widgets,
-    );
-  }
-
-  Widget _buildTitle(BuildContext context, String title) {
-    final theme = Theme.of(context);
-
-    return Text(
-      title,
-      style: theme.textTheme.headlineMedium?.copyWith(
-        fontWeight: FontWeight.bold,
-        color: theme.colorScheme.primary,
-      ),
-    );
-  }
-
-  Widget _buildLastUpdated(BuildContext context, String date) {
-    final theme = Theme.of(context);
-
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-      decoration: BoxDecoration(
-        color: theme.colorScheme.surfaceContainerHighest,
-        borderRadius: BorderRadius.circular(8),
-      ),
-      child: Text(
-        date,
-        style: theme.textTheme.bodySmall?.copyWith(
-          color: theme.colorScheme.onSurfaceVariant,
-          fontStyle: FontStyle.italic,
-        ),
-      ),
-    );
-  }
-
-  Widget _buildSection(BuildContext context, String title, String content) {
-    final theme = Theme.of(context);
-
-    // Extract section number and title
-    final match = RegExp(r'^(\d+)\.\s*(.+)$').firstMatch(title);
-    final sectionNumber = match?.group(1) ?? '';
-    final sectionTitle = match?.group(2) ?? title;
-
-    return Container(
-      decoration: BoxDecoration(
-        color: theme.colorScheme.surfaceContainerHighest.withOpacity(0.5),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: theme.colorScheme.outline.withOpacity(0.2),
-          width: 1,
-        ),
-      ),
-      child: Theme(
-        data: theme.copyWith(
-          dividerColor: Colors.transparent,
-        ),
-        child: ExpansionTile(
-          tilePadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-          childrenPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-          leading: Container(
-            width: 40,
-            height: 40,
-            decoration: BoxDecoration(
-              color: theme.colorScheme.primaryContainer,
-              shape: BoxShape.circle,
-            ),
-            child: Center(
-              child: Text(
-                sectionNumber,
-                style: theme.textTheme.titleMedium?.copyWith(
-                  fontWeight: FontWeight.bold,
-                  color: theme.colorScheme.onPrimaryContainer,
-                ),
+          const SizedBox(height: 12),
+          MarkdownBody(
+            data: displayedContent,
+            styleSheet: MarkdownStyleSheet.fromTheme(theme).copyWith(
+              p: theme.textTheme.bodyMedium?.copyWith(
+                height: 1.5,
+                color: theme.colorScheme.onSurface.withOpacity(0.8),
               ),
             ),
           ),
-          title: Text(
-            sectionTitle,
-            style: theme.textTheme.titleMedium?.copyWith(
-              fontWeight: FontWeight.bold,
-              color: theme.colorScheme.onSurface,
+          if (isLongText) ...[
+            const SizedBox(height: 8),
+            Align(
+              alignment: Alignment.centerRight,
+              child: TextButton(
+                onPressed: () {
+                  setState(() {
+                    _isExpanded = !_isExpanded;
+                  });
+                },
+                child: Text(
+                  _isExpanded ? "See less" : "See more",
+                  style: const TextStyle(
+                    color: Colors.redAccent,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
             ),
-          ),
-          children: [
-            _buildSectionContent(context, content),
           ],
-        ),
+          const SizedBox(height: 24),
+          const Divider(height: 1, thickness: 1),
+        ],
       ),
-    );
-  }
-
-  Widget _buildSectionContent(BuildContext context, String content) {
-    final theme = Theme.of(context);
-    final lines = content.split('\n');
-    final List<Widget> contentWidgets = [];
-
-    String currentSubsection = '';
-    List<String> currentSubsectionItems = [];
-
-    for (var line in lines) {
-      line = line.trim();
-      if (line.isEmpty) continue;
-
-      if (line.endsWith(':') && !line.startsWith('-')) {
-        // Subsection header
-        if (currentSubsection.isNotEmpty) {
-          contentWidgets.add(_buildSubsection(
-            context,
-            currentSubsection,
-            currentSubsectionItems,
-          ));
-          contentWidgets.add(const SizedBox(height: 12));
-        }
-        currentSubsection = line;
-        currentSubsectionItems = [];
-      } else {
-        currentSubsectionItems.add(line);
-      }
-    }
-
-    // Add last subsection
-    if (currentSubsection.isNotEmpty) {
-      contentWidgets.add(_buildSubsection(
-        context,
-        currentSubsection,
-        currentSubsectionItems,
-      ));
-    } else if (currentSubsectionItems.isNotEmpty) {
-      // No subsections, just content
-      contentWidgets.add(_buildParagraph(context, currentSubsectionItems.join(' ')));
-    }
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: contentWidgets,
-    );
-  }
-
-  Widget _buildSubsection(BuildContext context, String header, List<String> items) {
-    final theme = Theme.of(context);
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          header,
-          style: theme.textTheme.titleSmall?.copyWith(
-            fontWeight: FontWeight.bold,
-            color: theme.colorScheme.primary,
-          ),
-        ),
-        const SizedBox(height: 8),
-        ...items.map((item) => Padding(
-          padding: const EdgeInsets.only(bottom: 8),
-          child: _buildParagraph(context, item),
-        )),
-      ],
-    );
-  }
-
-  Widget _buildParagraph(BuildContext context, String text) {
-    final theme = Theme.of(context);
-
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        if (text.startsWith('-'))
-          Padding(
-            padding: const EdgeInsets.only(right: 8, top: 6),
-            child: Icon(
-              Icons.circle,
-              size: 6,
-              color: theme.colorScheme.primary,
-            ),
-          ),
-        Expanded(
-          child: Text(
-            text.startsWith('-') ? text.substring(1).trim() : text,
-            style: theme.textTheme.bodyMedium?.copyWith(
-              color: theme.colorScheme.onSurface,
-              height: 1.5,
-            ),
-          ),
-        ),
-      ],
     );
   }
 }

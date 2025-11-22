@@ -116,12 +116,13 @@ class _HelpSupportScreenState extends State<HelpSupportScreen> {
               }).toList(),
 
               // Spacing at the end of the list
-              const SizedBox(height: 20),
+              const SizedBox(height: 40),
+              _buildContactSection(),
+              const SizedBox(height: 80),
             ],
           ),
         ),
       ),
-      bottomNavigationBar: _buildContactSection(),
     );
   }
 
@@ -175,45 +176,39 @@ class _HelpSupportScreenState extends State<HelpSupportScreen> {
 
   Widget _buildContactSection() {
     final theme = Theme.of(context);
-    return SafeArea(
-      child: Container(
-        color: theme.scaffoldBackgroundColor,
-        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(
-              "Still stuck? Help is a mail away",
-              style: theme.textTheme.bodyLarge?.copyWith(
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-            const SizedBox(height: 12),
-            SizedBox(
-              width: double.infinity,
-              height: 50,
-              child: ElevatedButton(
-                onPressed: _sendEmail,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.green,
-                  foregroundColor: Colors.white,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(25),
-                  ),
-                  elevation: 0,
-                ),
-                child: const Text(
-                  "Send a message",
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ),
-            ),
-          ],
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text(
+          "Still stuck? Help is a mail away",
+          style: theme.textTheme.bodyLarge?.copyWith(
+            fontWeight: FontWeight.w600,
+          ),
         ),
-      ),
+        const SizedBox(height: 12),
+        SizedBox(
+          width: double.infinity,
+          height: 50,
+          child: ElevatedButton(
+            onPressed: _sendEmail,
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.green,
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(25),
+              ),
+              elevation: 0,
+            ),
+            child: const Text(
+              "Send a message",
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ),
+        ),
+      ],
     );
   }
 }

@@ -314,13 +314,18 @@ class _BookDetailsSheetState extends ConsumerState<BookDetailsSheet> {
   }
 
   Widget _buildStatsRow() {
+    // Calculate chapters from TOC
+    final chaptersCount = widget.book.toc.isNotEmpty
+        ? widget.book.toc.length
+        : (widget.book.totalChapters > 0 ? widget.book.totalChapters : null);
+
     return Row(
       children: [
         Expanded(
           child: _buildStatItem(
             icon: Icons.menu_book,
             label: 'Chapters',
-            value: '${widget.book.totalChapters}',
+            value: chaptersCount != null ? '$chaptersCount' : 'N/A',
           ),
         ),
         Expanded(

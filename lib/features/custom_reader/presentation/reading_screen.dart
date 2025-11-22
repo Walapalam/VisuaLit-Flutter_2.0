@@ -32,15 +32,12 @@ import 'package:visualit/features/custom_reader/presentation/widgets/reading_nav
 import 'package:visualit/features/custom_reader/presentation/widgets/settings_speed_dial.dart';
 import 'package:visualit/features/custom_reader/presentation/widgets/visualization_speed_dial.dart';
 import 'package:flutter/services.dart';
-
+import 'package:visualit/features/reader/application/throttled_reading_progress_notifier.dart';
 
 class ReadingScreen extends ConsumerStatefulWidget {
   final int bookId;
 
-  const ReadingScreen({
-    Key? key,
-    required this.bookId,
-  }) : super(key: key);
+  const ReadingScreen({Key? key, required this.bookId}) : super(key: key);
 
   @override
   ConsumerState<ReadingScreen> createState() => _ReadingScreenState();
@@ -68,7 +65,7 @@ class _ReadingScreenState extends ConsumerState<ReadingScreen> {
 
   bool _isLocked = false;
 
-// Add to _ReadingScreenState in reading_screen.dart
+  // Add to _ReadingScreenState in reading_screen.dart
   bool _isSettingsOverlayVisible = false;
   bool _isVisualizationOverlayVisible = false;
   String? _activeSettingsCategory; // null, 'text', 'theme', or 'layout'
@@ -76,11 +73,39 @@ class _ReadingScreenState extends ConsumerState<ReadingScreen> {
   @override
   void initState() {
     super.initState();
+    // Set reading session start time for streak tracking
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final existingSessionStart = ref.read(readingSessionStartProvider);
+      final now = DateTime.now();
+
+      if (existingSessionStart == null) {
+        // New session
+        ref.read(readingSessionStartProvider.notifier).state = now;
+        print('📖 Reading Session: STARTED at ${now.toString()}');
+        print('📖 Session Start Time: ${now.hour}:${now.minute}:${now.second}');
+      } else {
+        // Continuing existing session
+        final elapsed = now.difference(existingSessionStart);
+        print(
+          '📖 Reading Session: RESUMED (session started ${elapsed.inMinutes} minutes ago)',
+        );
+        print(
+          '📖 Original Start Time: ${existingSessionStart.hour}:${existingSessionStart.minute}:${existingSessionStart.second}',
+        );
+        print('📖 Current Time: ${now.hour}:${now.minute}:${now.second}');
+        print(
+          '📖 Total Elapsed: ${elapsed.inMinutes} min ${elapsed.inSeconds % 60} sec',
+        );
+      }
+    });
     _initializeController();
     _startHideOverlayTimer();
     //_loadBookAndEpub();
     // Ensure the system UI is visible when the screen is first loaded
-    SystemChrome.setEnabledSystemUIMode(SystemUiMode.manual, overlays: SystemUiOverlay.values);
+    SystemChrome.setEnabledSystemUIMode(
+      SystemUiMode.manual,
+      overlays: SystemUiOverlay.values,
+    );
   }
 
   // Method to toggle the overlay and system UI
@@ -89,7 +114,10 @@ class _ReadingScreenState extends ConsumerState<ReadingScreen> {
       _showOverlay = !_showOverlay;
       if (_showOverlay) {
         _startHideOverlayTimer();
-        SystemChrome.setEnabledSystemUIMode(SystemUiMode.manual, overlays: SystemUiOverlay.values);
+        SystemChrome.setEnabledSystemUIMode(
+          SystemUiMode.manual,
+          overlays: SystemUiOverlay.values,
+        );
       } else {
         _cancelHideOverlayTimer();
         SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
@@ -139,9 +167,11 @@ class _ReadingScreenState extends ConsumerState<ReadingScreen> {
       final file = File(_epubPath!);
       if (!await file.exists()) {
         // Check if this is a temporary cache path that no longer exists
-        if (_epubPath!.contains('/cache/file_picker/') || _epubPath!.contains('/cache/')) {
+        if (_epubPath!.contains('/cache/file_picker/') ||
+            _epubPath!.contains('/cache/')) {
           setState(() {
-            _error = 'FILE_NOT_FOUND_CACHE'; // Special error code for UI handling
+            _error =
+                'FILE_NOT_FOUND_CACHE'; // Special error code for UI handling
             _isLoading = false;
           });
         } else {
@@ -174,7 +204,10 @@ class _ReadingScreenState extends ConsumerState<ReadingScreen> {
         _isLoading = true;
       });
 
-      log('Initializing reading controller for bookId: ${widget.bookId}', name: '_ReadingScreenState');
+      log(
+        'Initializing reading controller for bookId: ${widget.bookId}',
+        name: '_ReadingScreenState',
+      );
       final isar = await ref.read(isarInstanceProvider.future);
       _readingController = NewReadingController(isar);
 
@@ -185,10 +218,14 @@ class _ReadingScreenState extends ConsumerState<ReadingScreen> {
       final progress = await _readingController!.loadProgress(widget.bookId);
 
       if (progress != null) {
-        _currentChapterIndex = _getChapterIndexFromHref(progress.lastChapterHref);
+        _currentChapterIndex = _getChapterIndexFromHref(
+          progress.lastChapterHref,
+        );
         _currentScrollOffset = progress.lastScrollOffset;
-        log('Restored progress: ChapterIndex=$_currentChapterIndex, ScrollOffset=$_currentScrollOffset',
-            name: '_ReadingScreenState');
+        log(
+          'Restored progress: ChapterIndex=$_currentChapterIndex, ScrollOffset=$_currentScrollOffset',
+          name: '_ReadingScreenState',
+        );
       }
 
       // Initialize PageController with the correct starting page
@@ -209,30 +246,49 @@ class _ReadingScreenState extends ConsumerState<ReadingScreen> {
         // Give more time for the PageView to settle on the correct page
         Future.delayed(const Duration(milliseconds: 500), () {
           if (_scrollController.hasClients && mounted) {
-            log('Attempting to apply scroll offset: $_currentScrollOffset', name: '_ReadingScreenState');
+            log(
+              'Attempting to apply scroll offset: $_currentScrollOffset',
+              name: '_ReadingScreenState',
+            );
 
             try {
               // If the scroll position is valid, jump to it
               if (_currentScrollOffset > 0 &&
-                  _currentScrollOffset < _scrollController.position.maxScrollExtent) {
+                  _currentScrollOffset <
+                      _scrollController.position.maxScrollExtent) {
                 _scrollController.jumpTo(_currentScrollOffset);
-                log('Jump to scroll offset successful: $_currentScrollOffset', name: '_ReadingScreenState');
+                log(
+                  'Jump to scroll offset successful: $_currentScrollOffset',
+                  name: '_ReadingScreenState',
+                );
               } else {
-                log('Invalid scroll offset: $_currentScrollOffset (max: ${_scrollController.position.maxScrollExtent})',
-                    name: '_ReadingScreenState');
+                log(
+                  'Invalid scroll offset: $_currentScrollOffset (max: ${_scrollController.position.maxScrollExtent})',
+                  name: '_ReadingScreenState',
+                );
               }
             } catch (e) {
-              log('Error applying scroll offset: $e', name: '_ReadingScreenState');
+              log(
+                'Error applying scroll offset: $e',
+                name: '_ReadingScreenState',
+              );
             }
           } else {
-            log('ScrollController has no clients when trying to restore position', name: '_ReadingScreenState');
+            log(
+              'ScrollController has no clients when trying to restore position',
+              name: '_ReadingScreenState',
+            );
           }
         });
       });
 
       _scrollController.addListener(_onScroll);
     } catch (e) {
-      log('Error initializing controller: $e', name: '_ReadingScreenState', error: e);
+      log(
+        'Error initializing controller: $e',
+        name: '_ReadingScreenState',
+        error: e,
+      );
       setState(() {
         _error = e.toString();
         _isLoading = false;
@@ -240,15 +296,15 @@ class _ReadingScreenState extends ConsumerState<ReadingScreen> {
     }
   }
 
-  String injectCssAndAdjustStyles(String htmlContent, List<String> cssContents) {
+  String injectCssAndAdjustStyles(
+    String htmlContent,
+    List<String> cssContents,
+  ) {
     final cssBlock = cssContents.map((css) => '<style>$css</style>').join('\n');
-    htmlContent = htmlContent.replaceFirst(
-      '</head>',
-      '$cssBlock\n</head>',
-    );
+    htmlContent = htmlContent.replaceFirst('</head>', '$cssBlock\n</head>');
     htmlContent = htmlContent.replaceAllMapped(
       RegExp(r'(<img[^>]*class="(?:calibre11|calibre12)"[^>]*>)'),
-          (match) => '<div style="text-align:center;">${match.group(1)}</div>',
+      (match) => '<div style="text-align:center;">${match.group(1)}</div>',
     );
     htmlContent = htmlContent.replaceAll(
       '<p ',
@@ -261,7 +317,10 @@ class _ReadingScreenState extends ConsumerState<ReadingScreen> {
     try {
       // Add null check to ensure _readingController is not null
       if (_readingController == null) {
-        log('Cannot restore reading progress: _readingController is null', name: '_ReadingScreenState');
+        log(
+          'Cannot restore reading progress: _readingController is null',
+          name: '_ReadingScreenState',
+        );
         return;
       }
 
@@ -269,7 +328,8 @@ class _ReadingScreenState extends ConsumerState<ReadingScreen> {
       if (progress != null && _epubData != null) {
         // Find the chapter index from href
         int chapterIndex = _epubData!.chapters.indexWhere(
-                (chapter) => chapter.href == progress.lastChapterHref);
+          (chapter) => chapter.href == progress.lastChapterHref,
+        );
 
         if (chapterIndex >= 0) {
           setState(() {
@@ -278,8 +338,10 @@ class _ReadingScreenState extends ConsumerState<ReadingScreen> {
             _pendingScrollOffset = progress.lastScrollOffset;
           });
 
-          log('Restored progress: ChapterIndex=$chapterIndex, ScrollOffset=${progress.lastScrollOffset}',
-              name: '_ReadingScreenState');
+          log(
+            'Restored progress: ChapterIndex=$chapterIndex, ScrollOffset=${progress.lastScrollOffset}',
+            name: '_ReadingScreenState',
+          );
 
           // Change the page - this will trigger the itemBuilder
           _pageController.jumpToPage(chapterIndex);
@@ -302,11 +364,14 @@ class _ReadingScreenState extends ConsumerState<ReadingScreen> {
 
       // Schedule a new save with debouncing
       _saveDebounceTimer = Timer(const Duration(seconds: 1), () {
-        log('Debounced save triggered. ScrollOffset=$_currentScrollOffset', name: '_ReadingScreenState');
+        log(
+          'Debounced save triggered. ScrollOffset=$_currentScrollOffset',
+          name: '_ReadingScreenState',
+        );
         _saveProgress(
-            bookIndex: widget.bookId,
-            chapterIndex: _currentChapterIndex,
-            scrollOffset: _currentScrollOffset
+          bookIndex: widget.bookId,
+          chapterIndex: _currentChapterIndex,
+          scrollOffset: _currentScrollOffset,
         );
       });
     }
@@ -315,7 +380,9 @@ class _ReadingScreenState extends ConsumerState<ReadingScreen> {
   int _getChapterIndexFromHref(String href) {
     if (_epubData == null) return 0;
 
-    final index = _epubData!.chapters.indexWhere((chapter) => chapter.href == href);
+    final index = _epubData!.chapters.indexWhere(
+      (chapter) => chapter.href == href,
+    );
     return index >= 0 ? index : 0;
   }
 
@@ -323,14 +390,37 @@ class _ReadingScreenState extends ConsumerState<ReadingScreen> {
     return _epubData?.chapters[index].href ?? '';
   }
 
-  Future<void> _saveProgress({required int bookIndex, required int chapterIndex, required double scrollOffset}) async {
-    log('Saving progress: BookId=$bookIndex, ChapterIndex=$chapterIndex, ScrollOffset=$scrollOffset', name: '_ReadingScreenState');
+  Future<void> _saveProgress({
+    required int bookIndex,
+    required int chapterIndex,
+    required double scrollOffset,
+  }) async {
+    final sessionStart = ref.read(readingSessionStartProvider);
+    if (sessionStart != null) {
+      final elapsed = DateTime.now().difference(sessionStart);
+      print(
+        '📖 Reading Progress: Saving after ${elapsed.inMinutes} min ${elapsed.inSeconds % 60} sec of reading',
+      );
+    }
+
+    log(
+      'Saving progress: BookId=$bookIndex, ChapterIndex=$chapterIndex, ScrollOffset=$scrollOffset',
+      name: '_ReadingScreenState',
+    );
     if (_readingController != null && _epubData != null) {
       final chapterHref = _getChapterHrefFromIndex(chapterIndex);
       if (chapterHref.isNotEmpty) {
-        await _readingController!.saveProgress(bookIndex, chapterHref, scrollOffset);
+        await _readingController!.saveProgress(
+          bookIndex,
+          chapterHref,
+          scrollOffset,
+          sessionStart: sessionStart,
+        );
       } else {
-        log('Warning: Could not save progress - invalid chapter href', name: '_ReadingScreenState');
+        log(
+          'Warning: Could not save progress - invalid chapter href',
+          name: '_ReadingScreenState',
+        );
       }
     }
   }
@@ -338,9 +428,7 @@ class _ReadingScreenState extends ConsumerState<ReadingScreen> {
   @override
   Widget build(BuildContext context) {
     if (_isLoading) {
-      return const Scaffold(
-        body: Center(child: CircularProgressIndicator()),
-      );
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
 
     if (_error != null) {
@@ -392,7 +480,9 @@ class _ReadingScreenState extends ConsumerState<ReadingScreen> {
                       if (context.mounted) {
                         ScaffoldMessenger.of(context).showSnackBar(
                           const SnackBar(
-                            content: Text('Book removed. You can now re-import it.'),
+                            content: Text(
+                              'Book removed. You can now re-import it.',
+                            ),
                             duration: Duration(seconds: 3),
                           ),
                         );
@@ -404,7 +494,10 @@ class _ReadingScreenState extends ConsumerState<ReadingScreen> {
                     style: ElevatedButton.styleFrom(
                       backgroundColor: Theme.of(context).colorScheme.error,
                       foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 24,
+                        vertical: 12,
+                      ),
                     ),
                   ),
                   const SizedBox(height: 12),
@@ -469,345 +562,445 @@ class _ReadingScreenState extends ConsumerState<ReadingScreen> {
         return false; // Prevent default pop (backgrounding)
       },
       child: Scaffold(
-      body: Stack(
-        children: [
-          // Chapter content with tap to toggle overlay
-          Positioned.fill(
-            child: Listener(
-              onPointerMove: (_) {
-                if (_showOverlay) {
-                  _resetHideOverlayTimer();
-                }
-              },
-              child: GestureDetector(
-                onTap: _isLocked ? null : _toggleOverlay, // Use the new toggle method
-                child: PageView.builder(
-                  controller: _pageController,
-                  itemCount: _epubData?.chapters.length ?? 0,
-                onPageChanged: (index) {
-                  setState(() {
-                    _currentChapterIndex = index;
-                    // Don't reset _currentScrollOffset to 0.0 here
-                  });
-
-                  log("PageView changed to chapter index: $index, Current Scroll Offset: $_currentScrollOffset", name: '_ReadingScreenState');
-
-                  // Save progress when chapter changes
-                  _saveProgress(
-                    bookIndex: widget.bookId,
-                    chapterIndex: _currentChapterIndex,
-                    scrollOffset: 0.0, // Starting at the top of the new chapter
-                  );
-
-                  _currentScrollOffset = 0.0;
-                  // Debug log
-                  log('Page changed to chapter $index, resetting scroll to 0.0', name: '_ReadingScreenState');
+        body: Stack(
+          children: [
+            // Chapter content with tap to toggle overlay
+            Positioned.fill(
+              child: Listener(
+                onPointerMove: (_) {
+                  if (_showOverlay) {
+                    _resetHideOverlayTimer();
+                  }
                 },
-                itemBuilder: (context, index) {
-                  final chapter = _epubData!.chapters[index];
-                  debugPrint('Rendering chapter $index: ${chapter.href}');
-                  final prefs = ref.watch(readingPreferencesProvider);
+                child: GestureDetector(
+                  onTap: _isLocked
+                      ? null
+                      : _toggleOverlay, // Use the new toggle method
+                  child: PageView.builder(
+                    controller: _pageController,
+                    itemCount: _epubData?.chapters.length ?? 0,
+                    onPageChanged: (index) {
+                      setState(() {
+                        _currentChapterIndex = index;
+                        // Don't reset _currentScrollOffset to 0.0 here
+                      });
 
-                  // Parse CSS styles as fallback
-                  Map<String, Style> htmlStyles = _cssParser.parseCssToHtmlStyles(_epubData!.cssFiles);
-
-                  if (prefs.fontSize != 18.0 || prefs.fontFamily != 'Georgia' || prefs.lineHeight != 1.6 || prefs.brightness != 1.0) {
-                    // Base style with preferences
-                    final baseStyle = prefs.baseTextStyle.copyWith(
-                      color: prefs.textColor,
-                    );
-
-                    // Override common tags
-                    htmlStyles['body'] = Style(
-                      fontSize: FontSize(prefs.fontSize),
-                      fontFamily: prefs.fontFamily,
-                      color: prefs.textColor,
-                      lineHeight: LineHeight(prefs.lineHeight),
-                      textAlign: TextAlign.justify,
-                    );
-                    htmlStyles['p'] = htmlStyles['body'] ?? Style();
-                    for (int i = 1; i <= 6; i++) {
-                      htmlStyles['h$i'] = Style(
-                        fontSize: FontSize(prefs.getStyleForHeading(i).fontSize ?? prefs.fontSize),
-                        fontFamily: prefs.fontFamily,
-                        color: prefs.textColor,
-                        fontWeight: prefs.getStyleForHeading(i).fontWeight,
-                        lineHeight: LineHeight(prefs.lineHeight),
-                        textAlign: TextAlign.center,
+                      log(
+                        "PageView changed to chapter index: $index, Current Scroll Offset: $_currentScrollOffset",
+                        name: '_ReadingScreenState',
                       );
-                    }
-                  }
 
-                  // Create a local controller variable
-                  ScrollController chapterScrollController;
+                      // Save progress when chapter changes
+                      _saveProgress(
+                        bookIndex: widget.bookId,
+                        chapterIndex: _currentChapterIndex,
+                        scrollOffset:
+                            0.0, // Starting at the top of the new chapter
+                      );
 
-                  // If this is the current chapter being restored, use a special approach
-                  if (index == _currentChapterIndex) {
-                    // Use the main scroll controller
-                    chapterScrollController = _scrollController;
+                      _currentScrollOffset = 0.0;
+                      // Debug log
+                      log(
+                        'Page changed to chapter $index, resetting scroll to 0.0',
+                        name: '_ReadingScreenState',
+                      );
+                    },
+                    itemBuilder: (context, index) {
+                      final chapter = _epubData!.chapters[index];
+                      debugPrint('Rendering chapter $index: ${chapter.href}');
+                      final prefs = ref.watch(readingPreferencesProvider);
 
-                    // Use a post-frame callback to set the scroll position after the widget is built
-                    WidgetsBinding.instance.addPostFrameCallback((_) {
-                      if (chapterScrollController.hasClients) {
-                        log('Applying scroll offset: $_currentScrollOffset to chapter $index', name: '_ReadingScreenState');
-                        try {
-                          // Apply the saved scroll position
-                          chapterScrollController.jumpTo(_currentScrollOffset);
-                        } catch (e) {
-                          log('Error applying scroll offset: $e', name: '_ReadingScreenState');
+                      // Parse CSS styles as fallback
+                      Map<String, Style> htmlStyles = _cssParser
+                          .parseCssToHtmlStyles(_epubData!.cssFiles);
+
+                      if (prefs.fontSize != 18.0 ||
+                          prefs.fontFamily != 'Georgia' ||
+                          prefs.lineHeight != 1.6 ||
+                          prefs.brightness != 1.0) {
+                        // Base style with preferences
+                        final baseStyle = prefs.baseTextStyle.copyWith(
+                          color: prefs.textColor,
+                        );
+
+                        // Override common tags
+                        htmlStyles['body'] = Style(
+                          fontSize: FontSize(prefs.fontSize),
+                          fontFamily: prefs.fontFamily,
+                          color: prefs.textColor,
+                          lineHeight: LineHeight(prefs.lineHeight),
+                          textAlign: TextAlign.justify,
+                        );
+                        htmlStyles['p'] = htmlStyles['body'] ?? Style();
+                        for (int i = 1; i <= 6; i++) {
+                          htmlStyles['h$i'] = Style(
+                            fontSize: FontSize(
+                              prefs.getStyleForHeading(i).fontSize ??
+                                  prefs.fontSize,
+                            ),
+                            fontFamily: prefs.fontFamily,
+                            color: prefs.textColor,
+                            fontWeight: prefs.getStyleForHeading(i).fontWeight,
+                            lineHeight: LineHeight(prefs.lineHeight),
+                            textAlign: TextAlign.center,
+                          );
                         }
-                      } else {
-                        log('ScrollController has no clients in post-frame callback', name: '_ReadingScreenState');
                       }
-                    });
-                  } else {
-                    // For non-active chapters, use a separate controller
-                    chapterScrollController = ScrollController();
-                  }
 
-                  return Container(
-                    color: prefs.pageColor,
-                    padding: EdgeInsets.only(
-                      left: 2.0,//prefs.leftPadding,
-                      right: 2.0, //prefs.rightPadding,
-                      top: 0.0,
-                      bottom: prefs.bottomPadding,
-                    ),
-                    child: SingleChildScrollView(
-                    controller: chapterScrollController,
-                      padding: const EdgeInsets.symmetric(horizontal: 0.0, vertical: 100.0),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const SizedBox(height: 16),
-                        Html(
-                          data: chapter.content, // Use processed content with local file URIs
-                          style: htmlStyles,
-                          extensions: [
-                            // Existing img tag extension
-                            TagExtension(
-                              tagsToExtend: {"img"},
-                              builder: (context) {
-                                final src = context.attributes['src'];
-                                if (src != null && src.isNotEmpty) {
-                                  return _buildImageWidget(src, _epubData!.chapters[_currentChapterIndex].href);
-                                }
-                                return const SizedBox.shrink();
-                              },
-                            ),
+                      // Create a local controller variable
+                      ScrollController chapterScrollController;
 
-                            // NEW: Separate SVG image extension
-                            TagExtension(
-                              tagsToExtend: {"image"},
-                              builder: (context) {
-                                print('DEBUG: Processing SVG image element');
-                                print('DEBUG: All attributes: ${context.attributes}');
+                      // If this is the current chapter being restored, use a special approach
+                      if (index == _currentChapterIndex) {
+                        // Use the main scroll controller
+                        chapterScrollController = _scrollController;
 
-                                // Get the href from xlink:href or href attribute
-                                final xlinkHref = context.attributes['xlink:href'];
-                                final href = context.attributes['href'];
-                                final imageRef = xlinkHref ?? href;
+                        // Use a post-frame callback to set the scroll position after the widget is built
+                        WidgetsBinding.instance.addPostFrameCallback((_) {
+                          if (chapterScrollController.hasClients) {
+                            log(
+                              'Applying scroll offset: $_currentScrollOffset to chapter $index',
+                              name: '_ReadingScreenState',
+                            );
+                            try {
+                              // Apply the saved scroll position
+                              chapterScrollController.jumpTo(
+                                _currentScrollOffset,
+                              );
+                            } catch (e) {
+                              log(
+                                'Error applying scroll offset: $e',
+                                name: '_ReadingScreenState',
+                              );
+                            }
+                          } else {
+                            log(
+                              'ScrollController has no clients in post-frame callback',
+                              name: '_ReadingScreenState',
+                            );
+                          }
+                        });
+                      } else {
+                        // For non-active chapters, use a separate controller
+                        chapterScrollController = ScrollController();
+                      }
 
-                                print('DEBUG: xlink:href=$xlinkHref, href=$href, final=$imageRef');
+                      return Container(
+                        color: prefs.pageColor,
+                        padding: EdgeInsets.only(
+                          left: 2.0, //prefs.leftPadding,
+                          right: 2.0, //prefs.rightPadding,
+                          top: 0.0,
+                          bottom: prefs.bottomPadding,
+                        ),
+                        child: SingleChildScrollView(
+                          controller: chapterScrollController,
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 0.0,
+                            vertical: 100.0,
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const SizedBox(height: 16),
+                              Html(
+                                data: chapter
+                                    .content, // Use processed content with local file URIs
+                                style: htmlStyles,
+                                extensions: [
+                                  // Existing img tag extension
+                                  TagExtension(
+                                    tagsToExtend: {"img"},
+                                    builder: (context) {
+                                      final src = context.attributes['src'];
+                                      if (src != null && src.isNotEmpty) {
+                                        return _buildImageWidget(
+                                          src,
+                                          _epubData!
+                                              .chapters[_currentChapterIndex]
+                                              .href,
+                                        );
+                                      }
+                                      return const SizedBox.shrink();
+                                    },
+                                  ),
 
-                                if (imageRef != null && imageRef.isNotEmpty) {
-                                  print('DEBUG: Building SVG image widget for: $imageRef');
-                                  return _buildImageWidget(imageRef, _epubData!.chapters[_currentChapterIndex].href);
-                                }
+                                  // NEW: Separate SVG image extension
+                                  TagExtension(
+                                    tagsToExtend: {"image"},
+                                    builder: (context) {
+                                      print(
+                                        'DEBUG: Processing SVG image element',
+                                      );
+                                      print(
+                                        'DEBUG: All attributes: ${context.attributes}',
+                                      );
 
-                                print('DEBUG: No valid href found in SVG image element');
-                                return const SizedBox.shrink();
-                              },
-                            ),
-
-                            ImageExtension(
-                              builder: (extensionContext) {
-                                final src = extensionContext.attributes['src'];
-                                if (src != null && src.isNotEmpty) {
-                                  return _buildImageWidget(src, _epubData!.chapters[_currentChapterIndex].href);
-                                }
-                                return const SizedBox.shrink();
-                              },
-                            ),
-
-                            TableHtmlExtension(),
-
-                            TagExtension(
-                              tagsToExtend: {"svg"},
-                              builder: (context) {
-                                print('DEBUG: Processing SVG element with attributes: ${context.attributes}');
-
-                                // Get the raw SVG content
-                                final element = context.element;
-                                if (element != null) {
-                                  print('DEBUG: Full SVG element HTML: ${element.outerHtml}');
-                                  print('DEBUG: SVG children count: ${element.children.length}');
-
-                                  // Check each child element
-                                  for (int i = 0; i < element.children.length; i++) {
-                                    final child = element.children[i];
-                                    print('DEBUG: SVG child $i: tag=${child.localName}, attributes=${child.attributes}');
-
-                                    if (child.localName == 'image') {
-                                      // print(child.attributes.entries.last.value);
-                                      final xlinkHref = child.attributes.entries.last.value;
-                                      final href = child.attributes['href'];
+                                      // Get the href from xlink:href or href attribute
+                                      final xlinkHref =
+                                          context.attributes['xlink:href'];
+                                      final href = context.attributes['href'];
                                       final imageRef = xlinkHref ?? href;
 
-                                      print('DEBUG: Found image child with href: $imageRef');
+                                      print(
+                                        'DEBUG: xlink:href=$xlinkHref, href=$href, final=$imageRef',
+                                      );
 
-                                      if (imageRef != null && imageRef.isNotEmpty) {
-                                        return _buildImageWidget(imageRef, _epubData!.chapters[_currentChapterIndex].href);
+                                      if (imageRef != null &&
+                                          imageRef.isNotEmpty) {
+                                        print(
+                                          'DEBUG: Building SVG image widget for: $imageRef',
+                                        );
+                                        return _buildImageWidget(
+                                          imageRef,
+                                          _epubData!
+                                              .chapters[_currentChapterIndex]
+                                              .href,
+                                        );
                                       }
-                                    }
-                                  }
-                                }
 
-                                return const SizedBox.shrink();
-                              },
-                            ),
+                                      print(
+                                        'DEBUG: No valid href found in SVG image element',
+                                      );
+                                      return const SizedBox.shrink();
+                                    },
+                                  ),
 
-                            SvgHtmlExtension(
-                              networkSchemas: ["https", "http", "file"],
-                              extension: "svg",
-                              dataEncoding: "base64",
-                              dataMimeType: "image/svg+xml",
-                            ),
-                          ],
+                                  ImageExtension(
+                                    builder: (extensionContext) {
+                                      final src =
+                                          extensionContext.attributes['src'];
+                                      if (src != null && src.isNotEmpty) {
+                                        return _buildImageWidget(
+                                          src,
+                                          _epubData!
+                                              .chapters[_currentChapterIndex]
+                                              .href,
+                                        );
+                                      }
+                                      return const SizedBox.shrink();
+                                    },
+                                  ),
+
+                                  TableHtmlExtension(),
+
+                                  TagExtension(
+                                    tagsToExtend: {"svg"},
+                                    builder: (context) {
+                                      print(
+                                        'DEBUG: Processing SVG element with attributes: ${context.attributes}',
+                                      );
+
+                                      // Get the raw SVG content
+                                      final element = context.element;
+                                      if (element != null) {
+                                        print(
+                                          'DEBUG: Full SVG element HTML: ${element.outerHtml}',
+                                        );
+                                        print(
+                                          'DEBUG: SVG children count: ${element.children.length}',
+                                        );
+
+                                        // Check each child element
+                                        for (
+                                          int i = 0;
+                                          i < element.children.length;
+                                          i++
+                                        ) {
+                                          final child = element.children[i];
+                                          print(
+                                            'DEBUG: SVG child $i: tag=${child.localName}, attributes=${child.attributes}',
+                                          );
+
+                                          if (child.localName == 'image') {
+                                            // print(child.attributes.entries.last.value);
+                                            final xlinkHref = child
+                                                .attributes
+                                                .entries
+                                                .last
+                                                .value;
+                                            final href =
+                                                child.attributes['href'];
+                                            final imageRef = xlinkHref ?? href;
+
+                                            print(
+                                              'DEBUG: Found image child with href: $imageRef',
+                                            );
+
+                                            if (imageRef != null &&
+                                                imageRef.isNotEmpty) {
+                                              return _buildImageWidget(
+                                                imageRef,
+                                                _epubData!
+                                                    .chapters[_currentChapterIndex]
+                                                    .href,
+                                              );
+                                            }
+                                          }
+                                        }
+                                      }
+
+                                      return const SizedBox.shrink();
+                                    },
+                                  ),
+
+                                  SvgHtmlExtension(
+                                    networkSchemas: ["https", "http", "file"],
+                                    extension: "svg",
+                                    dataEncoding: "base64",
+                                    dataMimeType: "image/svg+xml",
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ),
                         ),
-                      ],
-                    ),
-                  ),);
-                },
-              ),
-            ),
-          ),),
-          // Overlay AppBar
-          Positioned(
-            top: 0,
-            left: 0,
-            right: 0,
-            child: IgnorePointer(
-              ignoring: !_showOverlay,
-              child: AnimatedOpacity(
-                opacity: _showOverlay ? 1.0 : 0.0,
-                duration: const Duration(milliseconds: 300),
-                child: ReadingAppBar(
-                  bookTitle: _epubData?.title ?? 'Unknown',
-                  chapterTitle: _currentChapterIndex < (_epubData?.chapters.length ?? 0)
-                      ? _epubData!.chapters[_currentChapterIndex].title
-                      : 'Chapter ${_currentChapterIndex + 1}',
-                ),
-              ),
-            ),
-          ),
-          // Overlay navigation bar
-          Positioned(
-            left: 0,
-            right: 0,
-            bottom: 0,
-            child: IgnorePointer(
-              ignoring: !_showOverlay,
-              child: AnimatedOpacity(
-                opacity: _showOverlay ? 1.0 : 0.0,
-                duration: const Duration(milliseconds: 300),
-                child: SafeArea(
-                  child: ReadingNavigationBar(
-                    onPreviousChapter: _currentChapterIndex > 0
-                        ? () {
-                      _cancelHideOverlayTimer();
-                      _previousChapter();
-                    }
-                        : null,
-                    onNextChapter: _currentChapterIndex < (_epubData?.chapters.length ?? 0) - 1
-                        ? () {
-                      _cancelHideOverlayTimer();
-                      _nextChapter();
-                    }
-                        : null,
-                    onChapterListTap: () {
-                      _cancelHideOverlayTimer();
-                      _showChapterBottomSheet();
+                      );
                     },
-                    currentChapterIndex: _currentChapterIndex,
-                    totalChapters: _epubData?.chapters.length ?? 0,
-                    settingsSpeedDial: SettingsSpeedDial(
-                      isLocked: _isLocked,
-                      onToggleLock: () {
-                        _cancelHideOverlayTimer();
-                        setState(() => _isLocked = !_isLocked);
-                      },
-                      onShowSettingsPanel: _showSettingsPanel,
-                      onShowBookmark: () {
-                        _cancelHideOverlayTimer();
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('Bookmark added')),
-                        );
-                      },
-                      onShare: () {
-                        _cancelHideOverlayTimer();
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('Share feature coming soon')),
-                        );
-                      },
-                      onSearch: () {
-                        _cancelHideOverlayTimer();
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('Search feature coming soon')),
-                        );
-                      },
-                      isVisible: _showOverlay,
-                    ),
-                    visualizationSpeedDial: VisualizationSpeedDial(
-                      isVisible: _showOverlay,
-                      onToggleVisualization: _showBookOverviewDialog,
-                      onAdjustVisualization: () {
-                        _cancelHideOverlayTimer();
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('Visualization settings coming soon')),
-                        );
-                      },
-                    ),
-                    backgroundColor: Colors.transparent,
                   ),
                 ),
               ),
             ),
-          ),
-
-          if (_isSettingsOverlayVisible)
-            GestureDetector(
-              onTap: _hideSettingsPanel,
-              behavior: HitTestBehavior.opaque,
-              child: Container(
-                color: Colors.transparent,
-                width: double.infinity,
-                height: double.infinity,
-              ),
-            ),
-          if (_isSettingsOverlayVisible)
-            CustomReadingSettingsPanel(
-              category: 'text',
-              onBack: _hideSettingsPanel,
-              scrollController: ScrollController(), // <-- provide a controller
-            ),
-          if (_isVisualizationOverlayVisible)
+            // Overlay AppBar
             Positioned(
-              top: 130, // Adjust based on your app bar height
+              top: 0,
               left: 0,
               right: 0,
-              bottom: 80, // Adjust based on your navigation bar height
-              child: BookVisualizationOverlay(
-                bookTitleForLookup: _epubData?.title ?? 'Unknown',
-                localBookISBN: null,
-                localChapterNumber: _currentChapterIndex + 1,
-                localChapterContent: _epubData?.chapters[_currentChapterIndex].content ?? '',
-                onClose: _hideVisualizationOverlay,
+              child: IgnorePointer(
+                ignoring: !_showOverlay,
+                child: AnimatedOpacity(
+                  opacity: _showOverlay ? 1.0 : 0.0,
+                  duration: const Duration(milliseconds: 300),
+                  child: ReadingAppBar(
+                    bookTitle: _epubData?.title ?? 'Unknown',
+                    chapterTitle:
+                        _currentChapterIndex < (_epubData?.chapters.length ?? 0)
+                        ? _epubData!.chapters[_currentChapterIndex].title
+                        : 'Chapter ${_currentChapterIndex + 1}',
+                  ),
+                ),
               ),
             ),
-        ],
+            // Overlay navigation bar
+            Positioned(
+              left: 0,
+              right: 0,
+              bottom: 0,
+              child: IgnorePointer(
+                ignoring: !_showOverlay,
+                child: AnimatedOpacity(
+                  opacity: _showOverlay ? 1.0 : 0.0,
+                  duration: const Duration(milliseconds: 300),
+                  child: SafeArea(
+                    child: ReadingNavigationBar(
+                      onPreviousChapter: _currentChapterIndex > 0
+                          ? () {
+                              _cancelHideOverlayTimer();
+                              _previousChapter();
+                            }
+                          : null,
+                      onNextChapter:
+                          _currentChapterIndex <
+                              (_epubData?.chapters.length ?? 0) - 1
+                          ? () {
+                              _cancelHideOverlayTimer();
+                              _nextChapter();
+                            }
+                          : null,
+                      onChapterListTap: () {
+                        _cancelHideOverlayTimer();
+                        _showChapterBottomSheet();
+                      },
+                      currentChapterIndex: _currentChapterIndex,
+                      totalChapters: _epubData?.chapters.length ?? 0,
+                      settingsSpeedDial: SettingsSpeedDial(
+                        isLocked: _isLocked,
+                        onToggleLock: () {
+                          _cancelHideOverlayTimer();
+                          setState(() => _isLocked = !_isLocked);
+                        },
+                        onShowSettingsPanel: _showSettingsPanel,
+                        onShowBookmark: () {
+                          _cancelHideOverlayTimer();
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text('Bookmark added')),
+                          );
+                        },
+                        onShare: () {
+                          _cancelHideOverlayTimer();
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('Share feature coming soon'),
+                            ),
+                          );
+                        },
+                        onSearch: () {
+                          _cancelHideOverlayTimer();
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('Search feature coming soon'),
+                            ),
+                          );
+                        },
+                        isVisible: _showOverlay,
+                      ),
+                      visualizationSpeedDial: VisualizationSpeedDial(
+                        isVisible: _showOverlay,
+                        onToggleVisualization: _showBookOverviewDialog,
+                        onAdjustVisualization: () {
+                          _cancelHideOverlayTimer();
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text(
+                                'Visualization settings coming soon',
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+                      backgroundColor: Colors.transparent,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+
+            if (_isSettingsOverlayVisible)
+              GestureDetector(
+                onTap: _hideSettingsPanel,
+                behavior: HitTestBehavior.opaque,
+                child: Container(
+                  color: Colors.transparent,
+                  width: double.infinity,
+                  height: double.infinity,
+                ),
+              ),
+            if (_isSettingsOverlayVisible)
+              CustomReadingSettingsPanel(
+                category: 'text',
+                onBack: _hideSettingsPanel,
+                scrollController:
+                    ScrollController(), // <-- provide a controller
+              ),
+            if (_isVisualizationOverlayVisible)
+              Positioned(
+                top: 130, // Adjust based on your app bar height
+                left: 0,
+                right: 0,
+                bottom: 80, // Adjust based on your navigation bar height
+                child: BookVisualizationOverlay(
+                  bookTitleForLookup: _epubData?.title ?? 'Unknown',
+                  localBookISBN: null,
+                  localChapterNumber: _currentChapterIndex + 1,
+                  localChapterContent:
+                      _epubData?.chapters[_currentChapterIndex].content ?? '',
+                  onClose: _hideVisualizationOverlay,
+                ),
+              ),
+          ],
+        ),
       ),
-    ),);
+    );
   }
 
   Widget _buildImageWidget(String src, String chapterHref) {
@@ -878,10 +1071,7 @@ class _ReadingScreenState extends ConsumerState<ReadingScreen> {
       alignment: Alignment.center,
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          const Icon(Icons.broken_image),
-          Text(message),
-        ],
+        children: [const Icon(Icons.broken_image), Text(message)],
       ),
     );
   }
@@ -905,8 +1095,12 @@ class _ReadingScreenState extends ConsumerState<ReadingScreen> {
               Expanded(
                 child: Container(
                   decoration: BoxDecoration(
-                    color: Colors.black.withOpacity(0.9), // Your desired background color
-                    borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+                    color: Colors.black.withOpacity(
+                      0.9,
+                    ), // Your desired background color
+                    borderRadius: const BorderRadius.vertical(
+                      top: Radius.circular(20),
+                    ),
                   ),
                   child: ListView.builder(
                     controller: scrollController,
@@ -938,14 +1132,13 @@ class _ReadingScreenState extends ConsumerState<ReadingScreen> {
                     },
                   ),
                 ),
-              )
+              ),
             ],
           ),
         ),
       ),
     );
   }
-
 
   void _showAdvancedSettings() {
     showModalBottomSheet(
@@ -965,7 +1158,6 @@ class _ReadingScreenState extends ConsumerState<ReadingScreen> {
       ),
     );
   }
-
 
   void _showSettingsPanel() {
     _cancelHideOverlayTimer();
@@ -1005,7 +1197,6 @@ class _ReadingScreenState extends ConsumerState<ReadingScreen> {
       _isSettingsOverlayVisible = false;
     });
   }
-
 
   void _showBookOverview() {
     // Will implement this method to show book info/visualization
@@ -1092,7 +1283,8 @@ class _ReadingScreenState extends ConsumerState<ReadingScreen> {
 
   void _debugPrintChapterCssLinks(EpubChapter chapter) {
     final document = html_parser.parse(chapter.content);
-    final cssLinks = document.head?.querySelectorAll('link[rel="stylesheet"]') ?? [];
+    final cssLinks =
+        document.head?.querySelectorAll('link[rel="stylesheet"]') ?? [];
     if (cssLinks.isNotEmpty) {
       print('DEBUG: CSS links for chapter "${chapter.title}":');
       for (final link in cssLinks) {
@@ -1104,21 +1296,31 @@ class _ReadingScreenState extends ConsumerState<ReadingScreen> {
     }
   }
 
-  void _debugPrintChapterCssContents(EpubChapter chapter, Map<String, String> allCssFiles) {
+  void _debugPrintChapterCssContents(
+    EpubChapter chapter,
+    Map<String, String> allCssFiles,
+  ) {
     final document = html_parser.parse(chapter.content);
-    final cssLinks = document.head?.querySelectorAll('link[rel="stylesheet"]') ?? [];
+    final cssLinks =
+        document.head?.querySelectorAll('link[rel="stylesheet"]') ?? [];
     final chapterDir = p.dirname(chapter.href);
 
     for (final link in cssLinks) {
       final href = link.attributes['href'];
       if (href == null) continue;
       // Resolve relative path
-      final resolvedPath = p.normalize(p.join(chapterDir, href)).replaceAll('\\', '/');
-      final lookupPath = resolvedPath.startsWith('/') ? resolvedPath.substring(1) : resolvedPath;
+      final resolvedPath = p
+          .normalize(p.join(chapterDir, href))
+          .replaceAll('\\', '/');
+      final lookupPath = resolvedPath.startsWith('/')
+          ? resolvedPath.substring(1)
+          : resolvedPath;
       final cssFilePath = allCssFiles[lookupPath];
       if (cssFilePath != null && File(cssFilePath).existsSync()) {
         final cssContent = File(cssFilePath).readAsStringSync();
-        print('DEBUG: CSS content for "$href" in chapter "${chapter.title}":\n$cssContent\n');
+        print(
+          'DEBUG: CSS content for "$href" in chapter "${chapter.title}":\n$cssContent\n',
+        );
       } else {
         print('DEBUG: CSS file not found for "$href" (resolved: $lookupPath)');
       }
@@ -1145,8 +1347,10 @@ class _ReadingScreenState extends ConsumerState<ReadingScreen> {
     _pageController.dispose();
 
     // Reset system UI
-    SystemChrome.setEnabledSystemUIMode(SystemUiMode.manual,
-        overlays: SystemUiOverlay.values);
+    SystemChrome.setEnabledSystemUIMode(
+      SystemUiMode.manual,
+      overlays: SystemUiOverlay.values,
+    );
 
     super.dispose();
   }

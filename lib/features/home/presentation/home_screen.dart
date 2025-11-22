@@ -110,9 +110,7 @@ class HomeScreen extends ConsumerWidget {
                                           ],
                                         ),
                                         // Streak Widget instead of profile icon
-                                        const StreakWidget(
-                                          streakDays: 7,
-                                        ), // TODO: Get actual streak from user data
+                                        const StreakWidget(), // TODO: Get actual streak from user data
                                       ],
                                     );
                                   },

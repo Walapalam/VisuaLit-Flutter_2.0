@@ -9,6 +9,7 @@ import 'package:visualit/features/reader/data/search_index.dart';
 import 'package:visualit/features/marketplace/data/cached_book.dart';
 import 'package:visualit/features/custom_reader/model/new_reading_progress.dart';
 import 'package:visualit/features/reader/data/reading_progress.dart';
+import 'package:visualit/features/streaks/data/streak_data.dart';
 
 class IsarService {
   late Future<Isar> db;
@@ -36,6 +37,7 @@ class IsarService {
           CachedBookSchema,
           ReadingProgressSchema,
           NewReadingProgressSchema,
+          StreakDataSchema,
         ],
         directory: dir.path,
         inspector: true,
@@ -43,7 +45,6 @@ class IsarService {
     }
     return Future.value(Isar.getInstance());
   }
-
 
   Future<void> clearDB() async {
     final isar = await db;

@@ -21,168 +21,163 @@ class AppDrawer extends ConsumerWidget {
         ),
       ),
       child: Container(
-        decoration: BoxDecoration(
-          borderRadius: const BorderRadius.only(
+        decoration: const BoxDecoration(
+          borderRadius: BorderRadius.only(
             topLeft: Radius.circular(20),
             bottomLeft: Radius.circular(20),
           ),
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [
-              AppTheme.primaryGreen.withOpacity(0.05),
-              AppTheme.black,
-              AppTheme.black,
-            ],
-          ),
+          color: AppTheme.black,
         ),
         child: SafeArea(
-          child: Column(
-            children: [
-              // Header Section
-              Container(
-                padding: const EdgeInsets.all(24),
-                child: Column(
-                  children: [
-                    // Profile Avatar
-                    Container(
-                      width: 80,
-                      height: 80,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        gradient: LinearGradient(
-                          colors: [
-                            AppTheme.primaryGreen,
-                            AppTheme.primaryGreen.withOpacity(0.7),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 20),
+            child: Column(
+              children: [
+                // Header Section - Compact
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(24, 16, 24, 24),
+                  child: Column(
+                    children: [
+                      // Profile Avatar - Smaller
+                      Container(
+                        width: 64,
+                        height: 64,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: AppTheme.primaryGreen,
+                          boxShadow: [
+                            BoxShadow(
+                              color: AppTheme.primaryGreen.withOpacity(0.3),
+                              blurRadius: 16,
+                              offset: const Offset(0, 4),
+                            ),
                           ],
                         ),
-                        boxShadow: [
-                          BoxShadow(
-                            color: AppTheme.primaryGreen.withOpacity(0.3),
-                            blurRadius: 20,
-                            offset: const Offset(0, 4),
-                          ),
-                        ],
-                      ),
-                      child: Center(
-                        child: Text(
-                          user?.displayName?.isNotEmpty == true
-                              ? user!.displayName![0].toUpperCase()
-                              : 'G',
-                          style: const TextStyle(
-                            fontSize: 36,
-                            fontWeight: FontWeight.bold,
-                            color: AppTheme.black,
+                        child: Center(
+                          child: Text(
+                            user?.displayName?.isNotEmpty == true
+                                ? user!.displayName![0].toUpperCase()
+                                : 'G',
+                            style: const TextStyle(
+                              fontSize: 28,
+                              fontWeight: FontWeight.bold,
+                              color: AppTheme.black,
+                            ),
                           ),
                         ),
                       ),
-                    ),
-                    const SizedBox(height: 16),
-                    // User Name
-                    Text(
-                      user?.displayName ?? 'Guest User',
-                      style: const TextStyle(
-                        color: AppTheme.white,
-                        fontSize: 20,
-                        fontWeight: FontWeight.bold,
+                      const SizedBox(height: 12),
+                      // User Name
+                      Text(
+                        user?.displayName ?? 'Guest User',
+                        style: const TextStyle(
+                          color: AppTheme.white,
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                        ),
                       ),
-                    ),
-                    const SizedBox(height: 4),
-                    // Email
-                    Text(
-                      user?.email ?? 'Sign in for full features',
-                      style: TextStyle(
-                        color: AppTheme.white.withOpacity(0.6),
-                        fontSize: 14,
+                      const SizedBox(height: 4),
+                      // Email
+                      Text(
+                        user?.email ?? 'Sign in for full features',
+                        style: TextStyle(
+                          color: AppTheme.white.withOpacity(0.5),
+                          fontSize: 13,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
-              ),
 
-              const Divider(color: Colors.white10, height: 1, thickness: 1),
+                // Thin divider
+                Container(
+                  height: 1,
+                  margin: const EdgeInsets.symmetric(horizontal: 24),
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [
+                        Colors.transparent,
+                        AppTheme.primaryGreen.withOpacity(0.3),
+                        Colors.transparent,
+                      ],
+                    ),
+                  ),
+                ),
 
-              const SizedBox(height: 16),
+                const SizedBox(height: 24),
 
-              // Menu Items
-              _buildMenuItem(
-                icon: Icons.person_outline,
-                label: 'My Profile',
-                onTap: () {
-                  Navigator.pop(context);
-                  // TODO: Navigate to profile screen
-                },
-              ),
-              _buildMenuItem(
-                icon: Icons.leaderboard_outlined,
-                label: 'Leaderboards',
-                onTap: () {
-                  Navigator.pop(context);
-                  // TODO: Navigate to leaderboards screen
-                },
-              ),
+                // Menu Items - Simpler design
+                _buildSimpleMenuItem(
+                  icon: Icons.person_outline,
+                  label: 'My Profile',
+                  onTap: () {
+                    Navigator.pop(context);
+                    // TODO: Navigate to profile screen
+                  },
+                ),
+                const SizedBox(height: 8),
+                _buildSimpleMenuItem(
+                  icon: Icons.leaderboard_outlined,
+                  label: 'Leaderboards',
+                  onTap: () {
+                    Navigator.pop(context);
+                    // TODO: Navigate to leaderboards screen
+                  },
+                ),
 
-              const Spacer(),
+                const Spacer(),
 
-              // Logout/Login Button
-              Padding(
-                padding: const EdgeInsets.all(20),
-                child:
-                    authState.status == AuthStatus.authenticated ||
-                        authState.status == AuthStatus.guest
-                    ? _buildActionButton(
-                        icon: Icons.logout,
-                        label: 'Logout',
-                        onTap: () {
-                          Navigator.of(context).pop();
-                          ref.read(authControllerProvider.notifier).logout();
-                        },
-                      )
-                    : _buildActionButton(
-                        icon: Icons.login,
-                        label: 'Login',
-                        onTap: () {
-                          Navigator.of(context).pop();
-                          context.goNamed('login', extra: true);
-                        },
-                      ),
-              ),
-            ],
+                // Logout/Login Button - Cleaner
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 24),
+                  child:
+                      authState.status == AuthStatus.authenticated ||
+                          authState.status == AuthStatus.guest
+                      ? _buildCleanActionButton(
+                          icon: Icons.logout,
+                          label: 'Logout',
+                          onTap: () {
+                            Navigator.of(context).pop();
+                            ref.read(authControllerProvider.notifier).logout();
+                          },
+                        )
+                      : _buildCleanActionButton(
+                          icon: Icons.login,
+                          label: 'Login',
+                          onTap: () {
+                            Navigator.of(context).pop();
+                            context.goNamed('login', extra: true);
+                          },
+                        ),
+                ),
+                const SizedBox(height: 16),
+              ],
+            ),
           ),
         ),
       ),
     );
   }
 
-  Widget _buildMenuItem({
+  Widget _buildSimpleMenuItem({
     required IconData icon,
     required String label,
     required VoidCallback onTap,
   }) {
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+      padding: const EdgeInsets.symmetric(horizontal: 24),
       child: Material(
         color: Colors.transparent,
         child: InkWell(
           onTap: onTap,
           borderRadius: BorderRadius.circular(12),
-          child: Container(
+          child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-            decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.03),
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(
-                color: Colors.white.withOpacity(0.05),
-                width: 1,
-              ),
-            ),
             child: Row(
               children: [
-                Icon(
-                  icon,
-                  color: AppTheme.primaryGreen.withOpacity(0.8),
-                  size: 22,
-                ),
+                Icon(icon, color: AppTheme.primaryGreen, size: 22),
                 const SizedBox(width: 16),
                 Text(
                   label,
@@ -200,7 +195,7 @@ class AppDrawer extends ConsumerWidget {
     );
   }
 
-  Widget _buildActionButton({
+  Widget _buildCleanActionButton({
     required IconData icon,
     required String label,
     required VoidCallback onTap,
@@ -209,22 +204,21 @@ class AppDrawer extends ConsumerWidget {
       color: Colors.transparent,
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(30),
+        borderRadius: BorderRadius.circular(12),
         child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
+          padding: const EdgeInsets.symmetric(vertical: 14),
           decoration: BoxDecoration(
-            color: const Color(0xFF1A1A1A),
-            borderRadius: BorderRadius.circular(30),
+            borderRadius: BorderRadius.circular(12),
             border: Border.all(
               color: AppTheme.primaryGreen.withOpacity(0.3),
-              width: 1.5,
+              width: 1,
             ),
           ),
           child: Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               Icon(icon, color: AppTheme.primaryGreen, size: 20),
-              const SizedBox(width: 12),
+              const SizedBox(width: 10),
               Text(
                 label,
                 style: const TextStyle(

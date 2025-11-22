@@ -151,7 +151,9 @@ class CurrentlyReadingCarousel extends StatelessWidget {
                           opacity: isFocused ? 1.0 : 0.0,
                           child: isFocused
                               ? Padding(
-                                  padding: const EdgeInsets.only(top: 10),
+                                  padding: const EdgeInsets.only(
+                                    top: 3,
+                                  ), // Reduced from 10
                                   child: GestureDetector(
                                     onTap: () {
                                       context.pushNamed(

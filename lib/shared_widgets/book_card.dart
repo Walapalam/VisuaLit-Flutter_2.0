@@ -23,7 +23,7 @@ class BookCard extends StatelessWidget {
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        width: 110, // Better aspect ratio for book covers
+        width: 130, // Increased from 110 for better visibility
         margin: const EdgeInsets.only(right: 16.0),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,

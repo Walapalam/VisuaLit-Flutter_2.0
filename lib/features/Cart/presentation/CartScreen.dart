@@ -7,7 +7,6 @@ import 'dart:io';
 import 'package:path_provider/path_provider.dart';
 import 'package:visualit/core/theme/theme_extensions.dart';
 
-
 class CartScreen extends ConsumerStatefulWidget {
   const CartScreen({super.key});
 
@@ -16,12 +15,11 @@ class CartScreen extends ConsumerStatefulWidget {
 }
 
 class _CartScreenState extends ConsumerState<CartScreen> {
-  final Set<int> downloadingIds = {};
+  final Map<int, double> _downloadProgress = {};
 
   Future<Directory?> _getAppLibraryDir() async {
     try {
       if (Platform.isAndroid) {
-        // App-scoped external storage (no permission required)
         final dir = await getExternalStorageDirectory();
         if (dir == null) return null;
         final visuaLitDir = Directory('${dir.path}/VisuaLit');
@@ -45,7 +43,8 @@ class _CartScreenState extends ConsumerState<CartScreen> {
   Future<bool> _isBookDownloaded(String title) async {
     final dir = await _getAppLibraryDir();
     if (dir == null) return false;
-    final file = File('${dir.path}/$title.epub');
+    final safeTitle = _sanitizeFileName(title);
+    final file = File('${dir.path}/$safeTitle.epub');
     return file.exists();
   }
 
@@ -55,8 +54,10 @@ class _CartScreenState extends ConsumerState<CartScreen> {
   }
 
   Future<void> _downloadBook(Map<String, dynamic> book) async {
+    final bookId = book['id'];
     final bookTitle = book['title']?.toString() ?? 'book';
     final downloadUrl = book['formats']?['application/epub+zip']?.toString();
+
     if (downloadUrl == null) {
       throw Exception('Download URL not available');
     }
@@ -70,17 +71,43 @@ class _CartScreenState extends ConsumerState<CartScreen> {
     final filePath = '${targetDir.path}/$safeTitle.epub';
     final file = File(filePath);
 
-    final response = await http.get(Uri.parse(downloadUrl));
-    if (response.statusCode != 200) {
-      throw Exception('Failed to download the book');
-    }
-    await file.writeAsBytes(response.bodyBytes);
+    final client = http.Client();
+    try {
+      final request = http.Request('GET', Uri.parse(downloadUrl));
+      final response = await client.send(request);
 
-    if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('$bookTitle saved to Library')),
-    );
-    setState(() {});
+      if (response.statusCode != 200) {
+        throw Exception('Failed to download the book');
+      }
+
+      final contentLength = response.contentLength ?? 0;
+      var downloaded = 0;
+      final List<int> bytes = [];
+
+      await for (final chunk in response.stream) {
+        bytes.addAll(chunk);
+        downloaded += chunk.length;
+        if (contentLength > 0) {
+          setState(() {
+            _downloadProgress[bookId] = downloaded / contentLength;
+          });
+        }
+      }
+
+      await file.writeAsBytes(bytes);
+
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('$bookTitle saved to Library')));
+    } finally {
+      client.close();
+      if (mounted) {
+        setState(() {
+          _downloadProgress.remove(bookId);
+        });
+      }
+    }
   }
 
   @override
@@ -99,99 +126,127 @@ class _CartScreenState extends ConsumerState<CartScreen> {
       ),
       body: Padding(
         padding: context.screenPadding,
-        child:cartBooks.isEmpty
-          ? const Center(
-        child: Text(
-          'No books in the cart',
-          style: TextStyle(fontSize: 18),
-        ),
-      )
-          : ListView.builder(
-        itemCount: cartBooks.length,
-        itemBuilder: (context, index) {
-          final book = cartBooks[index];
-          final bookId = book['id'];
-          final bookTitle = book['title'] ?? 'book';
+        child: cartBooks.isEmpty
+            ? const Center(
+                child: Text(
+                  'No books in the cart',
+                  style: TextStyle(fontSize: 18),
+                ),
+              )
+            : ListView.builder(
+                itemCount: cartBooks.length,
+                itemBuilder: (context, index) {
+                  final book = cartBooks[index];
+                  final bookId = book['id'];
+                  final bookTitle = book['title'] ?? 'book';
+                  final progress = _downloadProgress[bookId];
 
-          return ListTile(
-            leading: book['formats']['image/jpeg'] != null
-                ? Image.network(
-              book['formats']['image/jpeg'],
-              width: 50,
-              height: 50,
-              fit: BoxFit.cover,
-            )
-                : const Icon(Icons.book),
-            title: Text(bookTitle),
-            trailing: FutureBuilder<bool>(
-              future: _isBookDownloaded(bookTitle),
-              builder: (context, snapshot) {
-                final isDownloaded = snapshot.data ?? false;
-                return Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    if (!isDownloaded)
-                      downloadingIds.contains(bookId)
-                          ? const SizedBox(
-                              width: 24,
-                              height: 24,
-                              child: CircularProgressIndicator(strokeWidth: 2),
-                            )
-                          : IconButton(
-                              icon: const Icon(Icons.download, color: Colors.blue),
-                              onPressed: () async {
-                                setState(() => downloadingIds.add(bookId));
-                                try {
-                                  await _downloadBook(book as Map<String, dynamic>);
-                                } catch (e) {
-                                  if (mounted) {
-                                    ScaffoldMessenger.of(context).showSnackBar(
-                                      SnackBar(content: Text('Error downloading ${book['title']}: $e')),
-                                    );
-                                  }
-                                } finally {
-                                  if (mounted) setState(() => downloadingIds.remove(bookId));
-                                }
+                  return ListTile(
+                    leading: book['formats']['image/jpeg'] != null
+                        ? Image.network(
+                            book['formats']['image/jpeg'],
+                            width: 50,
+                            height: 50,
+                            fit: BoxFit.cover,
+                          )
+                        : const Icon(Icons.book),
+                    title: Text(bookTitle),
+                    trailing: FutureBuilder<bool>(
+                      future: _isBookDownloaded(bookTitle),
+                      builder: (context, snapshot) {
+                        final isDownloaded = snapshot.data ?? false;
+                        return Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            if (!isDownloaded)
+                              progress != null
+                                  ? Stack(
+                                      alignment: Alignment.center,
+                                      children: [
+                                        CircularProgressIndicator(
+                                          value: progress,
+                                          strokeWidth: 3,
+                                        ),
+                                        Text(
+                                          '${(progress * 100).toInt()}%',
+                                          style: const TextStyle(fontSize: 10),
+                                        ),
+                                      ],
+                                    )
+                                  : IconButton(
+                                      icon: const Icon(
+                                        Icons.download,
+                                        color: Colors.blue,
+                                      ),
+                                      onPressed: () async {
+                                        setState(
+                                          () => _downloadProgress[bookId] = 0.0,
+                                        );
+                                        try {
+                                          await _downloadBook(book);
+                                        } catch (e) {
+                                          if (mounted) {
+                                            ScaffoldMessenger.of(
+                                              context,
+                                            ).showSnackBar(
+                                              SnackBar(
+                                                content: Text(
+                                                  'Error downloading ${book['title']}: $e',
+                                                ),
+                                              ),
+                                            );
+                                            setState(
+                                              () => _downloadProgress.remove(
+                                                bookId,
+                                              ),
+                                            );
+                                          }
+                                        }
+                                      },
+                                    ),
+                            IconButton(
+                              icon: const Icon(Icons.delete, color: Colors.red),
+                              onPressed: () {
+                                showDialog(
+                                  context: context,
+                                  builder: (context) => AlertDialog(
+                                    title: const Text('Delete Book'),
+                                    content: const Text(
+                                      'Are you sure you want to delete this book from the cart?',
+                                    ),
+                                    actions: [
+                                      TextButton(
+                                        onPressed: () =>
+                                            Navigator.of(context).pop(),
+                                        style: TextButton.styleFrom(
+                                          foregroundColor: Colors.white,
+                                        ),
+                                        child: const Text('Cancel'),
+                                      ),
+                                      TextButton(
+                                        onPressed: () {
+                                          ref
+                                              .read(cartProvider.notifier)
+                                              .removeBook(book);
+                                          Navigator.of(context).pop();
+                                        },
+                                        style: TextButton.styleFrom(
+                                          foregroundColor: Colors.white,
+                                        ),
+                                        child: const Text('Delete'),
+                                      ),
+                                    ],
+                                  ),
+                                );
                               },
                             ),
-                    IconButton(
-                      icon: const Icon(Icons.delete, color: Colors.red),
-                      onPressed: () {
-                        showDialog(
-                          context: context,
-                          builder: (context) => AlertDialog(
-                            title: const Text('Delete Book'),
-                            content: const Text('Are you sure you want to delete this book from the cart?'),
-                            actions: [
-                              TextButton(
-                                onPressed: () => Navigator.of(context).pop(),
-                                style: TextButton.styleFrom(
-                                  foregroundColor: Colors.white,
-                                ),
-                                child: const Text('Cancel'),
-                              ),
-                              TextButton(
-                                onPressed: () {
-                                  ref.read(cartProvider.notifier).removeBook(book);
-                                  Navigator.of(context).pop();
-                                },
-                                style: TextButton.styleFrom(
-                                  foregroundColor: Colors.white,
-                                ),
-                                child: const Text('Delete'),
-                              ),
-                            ],
-                          ),
+                          ],
                         );
                       },
                     ),
-                  ],
-                );
-              },
-            ),
-          );
-        },
-      ),
+                  );
+                },
+              ),
       ),
     );
   }

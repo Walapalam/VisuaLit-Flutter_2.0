@@ -11,10 +11,7 @@ class MarketplaceRepository {
 
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
-        return {
-          'results': data['results'],
-          'next': data['next'],
-        };
+        return {'results': data['results'], 'next': data['next']};
       } else {
         throw Exception('Failed to load books: ${response.statusCode}');
       }
@@ -27,7 +24,14 @@ class MarketplaceRepository {
     return fetchBooks('$baseUrl?sort=popular');
   }
 
-  Future<Map<String, dynamic>> fetchBooksByTopic(String topic, {int limit = 30}) async {
+  Future<Map<String, dynamic>> fetchRecentBooks({int limit = 30}) async {
+    return fetchBooks('$baseUrl?sort=descending');
+  }
+
+  Future<Map<String, dynamic>> fetchBooksByTopic(
+    String topic, {
+    int limit = 30,
+  }) async {
     return fetchBooks('$baseUrl?topic=${Uri.encodeComponent(topic)}');
   }
 

@@ -4,15 +4,16 @@ import 'package:go_router/go_router.dart';
 import 'package:visualit/features/Cart/presentation/CartNotifier.dart';
 import 'package:visualit/core/theme/theme_extensions.dart';
 import 'package:visualit/core/theme/app_theme.dart';
+import 'package:visualit/features/home/presentation/widgets/home_background.dart';
+import 'package:visualit/features/marketplace/presentation/widgets/hero_carousel.dart';
+import 'package:visualit/shared_widgets/custom_overlapped_carousel.dart';
 import 'marketplace_providers.dart';
 
 import 'widgets/all_books_view.dart';
 import 'widgets/bestsellers_section.dart';
-import 'widgets/book_card.dart';
+import 'widgets/marketplace_card.dart';
 import 'widgets/categories_section.dart';
-import 'widgets/hero_banner.dart';
-import 'widgets/horizontal_book_card_skeleton.dart';
-import 'widgets/loading_overlay.dart';
+import 'widgets/book_dialog.dart';
 
 class MarketplaceScreen extends ConsumerStatefulWidget {
   const MarketplaceScreen({super.key});
@@ -24,6 +25,7 @@ class MarketplaceScreen extends ConsumerStatefulWidget {
 class _MarketplaceScreenState extends ConsumerState<MarketplaceScreen> {
   final TextEditingController _searchController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
+  final FocusNode _searchFocusNode = FocusNode();
   bool showAllBooks = false;
 
   @override
@@ -33,7 +35,8 @@ class _MarketplaceScreenState extends ConsumerState<MarketplaceScreen> {
   }
 
   void _onScroll() {
-    if (_scrollController.position.pixels >= _scrollController.position.maxScrollExtent * 0.8) {
+    if (_scrollController.position.pixels >=
+        _scrollController.position.maxScrollExtent * 0.8) {
       final state = ref.read(marketplaceProvider);
       if (!state.isLoading && state.nextUrl != null) {
         ref.read(marketplaceProvider.notifier).loadBooks();
@@ -44,104 +47,67 @@ class _MarketplaceScreenState extends ConsumerState<MarketplaceScreen> {
   void _showAllBooks() {
     setState(() {
       showAllBooks = true;
-      // Optionally reset search
       ref.read(marketplaceProvider.notifier).searchBooks('');
     });
   }
 
   void _clearSearch() {
-    print('DEBUG: Clear search button tapped!'); // Debug log
     _searchController.clear();
+    _searchFocusNode.unfocus();
     ref.read(marketplaceProvider.notifier).clearSearch();
-    setState(() {}); // ensure UI rebuilds to hide search tag / show main content
-  }
-
-  Widget _buildSearchTag() {
-    final state = ref.watch(marketplaceProvider);
-
-    if (state.searchQuery.isEmpty) {
-      return const SizedBox.shrink();
-    }
-
-    return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      child: Row(
-        children: [
-          Chip(
-            backgroundColor: Theme.of(context).colorScheme.secondaryContainer,
-            label: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(
-                  Icons.search,
-                  size: 16,
-                  color: Theme.of(context).colorScheme.onSecondaryContainer,
-                ),
-                const SizedBox(width: 6),
-                Text(
-                  'Search: "${state.searchQuery}"',
-                  style: TextStyle(
-                    color: Theme.of(context).colorScheme.onSecondaryContainer,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-                const SizedBox(width: 6),
-                GestureDetector(
-                  onTap: () {
-                    print('DEBUG: GestureDetector tapped!');
-                    _clearSearch();
-                  },
-                  child: Container(
-                    padding: const EdgeInsets.all(8), // Increased padding for better tap area
-                    child: Icon(
-                      Icons.close,
-                      size: 18, // Slightly larger icon
-                      color: Theme.of(context).colorScheme.onSecondaryContainer,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const Spacer(),
-          if (state.books.isNotEmpty)
-            Text(
-              '${state.books.length} result${state.books.length == 1 ? '' : 's'}',
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
-              ),
-            ),
-        ],
-      ),
-    );
+    // Ensure we go back to main view if we were in search results
+    setState(() {});
   }
 
   @override
   void dispose() {
     _searchController.dispose();
     _scrollController.dispose();
+    _searchFocusNode.dispose();
     super.dispose();
   }
 
-  Widget _buildSkeletonLoader() {
+  Widget _buildCarousel(List<dynamic> books) {
+    if (books.isEmpty) return const SizedBox.shrink();
+
+    // Take top 10 for carousel
+    final carouselBooks = books.take(10).toList();
+
     return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        SizedBox(
-          height: context.bookShelfHeight,
-          child: ListView.builder(
-            scrollDirection: Axis.horizontal,
-            itemCount: 6,
-            itemBuilder: (context, index) => const HorizontalBookCardSkeleton(),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 24, 16, 16),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                'New & Trending',
+                style: Theme.of(context).textTheme.headlineMedium,
+              ),
+              TextButton(
+                onPressed: _showAllBooks,
+                child: const Text('View All'),
+              ),
+            ],
           ),
         ),
-        const SizedBox(height: 20),
-        SizedBox(
-          height: context.bookShelfHeight,
-          child: ListView.builder(
-            scrollDirection: Axis.horizontal,
-            itemCount: 6,
-            itemBuilder: (context, index) => const HorizontalBookCardSkeleton(),
-          ),
+        CustomOverlappedCarousel(
+          height: 280,
+          centerItemWidth: 180,
+          items: carouselBooks.asMap().entries.map((entry) {
+            final index = entry.key;
+            final book = entry.value;
+            return CustomOverlappedCarouselItem(
+              index: index,
+              builder: (context, isFocused) {
+                return MarketplaceCard(book: book);
+              },
+            );
+          }).toList(),
+          onClicked: (index) {
+            showBookDialog(context, ref, carouselBooks[index]);
+          },
         ),
       ],
     );
@@ -155,209 +121,305 @@ class _MarketplaceScreenState extends ConsumerState<MarketplaceScreen> {
     // Compose the main content separately to avoid complex inline ternary nesting
     final Widget bodyContent = showAllBooks
         ? AllBooksView(
-      searchController: _searchController,
-      scrollController: _scrollController,
-      ref: ref,
-      cartBooks: cartBooks,
-      onBack: () {
-        // return to main view and clear any search so main marketplace shows
-        setState(() {
-          showAllBooks = false;
-        });
-        _searchController.clear();
-        ref.read(marketplaceProvider.notifier).clearSearch();
-      },
-    )
-        : CustomScrollView(
-            controller: _scrollController,
-            slivers: [
-              // Search Bar
-              SliverAppBar(
-                floating: true,
-                snap: true,
-                backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-                elevation: 0,
-                title: TextField(
-                  controller: _searchController,
-                  decoration: InputDecoration(
-                    hintText: 'Search books...',
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(8),
-                      borderSide: BorderSide.none,
-                    ),
-                    filled: true,
-                    fillColor: Theme.of(context).colorScheme.surface,
-                    contentPadding: const EdgeInsets.symmetric(
-                      horizontal: 16,
-                      vertical: 8,
-                    ),
-                    prefixIcon: Icon(
-                      Icons.search,
-                      color: Theme.of(context).colorScheme.onSurface.withAlpha(153),
-                    ),
-                    suffixIcon: Stack(
-                      children: [
-                        IconButton(
-                          icon: Icon(
-                            Icons.shopping_cart,
-                            color: Theme.of(context).colorScheme.onSurface,
-                          ),
-                          onPressed: () {
-                            context.goNamed('cart');
-                          },
-                        ),
-                        if (state.isOffline)
-                          const Positioned(
-                            left: 8,
-                            top: 8,
-                            child: Icon(Icons.wifi_off, color: Colors.grey, size: 20),
-                          ),
-                        if (cartBooks.isNotEmpty)
-                          Positioned(
-                            right: 8,
-                            top: 8,
-                            child: Container(
-                              padding: const EdgeInsets.all(2),
-                              decoration: BoxDecoration(
-                                color: Theme.of(context).colorScheme.secondary,
-                                borderRadius: BorderRadius.circular(10),
-                              ),
-                              constraints: const BoxConstraints(
-                                minWidth: 16,
-                                minHeight: 16,
-                              ),
-                              child: Text(
-                                '${cartBooks.length}',
-                                style: TextStyle(
-                                  color: Theme.of(context).colorScheme.onSecondary,
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.bold,
+            searchController: _searchController,
+            scrollController: _scrollController,
+            ref: ref,
+            cartBooks: cartBooks,
+            onBack: () {
+              setState(() {
+                showAllBooks = false;
+              });
+            },
+          )
+        : Stack(
+            children: [
+              // Background
+              const HomeBackground(),
+
+              // Content
+              SafeArea(
+                child: CustomScrollView(
+                  controller: _scrollController,
+                  slivers: [
+                    // Search Bar (Scrollable, not pinned)
+                    SliverToBoxAdapter(
+                      child: Padding(
+                        padding: const EdgeInsets.fromLTRB(20, 20, 20, 10),
+                        child: TextField(
+                          controller: _searchController,
+                          focusNode: _searchFocusNode,
+                          textInputAction: TextInputAction.search,
+                          style: const TextStyle(color: Colors.white),
+                          decoration: InputDecoration(
+                            hintText: 'Search books...',
+                            hintStyle: TextStyle(
+                              color: Colors.white.withOpacity(0.5),
+                            ),
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(16),
+                              borderSide: BorderSide.none,
+                            ),
+                            filled: true,
+                            fillColor: Colors.white.withOpacity(0.1),
+                            contentPadding: const EdgeInsets.symmetric(
+                              horizontal: 20,
+                              vertical: 16,
+                            ),
+                            prefixIcon:
+                                state.isLoading && state.searchQuery.isNotEmpty
+                                ? Padding(
+                                    padding: const EdgeInsets.all(12.0),
+                                    child: SizedBox(
+                                      width: 20,
+                                      height: 20,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                        color: Colors.white.withOpacity(0.7),
+                                      ),
+                                    ),
+                                  )
+                                : IconButton(
+                                    icon: Icon(
+                                      Icons.search,
+                                      color: Colors.white.withOpacity(0.7),
+                                    ),
+                                    onPressed: () {
+                                      _searchFocusNode.unfocus();
+                                      if (_searchController.text
+                                          .trim()
+                                          .isNotEmpty) {
+                                        ref
+                                            .read(marketplaceProvider.notifier)
+                                            .searchBooks(
+                                              _searchController.text.trim(),
+                                            );
+                                      }
+                                    },
+                                  ),
+                            suffixIcon: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                if (_searchController.text.isNotEmpty)
+                                  IconButton(
+                                    icon: const Icon(
+                                      Icons.clear,
+                                      color: Colors.white,
+                                    ),
+                                    onPressed: _clearSearch,
+                                  ),
+                                Stack(
+                                  children: [
+                                    IconButton(
+                                      icon: const Icon(
+                                        Icons.shopping_cart,
+                                        color: Colors.white,
+                                      ),
+                                      onPressed: () {
+                                        context.goNamed('cart');
+                                      },
+                                    ),
+                                    if (state.isOffline)
+                                      const Positioned(
+                                        left: 8,
+                                        top: 8,
+                                        child: Icon(
+                                          Icons.wifi_off,
+                                          color: Colors.grey,
+                                          size: 20,
+                                        ),
+                                      ),
+                                    if (cartBooks.isNotEmpty)
+                                      Positioned(
+                                        right: 8,
+                                        top: 8,
+                                        child: Container(
+                                          padding: const EdgeInsets.all(4),
+                                          decoration: BoxDecoration(
+                                            color: Theme.of(
+                                              context,
+                                            ).colorScheme.secondary,
+                                            shape: BoxShape.circle,
+                                          ),
+                                          constraints: const BoxConstraints(
+                                            minWidth: 18,
+                                            minHeight: 18,
+                                          ),
+                                          child: Text(
+                                            '${cartBooks.length}',
+                                            style: TextStyle(
+                                              color: Theme.of(
+                                                context,
+                                              ).colorScheme.onSecondary,
+                                              fontSize: 10,
+                                              fontWeight: FontWeight.bold,
+                                            ),
+                                            textAlign: TextAlign.center,
+                                          ),
+                                        ),
+                                      ),
+                                  ],
                                 ),
-                                textAlign: TextAlign.center,
-                              ),
+                              ],
                             ),
                           ),
-                      ],
+                          onSubmitted: (query) {
+                            _searchFocusNode.unfocus();
+                            if (query.trim().isNotEmpty) {
+                              ref
+                                  .read(marketplaceProvider.notifier)
+                                  .searchBooks(query.trim());
+                            }
+                          },
+                          onTap: () {
+                            _searchFocusNode.requestFocus();
+                          },
+                        ),
+                      ),
                     ),
-                  ),
-                  onSubmitted: (query) {
-                    if (query.trim().isNotEmpty) {
-                      ref.read(marketplaceProvider.notifier).searchBooks(query.trim());
-                    }
-                  },
-                ),
-              ),
 
-              // Search Tag/Chip
-              SliverToBoxAdapter(
-                child: _buildSearchTag(),
-              ),
+                    // Offline / Error States
+                    if (state.isOffline && state.books.isEmpty)
+                      SliverFillRemaining(
+                        child: Center(
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              const Icon(
+                                Icons.wifi_off,
+                                size: 50,
+                                color: Colors.white54,
+                              ),
+                              const SizedBox(height: 10),
+                              const Text(
+                                'You are offline.',
+                                style: TextStyle(color: Colors.white),
+                              ),
+                              const Text(
+                                'Connect to the internet to discover new books.',
+                                style: TextStyle(color: Colors.white70),
+                              ),
+                              const SizedBox(height: 20),
+                              ElevatedButton(
+                                onPressed: () => ref
+                                    .read(marketplaceProvider.notifier)
+                                    .retryInitialLoad(),
+                                child: const Text('Retry'),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
 
-              // Top banner: show loading banner during initial caching/loading-from-cache, otherwise hero banner
-              if (state.searchQuery.isEmpty)
-                SliverToBoxAdapter(
-                  child: HeroBanner(onSeeAllBooks: _showAllBooks),
-                ),
+                    if (state.errorMessage != null)
+                      SliverFillRemaining(
+                        child: Center(
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              const Icon(
+                                Icons.error_outline,
+                                size: 50,
+                                color: Colors.red,
+                              ),
+                              const SizedBox(height: 10),
+                              Text(
+                                state.errorMessage!,
+                                style: const TextStyle(color: Colors.white),
+                              ),
+                              const SizedBox(height: 20),
+                              ElevatedButton(
+                                onPressed: () => ref
+                                    .read(marketplaceProvider.notifier)
+                                    .retryInitialLoad(),
+                                child: const Text('Retry'),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
 
-              if (state.isInitialLoading)
-                SliverToBoxAdapter(
-                  child: Column(
-                    children: [
-                      const SizedBox(height: 20),
-                      _buildSkeletonLoader(),
+                    // Main Content (Hero + Carousel + Sections)
+                    if (state.searchQuery.isEmpty) ...[
+                      // Hero Carousel (New Feature)
+                      if (state.recentBooks.isNotEmpty)
+                        SliverToBoxAdapter(
+                          child: Padding(
+                            padding: const EdgeInsets.only(
+                              top: 20.0,
+                              bottom: 10.0,
+                            ),
+                            child: HeroCarousel(
+                              books: state.recentBooks.take(5).toList(),
+                            ),
+                          ),
+                        ),
+
+                      // New & Trending (Overlapped Carousel)
+                      if (state.recentBooks.isNotEmpty)
+                        SliverToBoxAdapter(
+                          child: _buildCarousel(state.recentBooks),
+                        ),
+
+                      // Bestsellers List (Horizontal)
+                      const SliverToBoxAdapter(child: BestsellersSection()),
+
+                      // Categories
+                      SliverToBoxAdapter(child: CategoriesSection()),
                     ],
-                  ),
-                ),
 
-              if (state.isOffline && state.books.isEmpty)
-                SliverFillRemaining(
-                  child: Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        const Icon(Icons.wifi_off, size: 50),
-                        const SizedBox(height: 10),
-                        const Text('You are offline.'),
-                        const Text('Connect to the internet to discover new books.'),
-                        const SizedBox(height: 20),
-                        ElevatedButton(
-                          onPressed: () => ref.read(marketplaceProvider.notifier).retryInitialLoad(),
-                          child: const Text('Retry'),
-                        )
-                      ],
-                    ),
-                  ),
-                ),
+                    // Search Results Grid
+                    if (state.searchQuery.isNotEmpty)
+                      SliverPadding(
+                        padding: EdgeInsets.all(
+                          context.isMobile ? AppSpacing.md : AppSpacing.lg,
+                        ),
+                        sliver: SliverGrid(
+                          gridDelegate:
+                              SliverGridDelegateWithFixedCrossAxisCount(
+                                crossAxisCount: context.gridColumns,
+                                childAspectRatio: 0.66, // Standard book ratio
+                                crossAxisSpacing: AppSpacing.md,
+                                mainAxisSpacing: AppSpacing.md,
+                              ),
+                          delegate: SliverChildBuilderDelegate(
+                            (context, index) {
+                              if (index < state.books.length) {
+                                return MarketplaceCard(
+                                  book: state.books[index],
+                                );
+                              } else {
+                                return const Center(
+                                  child: CircularProgressIndicator(),
+                                );
+                              }
+                            },
+                            childCount: state.isLoading
+                                ? state.books.length + 1
+                                : state.books.length,
+                          ),
+                        ),
+                      ),
 
-              if (state.errorMessage != null)
-                SliverFillRemaining(
-                  child: Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        const Icon(Icons.error_outline, size: 50, color: Colors.red),
-                        const SizedBox(height: 10),
-                        Text(state.errorMessage!),
-                        const SizedBox(height: 20),
-                        ElevatedButton(
-                          onPressed: () => ref.read(marketplaceProvider.notifier).retryInitialLoad(),
-                          child: const Text('Retry'),
-                        )
-                      ],
-                    ),
-                  ),
+                    // Loading Indicator (for pagination)
+                    if (state.isLoading && state.searchQuery.isNotEmpty)
+                      const SliverToBoxAdapter(
+                        child: Center(
+                          child: Padding(
+                            padding: EdgeInsets.all(16.0),
+                            child: CircularProgressIndicator(),
+                          ),
+                        ),
+                      ),
+                  ],
                 ),
-
-              // Bestsellers and Categories: render them even during initial loading so cached shelves show up
-              if (state.searchQuery.isEmpty) const SliverToBoxAdapter(child: BestsellersSection()),
-              if (state.searchQuery.isEmpty) SliverToBoxAdapter(child: CategoriesSection()),
-
-              // Search Results Grid (if searching)
-              if (state.searchQuery.isNotEmpty)
-                SliverPadding(
-                  padding: EdgeInsets.all(context.isMobile ? AppSpacing.md : AppSpacing.lg),
-                  sliver: SliverGrid(
-                    gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                      crossAxisCount: context.gridColumns,
-                      childAspectRatio: context.cardAspectRatio,
-                      crossAxisSpacing: AppSpacing.md,
-                      mainAxisSpacing: AppSpacing.md,
-                    ),
-                    delegate: SliverChildBuilderDelegate(
-                      (context, index) {
-                        if (index < state.books.length) {
-                          return BookCard(book: state.books[index]);
-                        } else {
-                          // Show loading indicator at the end
-                          return const Center(child: CircularProgressIndicator());
-                        }
-                      },
-                      childCount: state.isLoading ? state.books.length + 1 : state.books.length,
-                    ),
-                  ),
-                ),
-
-              // Loading Indicator
-              if (state.isLoading)
-                const SliverToBoxAdapter(
-                  child: Center(
-                    child: Padding(
-                      padding: EdgeInsets.all(16.0),
-                      child: CircularProgressIndicator(),
-                    ),
-                  ),
-                ),
+              ),
             ],
           );
 
     return Scaffold(
-      backgroundColor: Theme.of(context).colorScheme.primary,
-      body: SafeArea(
-        child: LoadingOverlay(
-          isLoading: state.isInitialLoading,
-          child: bodyContent,
-        ),
-      ),
+      extendBodyBehindAppBar: true,
+      backgroundColor: Colors.transparent,
+      body: bodyContent,
     );
   }
 }

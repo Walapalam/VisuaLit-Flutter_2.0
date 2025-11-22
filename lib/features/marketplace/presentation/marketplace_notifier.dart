@@ -19,6 +19,7 @@ class MarketplaceState {
   final bool isOffline;
   final String? errorMessage;
   final List<dynamic> bestsellers;
+  final List<dynamic> recentBooks;
   final Map<String, List<dynamic>> categorizedBooks;
   final List<String> loadedCategories;
 
@@ -32,6 +33,7 @@ class MarketplaceState {
     this.isOffline = false,
     this.errorMessage,
     this.bestsellers = const [],
+    this.recentBooks = const [],
     this.categorizedBooks = const {},
     this.loadedCategories = const [],
   });
@@ -46,6 +48,7 @@ class MarketplaceState {
     bool? isOffline,
     String? errorMessage,
     List<dynamic>? bestsellers,
+    List<dynamic>? recentBooks,
     Map<String, List<dynamic>>? categorizedBooks,
     List<String>? loadedCategories,
   }) {
@@ -59,6 +62,7 @@ class MarketplaceState {
       isOffline: isOffline ?? this.isOffline,
       errorMessage: errorMessage ?? this.errorMessage,
       bestsellers: bestsellers ?? this.bestsellers,
+      recentBooks: recentBooks ?? this.recentBooks,
       categorizedBooks: categorizedBooks ?? this.categorizedBooks,
       loadedCategories: loadedCategories ?? this.loadedCategories,
     );
@@ -71,13 +75,15 @@ class MarketplaceNotifier extends StateNotifier<MarketplaceState> {
   static const _cacheExpiry = Duration(hours: 24);
 
   MarketplaceNotifier(this._isar, this._repository)
-      : super(MarketplaceState(
+    : super(
+        MarketplaceState(
           books: [],
           nextUrl: 'https://gutendex.com/books/',
           isLoading: false,
           searchQuery: '',
           isInitialLoading: true,
-        )) {
+        ),
+      ) {
     _loadInitialData();
   }
 
@@ -98,22 +104,31 @@ class MarketplaceNotifier extends StateNotifier<MarketplaceState> {
 
     if (_isar != null) {
       final cachedBestsellers = await _loadFromCache('bestsellers');
+      final cachedRecent = await _loadFromCache('recent');
       final cachedFiction = await _loadFromCache('fiction');
       final cachedScience = await _loadFromCache('science');
       final cachedHistory = await _loadFromCache('history');
       final cachedPhilosophy = await _loadFromCache('philosophy');
 
-      if (cachedBestsellers.isNotEmpty) {
+      if (cachedBestsellers.isNotEmpty || cachedRecent.isNotEmpty) {
         // Build categorized map and dedupe/shuffle so the same book doesn't appear in multiple shelves
         final rawCategorized = {
           'bestsellers': List<dynamic>.from(cachedBestsellers),
+          'recent': List<dynamic>.from(cachedRecent),
           'fiction': List<dynamic>.from(cachedFiction),
           'science': List<dynamic>.from(cachedScience),
           'history': List<dynamic>.from(cachedHistory),
           'philosophy': List<dynamic>.from(cachedPhilosophy),
         };
 
-        final shuffled = _dedupeAndShuffleCategorized(rawCategorized, ['bestsellers', 'fiction', 'science', 'history', 'philosophy']);
+        final shuffled = _dedupeAndShuffleCategorized(rawCategorized, [
+          'bestsellers',
+          'recent',
+          'fiction',
+          'science',
+          'history',
+          'philosophy',
+        ]);
 
         final loaded = <String>[];
         shuffled.forEach((k, v) {
@@ -122,6 +137,7 @@ class MarketplaceNotifier extends StateNotifier<MarketplaceState> {
 
         state = state.copyWith(
           bestsellers: shuffled['bestsellers']!,
+          recentBooks: shuffled['recent']!,
           categorizedBooks: {
             'fiction': shuffled['fiction']!,
             'science': shuffled['science']!,
@@ -148,22 +164,35 @@ class MarketplaceNotifier extends StateNotifier<MarketplaceState> {
     try {
       await fetchAndCacheInitialData();
       final bestsellers = await _loadFromCache('bestsellers');
+      final recent = await _loadFromCache('recent');
       final fiction = await _loadFromCache('fiction');
       final science = await _loadFromCache('science');
       final history = await _loadFromCache('history');
       final philosophy = await _loadFromCache('philosophy');
 
       // Final dedupe & shuffle across all categories before assigning
-      final finalCategorized = _dedupeAndShuffleCategorized({
-        'bestsellers': List<dynamic>.from(bestsellers),
-        'fiction': List<dynamic>.from(fiction),
-        'science': List<dynamic>.from(science),
-        'history': List<dynamic>.from(history),
-        'philosophy': List<dynamic>.from(philosophy),
-      }, ['bestsellers', 'fiction', 'science', 'history', 'philosophy']);
+      final finalCategorized = _dedupeAndShuffleCategorized(
+        {
+          'bestsellers': List<dynamic>.from(bestsellers),
+          'recent': List<dynamic>.from(recent),
+          'fiction': List<dynamic>.from(fiction),
+          'science': List<dynamic>.from(science),
+          'history': List<dynamic>.from(history),
+          'philosophy': List<dynamic>.from(philosophy),
+        },
+        [
+          'bestsellers',
+          'recent',
+          'fiction',
+          'science',
+          'history',
+          'philosophy',
+        ],
+      );
 
       state = state.copyWith(
         bestsellers: finalCategorized['bestsellers']!,
+        recentBooks: finalCategorized['recent']!,
         categorizedBooks: {
           'fiction': finalCategorized['fiction']!,
           'science': finalCategorized['science']!,
@@ -173,7 +202,14 @@ class MarketplaceNotifier extends StateNotifier<MarketplaceState> {
         isInitialLoading: false,
         isLoading: false,
         isLoadingFromCache: false,
-        loadedCategories: ['bestsellers', 'fiction', 'science', 'history', 'philosophy'],
+        loadedCategories: [
+          'bestsellers',
+          'recent',
+          'fiction',
+          'science',
+          'history',
+          'philosophy',
+        ],
       );
       debugPrint('Finished loading and caching initial data.');
     } catch (e) {
@@ -187,32 +223,87 @@ class MarketplaceNotifier extends StateNotifier<MarketplaceState> {
   }
 
   Future<void> fetchAndCacheInitialData() async {
-    // 1. Fetch Bestsellers
-    final bestsellers = await _repository.fetchBestsellers();
-    await _saveToCache(bestsellers, 'bestsellers');
-    debugPrint('Fetched and cached ${bestsellers.length} bestsellers.');
+    // 1. Fetch Bestsellers & Recent
+    try {
+      final bestsellers = await _repository.fetchBestsellers();
+      await _saveToCache(bestsellers, 'bestsellers');
+
+      final recentData = await _repository.fetchRecentBooks();
+      final recent = recentData['results'] as List<dynamic>;
+      await _saveToCache(recent, 'recent');
+
+      debugPrint(
+        'Fetched and cached ${bestsellers.length} bestsellers and ${recent.length} recent books.',
+      );
+
+      // Update state immediately
+      final updatedCategorized = Map<String, List<dynamic>>.from(
+        state.categorizedBooks,
+      );
+      updatedCategorized['bestsellers'] = bestsellers;
+      updatedCategorized['recent'] = recent;
+
+      // Dedupe & shuffle
+      final deduped = _dedupeAndShuffleCategorized(updatedCategorized, [
+        'bestsellers',
+        'recent',
+      ]);
+
+      state = state.copyWith(
+        bestsellers: deduped['bestsellers']!,
+        recentBooks: deduped['recent']!,
+        categorizedBooks: deduped,
+        isInitialLoading: false, // Show UI now!
+        isLoadingFromCache: true,
+        loadedCategories: ['bestsellers', 'recent'],
+      );
+    } catch (e) {
+      debugPrint('Error fetching initial lists: $e');
+    }
 
     // 2. Fetch for each category
     final categories = ['fiction', 'science', 'history', 'philosophy'];
     for (final category in categories) {
-      final categoryBooks = await _repository.fetchBooksByTopic(category);
-      await _saveToCache(categoryBooks['results'], category);
-      // Update UI immediately for this category so the shelf appears before moving on
-      final updatedCategorized = Map<String, List<dynamic>>.from(state.categorizedBooks);
-      updatedCategorized[category] = categoryBooks['results'];
+      try {
+        final categoryBooks = await _repository.fetchBooksByTopic(category);
+        await _saveToCache(categoryBooks['results'], category);
 
-      // Dedupe & shuffle across known categories including bestsellers
-      final deduped = _dedupeAndShuffleCategorized(updatedCategorized, ['bestsellers', 'fiction', 'science', 'history', 'philosophy']);
+        // Update UI immediately for this category
+        final updatedCategorized = Map<String, List<dynamic>>.from(
+          state.categorizedBooks,
+        );
+        updatedCategorized[category] = categoryBooks['results'];
 
-      final updatedLoaded = List<String>.from(state.loadedCategories);
-      if (!updatedLoaded.contains(category)) updatedLoaded.add(category);
+        // Dedupe & shuffle across all currently loaded categories
+        final allLoaded = [
+          'bestsellers',
+          'recent',
+          ...state.loadedCategories.where(
+            (c) => c != 'bestsellers' && c != 'recent',
+          ),
+          category,
+        ];
+        final deduped = _dedupeAndShuffleCategorized(
+          updatedCategorized,
+          allLoaded,
+        );
 
-      state = state.copyWith(
-        categorizedBooks: deduped,
-        loadedCategories: updatedLoaded,
-        isLoadingFromCache: true,
-      );
-      debugPrint('Fetched and cached ${categoryBooks['results'].length} books for $category.');
+        final updatedLoaded = List<String>.from(state.loadedCategories);
+        if (!updatedLoaded.contains(category)) updatedLoaded.add(category);
+
+        state = state.copyWith(
+          categorizedBooks: deduped,
+          loadedCategories: updatedLoaded,
+          isLoadingFromCache: true,
+          // Ensure initial loading is false if it wasn't already
+          isInitialLoading: false,
+        );
+        debugPrint(
+          'Fetched and cached ${categoryBooks['results'].length} books for $category.',
+        );
+      } catch (e) {
+        debugPrint('Error fetching $category: $e');
+      }
     }
   }
 
@@ -262,37 +353,51 @@ class MarketplaceNotifier extends StateNotifier<MarketplaceState> {
           final cached = CachedBook()
             ..bookId = book['id']
             ..title = book['title'] ?? ''
-            ..author = book['authors']?.isNotEmpty == true ? book['authors'][0]['name'] : null
+            ..author = book['authors']?.isNotEmpty == true
+                ? book['authors'][0]['name']
+                : null
             ..coverUrl = book['formats']?['image/jpeg']
             ..downloadUrl = book['formats']?['application/epub+zip']
-            ..language = book['languages']?.isNotEmpty == true ? book['languages'][0] : null
+            ..language = book['languages']?.isNotEmpty == true
+                ? book['languages'][0]
+                : null
             ..subjects = List<String>.from(book['subjects'] ?? [])
             ..cachedAt = now
             ..rawData = json.encode(book)
             ..searchQuery = query.isEmpty ? null : query
             ..downloadCount = book['download_count'] ?? 0
-            ..isBestseller = query == 'bestsellers' || (book['download_count'] ?? 0) > 10000;
+            ..isBestseller =
+                query == 'bestsellers' || (book['download_count'] ?? 0) > 10000;
           await _isar.cachedBooks.put(cached);
         } else {
           // Update fields on existing record to refresh cache
           existing.title = book['title'] ?? existing.title;
-          existing.author = book['authors']?.isNotEmpty == true ? book['authors'][0]['name'] : existing.author;
-          existing.coverUrl = book['formats']?['image/jpeg'] ?? existing.coverUrl;
-          existing.downloadUrl = book['formats']?['application/epub+zip'] ?? existing.downloadUrl;
-          existing.language = book['languages']?.isNotEmpty == true ? book['languages'][0] : existing.language;
-          existing.subjects = List<String>.from(book['subjects'] ?? existing.subjects ?? []);
+          existing.author = book['authors']?.isNotEmpty == true
+              ? book['authors'][0]['name']
+              : existing.author;
+          existing.coverUrl =
+              book['formats']?['image/jpeg'] ?? existing.coverUrl;
+          existing.downloadUrl =
+              book['formats']?['application/epub+zip'] ?? existing.downloadUrl;
+          existing.language = book['languages']?.isNotEmpty == true
+              ? book['languages'][0]
+              : existing.language;
+          existing.subjects = List<String>.from(
+            book['subjects'] ?? existing.subjects ?? [],
+          );
           existing.cachedAt = now;
           existing.rawData = json.encode(book);
           existing.searchQuery = query.isEmpty ? null : query;
-          existing.downloadCount = book['download_count'] ?? existing.downloadCount;
-          existing.isBestseller = query == 'bestsellers' || (book['download_count'] ?? 0) > 10000;
+          existing.downloadCount =
+              book['download_count'] ?? existing.downloadCount;
+          existing.isBestseller =
+              query == 'bestsellers' || (book['download_count'] ?? 0) > 10000;
 
           await _isar.cachedBooks.put(existing);
         }
       }
     });
   }
-
 
   Future<void> _clearOldCache() async {
     if (_isar == null) return;
@@ -349,7 +454,8 @@ class MarketplaceNotifier extends StateNotifier<MarketplaceState> {
 
     state = state.copyWith(
       searchQuery: query,
-      nextUrl: 'https://gutendex.com/books/?search=${Uri.encodeComponent(query)}',
+      nextUrl:
+          'https://gutendex.com/books/?search=${Uri.encodeComponent(query)}',
       books: cachedBooks,
       isLoadingFromCache: cachedBooks.isNotEmpty,
     );
@@ -371,7 +477,10 @@ class MarketplaceNotifier extends StateNotifier<MarketplaceState> {
 
   // Helper: dedupe books across categories and shuffle each category's list.
   // Uses improved randomization to fairly distribute books across categories
-  Map<String, List<dynamic>> _dedupeAndShuffleCategorized(Map<String, List<dynamic>> input, List<String> order) {
+  Map<String, List<dynamic>> _dedupeAndShuffleCategorized(
+    Map<String, List<dynamic>> input,
+    List<String> order,
+  ) {
     final out = <String, List<dynamic>>{};
     final seen = <int>{};
     final rng = Random();
@@ -388,7 +497,9 @@ class MarketplaceNotifier extends StateNotifier<MarketplaceState> {
       final books = input[category] ?? [];
       for (final book in books) {
         try {
-          final id = (book['id'] is int) ? book['id'] as int : int.parse(book['id'].toString());
+          final id = (book['id'] is int)
+              ? book['id'] as int
+              : int.parse(book['id'].toString());
           bookCategories.putIfAbsent(id, () => []).add(category);
         } catch (_) {
           // Skip books without valid IDs
@@ -397,7 +508,8 @@ class MarketplaceNotifier extends StateNotifier<MarketplaceState> {
     }
 
     // Now process books, giving priority to books that appear in fewer categories
-    final bookAssignments = <int, String>{}; // Track which category each book is assigned to
+    final bookAssignments =
+        <int, String>{}; // Track which category each book is assigned to
 
     // Sort books by how many categories they appear in (fewer categories = higher priority)
     final bookPriorities = bookCategories.entries.toList()
@@ -410,7 +522,9 @@ class MarketplaceNotifier extends StateNotifier<MarketplaceState> {
 
       if (!bookAssignments.containsKey(bookId)) {
         // Randomly choose one of the categories this book belongs to
-        final availableCategories = categories.where((cat) => order.contains(cat)).toList();
+        final availableCategories = categories
+            .where((cat) => order.contains(cat))
+            .toList();
         if (availableCategories.isNotEmpty) {
           availableCategories.shuffle(rng);
           bookAssignments[bookId] = availableCategories.first;
@@ -425,7 +539,9 @@ class MarketplaceNotifier extends StateNotifier<MarketplaceState> {
 
       for (final book in books) {
         try {
-          final id = (book['id'] is int) ? book['id'] as int : int.parse(book['id'].toString());
+          final id = (book['id'] is int)
+              ? book['id'] as int
+              : int.parse(book['id'].toString());
           if (bookAssignments[id] == category) {
             assigned.add(book);
           }
@@ -448,7 +564,9 @@ class MarketplaceNotifier extends StateNotifier<MarketplaceState> {
 
         for (final book in books) {
           try {
-            final id = (book['id'] is int) ? book['id'] as int : int.parse(book['id'].toString());
+            final id = (book['id'] is int)
+                ? book['id'] as int
+                : int.parse(book['id'].toString());
             if (bookAssignments[id] == category) {
               assigned.add(book);
             }

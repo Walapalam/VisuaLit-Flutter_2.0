@@ -12,19 +12,32 @@ class StreakWidget extends StatelessWidget {
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          'x$streakDays',
-          style: const TextStyle(
-            color: AppTheme.primaryGreen,
-            fontSize: 24,
-            fontWeight: FontWeight.bold,
-            letterSpacing: 0.5,
+        RichText(
+          text: TextSpan(
+            children: [
+              TextSpan(
+                text: 'x',
+                style: TextStyle(
+                  color: Colors.grey[600],
+                  fontSize: 24,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              TextSpan(
+                text: '$streakDays',
+                style: const TextStyle(
+                  color: AppTheme.primaryGreen,
+                  fontSize: 24,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ],
           ),
         ),
         // Fire emoji superscripted like mathematical notation
         Transform.translate(
-          offset: const Offset(2, -6),
-          child: const Text('🔥', style: TextStyle(fontSize: 18)),
+          offset: const Offset(-2, -8),
+          child: const Text('🔥', style: TextStyle(fontSize: 16)),
         ),
       ],
     );

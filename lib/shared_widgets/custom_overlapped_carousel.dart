@@ -84,11 +84,8 @@ class _CustomOverlappedCarouselState extends State<CustomOverlappedCarousel>
   }
 
   void _onHorizontalDragEnd(DragEndDetails details) {
-    // Snap to nearest index
-    final int targetIndex = _scrollPercent.round().clamp(
-      0,
-      widget.items.length - 1,
-    );
+    // Snap to nearest index (no clamping for infinite scroll)
+    final int targetIndex = _scrollPercent.round();
 
     _controller.duration = const Duration(milliseconds: 300);
     final double targetPercent = targetIndex.toDouble();
@@ -137,48 +134,52 @@ class _CustomOverlappedCarouselState extends State<CustomOverlappedCarousel>
 
   List<Widget> _buildStackChildren() {
     final List<Widget> children = [];
-    final int currentIndex = _scrollPercent.round();
-    final double centerOffset = MediaQuery.of(context).size.width / 2;
+    // Use modulo for infinite scroll effect logic
+    // We assume the list is circular.
+    // _scrollPercent can now go beyond 0..length-1
 
-    // We want to render items such that the center one is last (on top).
-    // So we render from edges inwards.
+    final double centerOffset = MediaQuery.of(context).size.width / 2;
+    final int totalItems = widget.items.length;
+    if (totalItems == 0) return [];
+
+    // Normalize scroll percent to positive range for easier calculation if needed,
+    // but we can handle negative indices with modulo.
 
     // Determine visible range (e.g., +/- 2 items)
     const int visibleRange = 2;
-    final int minIndex = (currentIndex - visibleRange).clamp(
-      0,
-      widget.items.length - 1,
-    );
-    final int maxIndex = (currentIndex + visibleRange).clamp(
-      0,
-      widget.items.length - 1,
-    );
+    final int currentIndex = _scrollPercent.round();
 
-    // Create a list of indices to render, sorted by depth (furthest first)
-    // Depth is determined by distance from _scrollPercent
-    final List<int> indices = [];
-    for (int i = minIndex; i <= maxIndex; i++) {
-      indices.add(i);
+    // Create a list of indices to render relative to current index
+    final List<int> relativeIndices = [];
+    for (int i = -visibleRange; i <= visibleRange; i++) {
+      relativeIndices.add(currentIndex + i);
     }
 
     // Sort: indices with larger distance from _scrollPercent should come first (be behind)
-    indices.sort((a, b) {
+    relativeIndices.sort((a, b) {
       final double distA = (a - _scrollPercent).abs();
       final double distB = (b - _scrollPercent).abs();
       return distB.compareTo(distA); // Descending distance
     });
 
-    for (final int index in indices) {
-      final double distance = (index - _scrollPercent);
+    for (final int relativeIndex in relativeIndices) {
+      final double distance = (relativeIndex - _scrollPercent);
       final double absDistance = distance.abs();
 
       // Calculate transform properties
       // Reduced the scale reduction factor from 0.2 to 0.08 to keep books larger
-      final double scale = (1.0 - (absDistance * 0.08)).clamp(0.0, 1.0);
-      // Reduced the opacity reduction factor from 0.3 to 0.15 to keep books more visible
-      final double opacity = (1.0 - (absDistance * 0.15)).clamp(0.0, 1.0);
+      final double scale = (1.0 - (absDistance * 0.1)).clamp(0.0, 1.0);
+
+      // User requested NO transparency/translucency for following layers
+      // So we keep opacity at 1.0 unless it's very far and we want to hide it completely
+      final double opacity = 1.0;
+
       final double translateX =
           distance * (widget.centerItemWidth * 0.6); // Overlap factor
+
+      // Wrap index for infinite scroll
+      int actualIndex = relativeIndex % totalItems;
+      if (actualIndex < 0) actualIndex += totalItems;
 
       children.add(
         Positioned(
@@ -195,15 +196,13 @@ class _CustomOverlappedCarouselState extends State<CustomOverlappedCarousel>
               scale: scale, // Also scale content
               child: GestureDetector(
                 onTap: () {
-                  if (index == currentIndex) {
-                    widget.onClicked(index);
+                  if (relativeIndex == currentIndex) {
+                    widget.onClicked(actualIndex);
                   } else {
-                    // Scroll to this item if clicked
-                    // _scrollToIndex(index);
-                    // For now, just let drag handle it or implement scroll to tap
+                    // Optional: Scroll to clicked
                   }
                 },
-                child: widget.items[index],
+                child: widget.items[actualIndex],
               ),
             ),
           ),

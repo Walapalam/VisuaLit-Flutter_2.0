@@ -29,10 +29,12 @@ class MainShell extends StatelessWidget {
             fontWeight: FontWeight.normal,
           ),
         ),
-        centerTitle: false,
-        titleSpacing: 20, // Match home screen content padding (20px)
+        centerTitle: true, // Center the logo
         backgroundColor: Theme.of(context).colorScheme.primary.withOpacity(0.0),
         elevation: 0,
+        // Add empty leading to balance the profile icon on right
+        leading: const SizedBox(width: 56), // Same width as IconButton
+        leadingWidth: 56,
         actions: [
           // Profile icon aligned with home screen content
           Padding(

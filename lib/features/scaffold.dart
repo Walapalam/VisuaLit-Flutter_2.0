@@ -1,13 +1,14 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:visualit/core/theme/app_theme.dart';
+import 'package:visualit/features/auth/presentation/auth_controller.dart';
 import 'app_drawer.dart';
 import 'audiobook_player/presentation/mini_audio_player.dart';
+import 'package:visualit/shared_widgets/glass_bottom_nav.dart';
 
 class MainShell extends StatelessWidget {
-  const MainShell({
-    required this.navigationShell,
-    super.key,
-  });
+  const MainShell({required this.navigationShell, super.key});
 
   final StatefulNavigationShell navigationShell;
 
@@ -29,99 +30,85 @@ class MainShell extends StatelessWidget {
           ),
         ),
         centerTitle: false,
+        titleSpacing: 20, // Match home screen content padding (20px)
         backgroundColor: Theme.of(context).colorScheme.primary.withOpacity(0.0),
         elevation: 0,
         actions: [
-          IconButton(
-            icon: Icon(
-              Icons.search,
-              color: Theme.of(context).colorScheme.onPrimary,
-            ),
-            onPressed: () {
-              showSearch(
-                context: context,
-                delegate: MySearchDelegate(),
-              );
-            },
-          ),
-          Builder(
-            builder: (context) => IconButton(
-              icon: CircleAvatar(
-                backgroundColor: Theme.of(context).colorScheme.surface,
-                radius: 16,
-              ),
-              onPressed: () {
-                Scaffold.of(context).openEndDrawer();
+          // Profile icon aligned with home screen content
+          Padding(
+            padding: const EdgeInsets.only(
+              right: 20,
+            ), // Match home screen padding
+            child: Consumer(
+              builder: (context, ref, child) {
+                final authState = ref.watch(authControllerProvider);
+                final user = authState.user;
+
+                return Builder(
+                  builder: (context) => IconButton(
+                    icon: CircleAvatar(
+                      backgroundColor: AppTheme.primaryGreen,
+                      radius: 16,
+                      child: Text(
+                        user?.displayName?.isNotEmpty == true
+                            ? user!.displayName![0].toUpperCase()
+                            : 'G',
+                        style: const TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                          color: AppTheme.black,
+                        ),
+                      ),
+                    ),
+                    onPressed: () {
+                      Scaffold.of(context).openEndDrawer();
+                    },
+                  ),
+                );
               },
             ),
           ),
         ],
       ),
       endDrawer: const AppDrawer(),
-
-      // +++ THIS IS THE MAIN CHANGE +++
-      // We use a Column to stack the main page content on top of the mini-player.
-      body: Column(
+      body: Stack(
         children: [
-          // The Expanded widget ensures the main content (your pages)
-          // takes up all available space, pushing the mini-player to the bottom.
-          Expanded(
-            child: navigationShell,
-          ),
+          // Main Content
+          navigationShell,
 
-          // The MiniAudioPlayer is placed here.
-          // It will automatically be visible only when an audiobook is loaded
-          // in the global AudiobookPlayerService.
-          const MiniAudioPlayer(),
-        ],
-      ),
-
-      bottomNavigationBar: BottomNavigationBar(
-        backgroundColor: Theme.of(context).colorScheme.primary,
-        selectedItemColor: Theme.of(context).colorScheme.onPrimary,
-        unselectedItemColor: Theme.of(context).colorScheme.onPrimary.withOpacity(0.6),
-        type: BottomNavigationBarType.fixed,
-        showUnselectedLabels: false,
-        showSelectedLabels: true,
-        currentIndex: navigationShell.currentIndex,
-        onTap: (index) {
-          debugPrint('Navigating to index: $index');
-          navigationShell.goBranch(
-            index,
-            initialLocation: index == navigationShell.currentIndex,
-          );
-        },
-        items: const [
-          BottomNavigationBarItem(
-            icon: Icon(Icons.home_outlined),
-            activeIcon: Icon(Icons.home),
-            label: 'Home',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.book_outlined),
-            activeIcon: Icon(Icons.book),
-            label: 'Library',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.headphones_outlined),
-            activeIcon: Icon(Icons.headphones),
-            label: 'Audio',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.store_outlined),
-            activeIcon: Icon(Icons.store),
-            label: 'Marketplace',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.settings_outlined),
-            activeIcon: Icon(Icons.settings),
-            label: 'Settings',
+          // Bottom Elements
+          Positioned(
+            left: 0,
+            right: 0,
+            bottom: 0,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const MiniAudioPlayer(),
+                // Add some spacing if needed, or let the player sit on top of the nav bar area
+                // But typically MiniAudioPlayer sits above the nav bar.
+                // Let's put the nav bar below it.
+                GlassBottomNav(
+                  currentIndex: navigationShell.currentIndex,
+                  onTap: (index) {
+                    debugPrint('Navigating to index: $index');
+                    navigationShell.goBranch(
+                      index,
+                      initialLocation: index == navigationShell.currentIndex,
+                    );
+                  },
+                ),
+              ],
+            ),
           ),
         ],
       ),
+      // Remove standard BottomNavigationBar
+      // bottomNavigationBar: ...
     );
   }
 }
+
 // Your MySearchDelegate code remains the same
 class MySearchDelegate extends SearchDelegate<String> {
   @override

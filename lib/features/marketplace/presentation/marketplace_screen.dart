@@ -215,7 +215,7 @@ class _MarketplaceScreenState extends ConsumerState<MarketplaceScreen> {
                                         color: Colors.white,
                                       ),
                                       onPressed: () {
-                                        context.goNamed('cart');
+                                        context.go('/marketplace/cart');
                                       },
                                     ),
                                     if (state.isOffline)

@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import 'package:visualit/core/theme/app_theme.dart';
 import 'package:visualit/features/reader/data/book_data.dart';
 import 'package:visualit/features/library/presentation/library_controller.dart';
+import 'package:visualit/core/services/toast_service.dart';
 
 class BookDetailsSheet extends ConsumerStatefulWidget {
   final Book book;
@@ -161,11 +162,10 @@ class _BookDetailsSheetState extends ConsumerState<BookDetailsSheet> {
                           icon: Icons.share_outlined,
                           onTap: () {
                             // TODO: Implement share functionality
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                content: Text('Share feature coming soon'),
-                                backgroundColor: AppTheme.primaryGreen,
-                              ),
+                            ToastService.show(
+                              context,
+                              'Share feature coming soon',
+                              type: ToastType.info,
                             );
                           },
                         ),
@@ -570,11 +570,10 @@ class _BookDetailsSheetState extends ConsumerState<BookDetailsSheet> {
               Navigator.pop(context); // Close dialog
               Navigator.pop(context); // Close bottom sheet
               widget.controller.deleteBook(widget.book.id);
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('Book removed from library'),
-                  backgroundColor: AppTheme.primaryGreen,
-                ),
+              ToastService.show(
+                context,
+                'Book removed from library',
+                type: ToastType.success,
               );
             },
             style: ElevatedButton.styleFrom(backgroundColor: Colors.red),

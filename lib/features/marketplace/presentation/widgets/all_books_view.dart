@@ -106,7 +106,10 @@ class _AllBooksViewState extends State<AllBooksView> {
                 ),
                 filled: true,
                 fillColor: Theme.of(context).colorScheme.surface,
-                contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                contentPadding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 8,
+                ),
                 prefixIcon: Icon(
                   Icons.search,
                   color: Theme.of(context).colorScheme.onSurface.withAlpha(153),
@@ -114,7 +117,9 @@ class _AllBooksViewState extends State<AllBooksView> {
               ),
               onSubmitted: (query) {
                 if (query.trim().isNotEmpty) {
-                  widget.ref.read(marketplaceProvider.notifier).searchBooks(query.trim());
+                  widget.ref
+                      .read(marketplaceProvider.notifier)
+                      .searchBooks(query.trim());
                 }
               },
             ),
@@ -128,7 +133,7 @@ class _AllBooksViewState extends State<AllBooksView> {
               ),
             IconButton(
               icon: const Icon(Icons.shopping_cart),
-              onPressed: () => context.goNamed('cart'),
+              onPressed: () => context.go('/marketplace/cart'),
             ),
           ],
         ),
@@ -140,16 +145,12 @@ class _AllBooksViewState extends State<AllBooksView> {
               const SizedBox(width: 4),
               DropdownButton<String>(
                 value: sortOption,
-                items: [
-                  'Default',
-                  'Title',
-                  'Author',
-                  'Newest',
-                  'Popular',
-                ].map((option) => DropdownMenuItem(
-                  value: option,
-                  child: Text(option),
-                )).toList(),
+                items: ['Default', 'Title', 'Author', 'Newest', 'Popular']
+                    .map(
+                      (option) =>
+                          DropdownMenuItem(value: option, child: Text(option)),
+                    )
+                    .toList(),
                 onChanged: (value) {
                   setState(() {
                     sortOption = value!;
@@ -162,10 +163,14 @@ class _AllBooksViewState extends State<AllBooksView> {
               const SizedBox(width: 4),
               DropdownButton<int>(
                 value: columns,
-                items: [2, 3, 4].map((col) => DropdownMenuItem(
-                  value: col,
-                  child: Text('$col per row'),
-                )).toList(),
+                items: [2, 3, 4]
+                    .map(
+                      (col) => DropdownMenuItem(
+                        value: col,
+                        child: Text('$col per row'),
+                      ),
+                    )
+                    .toList(),
                 onChanged: (value) {
                   setState(() {
                     columns = value!;
@@ -204,36 +209,48 @@ class _AllBooksViewState extends State<AllBooksView> {
                   Positioned.fill(child: content),
 
                   // Scroll-following indicator (visible while user scrolls or while loading)
-                  if ((_isIndicatorVisible || state.isLoading) && widget.scrollController.hasClients)
+                  if ((_isIndicatorVisible || state.isLoading) &&
+                      widget.scrollController.hasClients)
                     Positioned(
                       right: 12,
                       top: topPos,
                       child: AnimatedOpacity(
                         duration: const Duration(milliseconds: 250),
-                        opacity: (_isIndicatorVisible || state.isLoading) ? 1.0 : 0.0,
+                        opacity: (_isIndicatorVisible || state.isLoading)
+                            ? 1.0
+                            : 0.0,
                         child: Container(
                           padding: const EdgeInsets.all(6),
                           decoration: BoxDecoration(
-                            color: Theme.of(context).colorScheme.onSurface.withAlpha(20), // ~0.08 * 255
+                            color: Theme.of(context).colorScheme.onSurface
+                                .withAlpha(20), // ~0.08 * 255
                             borderRadius: BorderRadius.circular(12),
                             boxShadow: [
                               BoxShadow(
-                                color: Colors.black.withAlpha(38), // ~0.15 * 255
+                                color: Colors.black.withAlpha(
+                                  38,
+                                ), // ~0.15 * 255
                                 blurRadius: 6,
                                 offset: const Offset(0, 2),
-                              )
+                              ),
                             ],
                           ),
                           child: state.isLoading
                               ? const SizedBox(
                                   width: 20,
                                   height: 20,
-                                  child: CircularProgressIndicator(strokeWidth: 2),
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                  ),
                                 )
                               : Icon(
-                                  _scrollingDown ? Icons.arrow_downward : Icons.arrow_upward,
+                                  _scrollingDown
+                                      ? Icons.arrow_downward
+                                      : Icons.arrow_upward,
                                   size: 18,
-                                  color: Theme.of(context).colorScheme.onSurface,
+                                  color: Theme.of(
+                                    context,
+                                  ).colorScheme.onSurface,
                                 ),
                         ),
                       ),
@@ -272,9 +289,11 @@ class _AllBooksViewState extends State<AllBooksView> {
             const Text('Connect to the internet to discover new books.'),
             const SizedBox(height: 20),
             ElevatedButton(
-              onPressed: () => widget.ref.read(marketplaceProvider.notifier).loadBooks(reset: true),
+              onPressed: () => widget.ref
+                  .read(marketplaceProvider.notifier)
+                  .loadBooks(reset: true),
               child: const Text('Retry'),
-            )
+            ),
           ],
         ),
       );
@@ -290,9 +309,11 @@ class _AllBooksViewState extends State<AllBooksView> {
             Text(state.errorMessage!),
             const SizedBox(height: 20),
             ElevatedButton(
-              onPressed: () => widget.ref.read(marketplaceProvider.notifier).loadBooks(reset: true),
+              onPressed: () => widget.ref
+                  .read(marketplaceProvider.notifier)
+                  .loadBooks(reset: true),
               child: const Text('Retry'),
-            )
+            ),
           ],
         ),
       );
@@ -301,7 +322,8 @@ class _AllBooksViewState extends State<AllBooksView> {
     return NotificationListener<ScrollNotification>(
       onNotification: (scrollNotification) {
         // If user scrolled near the end, attempt to load more (the notifier will handle locking)
-        if (scrollNotification.metrics.pixels >= scrollNotification.metrics.maxScrollExtent * 0.8) {
+        if (scrollNotification.metrics.pixels >=
+            scrollNotification.metrics.maxScrollExtent * 0.8) {
           final stateLocal = widget.ref.read(marketplaceProvider);
           if (!stateLocal.isLoading && stateLocal.nextUrl != null) {
             widget.ref.read(marketplaceProvider.notifier).loadBooks();

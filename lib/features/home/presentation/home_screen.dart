@@ -15,6 +15,8 @@ import 'widgets/home_background.dart';
 import 'widgets/glass_search_bar.dart';
 import 'widgets/currently_reading_carousel.dart';
 import 'widgets/section_header.dart';
+import 'widgets/empty_library_view.dart';
+import 'package:visualit/core/services/toast_service.dart';
 
 class HomeScreen extends ConsumerWidget {
   const HomeScreen({super.key});
@@ -121,10 +123,10 @@ class HomeScreen extends ConsumerWidget {
                                 GlassSearchBar(
                                   onTap: () {
                                     // TODO: Implement search navigation or logic
-                                    ScaffoldMessenger.of(context).showSnackBar(
-                                      const SnackBar(
-                                        content: Text('Search coming soon'),
-                                      ),
+                                    ToastService.show(
+                                      context,
+                                      'Search coming soon',
+                                      type: ToastType.info,
                                     );
                                   },
                                 ),
@@ -133,82 +135,128 @@ class HomeScreen extends ConsumerWidget {
                           ),
                         ),
 
-                        // Currently Reading Section
-                        SliverToBoxAdapter(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.center,
-                            children: [
-                              const SizedBox(height: 20),
-                              const Padding(
-                                padding: EdgeInsets.symmetric(horizontal: 10.0),
-                                child: Text(
-                                  'Continue Reading',
-                                  textAlign: TextAlign.center, // Centered
-                                  style: TextStyle(
-                                    color: AppTheme.white,
-                                    fontSize: 24,
-                                    fontWeight: FontWeight.bold,
+                        if (books.isEmpty) ...[
+                          // EMPTY STATE LAYOUT
+                          // 1. Marketplace (Moved to top)
+                          SliverToBoxAdapter(
+                            child: Consumer(
+                              builder: (context, ref, child) {
+                                final marketplaceState = ref.watch(
+                                  marketplaceProvider,
+                                );
+
+                                // Combine all marketplace books
+                                final allMarketplaceBooks = <dynamic>[
+                                  ...marketplaceState.bestsellers,
+                                  ...marketplaceState.categorizedBooks.values
+                                      .expand((list) => list),
+                                ];
+
+                                // Get 10 random books
+                                final random = allMarketplaceBooks.toList()
+                                  ..shuffle();
+                                final randomBooks = random.take(10).toList();
+
+                                return Column(
+                                  children: [
+                                    const SizedBox(height: 24),
+                                    SectionHeader(
+                                      title: 'Discover Books',
+                                      onActionTap: () =>
+                                          context.go('/marketplace'),
+                                    ),
+                                    _HorizontalMarketplaceBookList(
+                                      books: randomBooks,
+                                    ),
+                                  ],
+                                );
+                              },
+                            ),
+                          ),
+
+                          // 2. Motivational Empty State
+                          const SliverToBoxAdapter(child: EmptyLibraryView()),
+                        ] else ...[
+                          // NORMAL LAYOUT
+                          // Currently Reading Section
+                          SliverToBoxAdapter(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.center,
+                              children: [
+                                const SizedBox(height: 20),
+                                const Padding(
+                                  padding: EdgeInsets.symmetric(
+                                    horizontal: 10.0,
+                                  ),
+                                  child: Text(
+                                    'Continue Reading',
+                                    textAlign: TextAlign.center, // Centered
+                                    style: TextStyle(
+                                      color: AppTheme.white,
+                                      fontSize: 24,
+                                      fontWeight: FontWeight.bold,
+                                    ),
                                   ),
                                 ),
-                              ),
-                              const SizedBox(height: 16),
-                              CurrentlyReadingCarousel(books: recentBooks),
-                            ],
+                                const SizedBox(height: 16),
+                                CurrentlyReadingCarousel(books: recentBooks),
+                              ],
+                            ),
                           ),
-                        ),
 
-                        // My Books Section
-                        SliverToBoxAdapter(
-                          child: Column(
-                            children: [
-                              const SizedBox(height: 32),
-                              SectionHeader(
-                                title: 'My Books',
-                                onActionTap: () => context.go('/library'),
-                              ),
-                              _HorizontalBookList(books: books),
-                            ],
+                          // My Books Section
+                          SliverToBoxAdapter(
+                            child: Column(
+                              children: [
+                                const SizedBox(height: 32),
+                                SectionHeader(
+                                  title: 'My Books',
+                                  onActionTap: () => context.go('/library'),
+                                ),
+                                _HorizontalBookList(books: books),
+                              ],
+                            ),
                           ),
-                        ),
 
-                        // Marketplace Section - Show 10 random books
-                        SliverToBoxAdapter(
-                          child: Consumer(
-                            builder: (context, ref, child) {
-                              final marketplaceState = ref.watch(
-                                marketplaceProvider,
-                              );
+                          // Marketplace Section - Show 10 random books
+                          SliverToBoxAdapter(
+                            child: Consumer(
+                              builder: (context, ref, child) {
+                                final marketplaceState = ref.watch(
+                                  marketplaceProvider,
+                                );
 
-                              // Combine all marketplace books
-                              final allMarketplaceBooks = <dynamic>[
-                                ...marketplaceState.bestsellers,
-                                ...marketplaceState.categorizedBooks.values
-                                    .expand((list) => list),
-                              ];
+                                // Combine all marketplace books
+                                final allMarketplaceBooks = <dynamic>[
+                                  ...marketplaceState.bestsellers,
+                                  ...marketplaceState.categorizedBooks.values
+                                      .expand((list) => list),
+                                ];
 
-                              // Get 10 random books
-                              final random = allMarketplaceBooks.toList()
-                                ..shuffle();
-                              final randomBooks = random.take(10).toList();
+                                // Get 10 random books
+                                final random = allMarketplaceBooks.toList()
+                                  ..shuffle();
+                                final randomBooks = random.take(10).toList();
 
-                              return Column(
-                                children: [
-                                  const SizedBox(height: 24),
-                                  SectionHeader(
-                                    title: 'Marketplace',
-                                    onActionTap: () =>
-                                        context.go('/marketplace'),
-                                  ),
-                                  _HorizontalMarketplaceBookList(
-                                    books: randomBooks,
-                                  ),
-                                ],
-                              );
-                            },
+                                return Column(
+                                  children: [
+                                    const SizedBox(height: 24),
+                                    SectionHeader(
+                                      title: 'Marketplace',
+                                      onActionTap: () =>
+                                          context.go('/marketplace'),
+                                    ),
+                                    _HorizontalMarketplaceBookList(
+                                      books: randomBooks,
+                                    ),
+                                  ],
+                                );
+                              },
+                            ),
                           ),
-                        ),
+                        ],
 
-                        // Add Books Button - Expandable
+                        // Add Books Button - Expandable (Always visible)
                         SliverToBoxAdapter(
                           child: Padding(
                             padding: const EdgeInsets.all(20.0),
@@ -281,12 +329,10 @@ class _HorizontalBookList extends StatelessWidget {
                   pathParameters: {'bookId': book.id.toString()},
                 );
               } else {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text(
-                      '${book.title ?? 'Book'} is still processing...',
-                    ),
-                  ),
+                ToastService.show(
+                  context,
+                  '${book.title ?? 'Book'} is still processing...',
+                  type: ToastType.info,
                 );
               }
             },

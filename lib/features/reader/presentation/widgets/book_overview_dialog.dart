@@ -7,6 +7,7 @@ import 'package:visualit/data/models/generated_visual.dart';
 import 'package:visualit/data/services/appwrite_service.dart';
 import 'package:visualit/features/reader/presentation/widgets/image_detail_dialog.dart';
 import 'package:visualit/features/reader/presentation/widgets/liquid_glass_container.dart';
+import 'package:visualit/core/services/toast_service.dart';
 
 // A StateProvider to manage the loading state of the generation request
 final generationLoadingProvider = StateProvider.autoDispose<bool>((ref) {
@@ -18,12 +19,17 @@ final generationLoadingProvider = StateProvider.autoDispose<bool>((ref) {
 });
 
 // FutureProvider to fetch book details from Appwrite by title for lookup
-final bookDetailsByTitleProvider = FutureProvider.family<Book?, String>((ref, bookTitle) async {
+final bookDetailsByTitleProvider = FutureProvider.family<Book?, String>((
+  ref,
+  bookTitle,
+) async {
   print('📚 DEBUG: Fetching book details for title: $bookTitle');
   final service = ref.watch(appwriteServiceProvider);
   try {
     final book = await service.getBookByTitle(bookTitle);
-    print('📚 DEBUG: Book lookup result - Found: ${book != null}, Title: ${book?.title}');
+    print(
+      '📚 DEBUG: Book lookup result - Found: ${book != null}, Title: ${book?.title}',
+    );
     return book;
   } catch (e) {
     print('📚 DEBUG: Error fetching book details: $e');
@@ -32,54 +38,71 @@ final bookDetailsByTitleProvider = FutureProvider.family<Book?, String>((ref, bo
 });
 
 // FutureProvider to fetch chapters for a given Appwrite book ID
-final chaptersForAppwriteBookProvider = FutureProvider.family<List<Chapter>, String>((ref, appwriteBookId) async {
-  print('📚 DEBUG: Fetching chapters for book ID: $appwriteBookId');
-  final service = ref.watch(appwriteServiceProvider);
-  try {
-    final chapters = await service.getChaptersForBook(appwriteBookId);
-    print('📚 DEBUG: Found ${chapters.length} chapters for book ID: $appwriteBookId');
-    return chapters;
-  } catch (e) {
-    print('📚 DEBUG: Error fetching chapters: $e');
-    rethrow;
-  }
-});
+final chaptersForAppwriteBookProvider =
+    FutureProvider.family<List<Chapter>, String>((ref, appwriteBookId) async {
+      print('📚 DEBUG: Fetching chapters for book ID: $appwriteBookId');
+      final service = ref.watch(appwriteServiceProvider);
+      try {
+        final chapters = await service.getChaptersForBook(appwriteBookId);
+        print(
+          '📚 DEBUG: Found ${chapters.length} chapters for book ID: $appwriteBookId',
+        );
+        return chapters;
+      } catch (e) {
+        print('📚 DEBUG: Error fetching chapters: $e');
+        rethrow;
+      }
+    });
 
 // FutureProvider to fetch all generated visuals for a given Appwrite book (indirectly via chapters)
-final generatedVisualsForAppwriteBookProvider = FutureProvider.family<List<GeneratedVisual>, String>((ref, appwriteBookId) async {
-  print('📚 DEBUG: Starting visual fetch process for book ID: $appwriteBookId');
-  final chaptersAsync = ref.watch(chaptersForAppwriteBookProvider(appwriteBookId));
+final generatedVisualsForAppwriteBookProvider =
+    FutureProvider.family<List<GeneratedVisual>, String>((
+      ref,
+      appwriteBookId,
+    ) async {
+      print(
+        '📚 DEBUG: Starting visual fetch process for book ID: $appwriteBookId',
+      );
+      final chaptersAsync = ref.watch(
+        chaptersForAppwriteBookProvider(appwriteBookId),
+      );
 
-  return chaptersAsync.when(
-      data: (chapters) async {
-        print('📚 DEBUG: Processing ${chapters.length} chapters for visuals');
-        if (chapters.isEmpty) {
-          print('📚 DEBUG: No chapters found, returning empty visuals list');
+      return chaptersAsync.when(
+        data: (chapters) async {
+          print('📚 DEBUG: Processing ${chapters.length} chapters for visuals');
+          if (chapters.isEmpty) {
+            print('📚 DEBUG: No chapters found, returning empty visuals list');
+            return [];
+          }
+          final chapterIds = chapters.map((c) => c.id).toList();
+          print('📚 DEBUG: Fetching visuals for chapter IDs: $chapterIds');
+          final service = ref.watch(appwriteServiceProvider);
+          try {
+            final visuals = await service.getGeneratedVisualsForChapters(
+              chapterIds,
+            );
+            print(
+              '📚 DEBUG: Retrieved ${visuals.length} visuals for book ID: $appwriteBookId',
+            );
+            return visuals;
+          } catch (e) {
+            print('📚 DEBUG: Error fetching visuals: $e');
+            rethrow;
+          }
+        },
+        loading: () {
+          print(
+            '📚 DEBUG: Chapters still loading, returning empty visuals list',
+          );
           return [];
-        }
-        final chapterIds = chapters.map((c) => c.id).toList();
-        print('📚 DEBUG: Fetching visuals for chapter IDs: $chapterIds');
-        final service = ref.watch(appwriteServiceProvider);
-        try {
-          final visuals = await service.getGeneratedVisualsForChapters(chapterIds);
-          print('📚 DEBUG: Retrieved ${visuals.length} visuals for book ID: $appwriteBookId');
-          return visuals;
-        } catch (e) {
-          print('📚 DEBUG: Error fetching visuals: $e');
-          rethrow;
-        }
-      },
-      loading: () {
-        print('📚 DEBUG: Chapters still loading, returning empty visuals list');
-        return [];
-      },
-      error: (err, stack) {
-        print('📚 DEBUG: Error in chapters fetch: $err');
-        print('📚 DEBUG: Stack trace: $stack');
-        throw Exception('Error loading chapters for visuals: $err');
-      }
-  );
-});
+        },
+        error: (err, stack) {
+          print('📚 DEBUG: Error in chapters fetch: $err');
+          print('📚 DEBUG: Stack trace: $stack');
+          throw Exception('Error loading chapters for visuals: $err');
+        },
+      );
+    });
 
 class BookOverviewDialog extends ConsumerWidget {
   final String bookTitleForLookup;
@@ -109,13 +132,17 @@ class BookOverviewDialog extends ConsumerWidget {
     _debugPrintInfo();
     print('📚 DEBUG: Building BookOverviewDialog');
 
-    final appwriteBookAsyncValue = ref.watch(bookDetailsByTitleProvider(bookTitleForLookup));
+    final appwriteBookAsyncValue = ref.watch(
+      bookDetailsByTitleProvider(bookTitleForLookup),
+    );
     final isGenerating = ref.watch(generationLoadingProvider);
 
     print('📚 DEBUG: Generation status - isGenerating: $isGenerating');
 
     appwriteBookAsyncValue.whenData((book) {
-      print('📚 DEBUG: Appwrite book lookup result: ${book?.title ?? "Not found"}');
+      print(
+        '📚 DEBUG: Appwrite book lookup result: ${book?.title ?? "Not found"}',
+      );
     });
 
     return Dialog.fullscreen(
@@ -132,17 +159,34 @@ class BookOverviewDialog extends ConsumerWidget {
                 data: (appwriteBook) {
                   if (appwriteBook == null) {
                     // Scenario B: Book NOT found in Appwrite, show generation UI
-                    return _buildGenerationRequestUI(context, ref, isGenerating);
+                    return _buildGenerationRequestUI(
+                      context,
+                      ref,
+                      isGenerating,
+                    );
                   } else {
                     // Scenario A: Book found in Appwrite, now load its visuals
-                    return _buildVisualsDisplay(context, ref, appwriteBook.id, appwriteBook.title);
+                    return _buildVisualsDisplay(
+                      context,
+                      ref,
+                      appwriteBook.id,
+                      appwriteBook.title,
+                    );
                   }
                 },
-                loading: () => const Center(child: CircularProgressIndicator(color: Colors.white)),
+                loading: () => const Center(
+                  child: CircularProgressIndicator(color: Colors.white),
+                ),
                 error: (error, stack) => Center(
-                  child: _buildErrorWidget(context, "Error looking up book: $error", () {
-                    ref.invalidate(bookDetailsByTitleProvider(bookTitleForLookup));
-                  }),
+                  child: _buildErrorWidget(
+                    context,
+                    "Error looking up book: $error",
+                    () {
+                      ref.invalidate(
+                        bookDetailsByTitleProvider(bookTitleForLookup),
+                      );
+                    },
+                  ),
                 ),
               ),
             ),
@@ -152,18 +196,27 @@ class BookOverviewDialog extends ConsumerWidget {
     );
   }
 
-
-  AppBar _buildAppBar(BuildContext context, AsyncValue<Book?> appwriteBookAsyncValue) {
+  AppBar _buildAppBar(
+    BuildContext context,
+    AsyncValue<Book?> appwriteBookAsyncValue,
+  ) {
     return AppBar(
       backgroundColor: Colors.transparent,
       elevation: 0,
       title: appwriteBookAsyncValue.when(
         data: (appwriteBook) => Text(
-          appwriteBook?.title ?? 'Visualizations', // Use Appwrite book title if found
-          style: Theme.of(context).textTheme.headlineSmall?.copyWith(color: Colors.white),
+          appwriteBook?.title ??
+              'Visualizations', // Use Appwrite book title if found
+          style: Theme.of(
+            context,
+          ).textTheme.headlineSmall?.copyWith(color: Colors.white),
         ),
-        loading: () => const Text('Loading Book...', style: TextStyle(color: Colors.white)),
-        error: (error, stack) => const Text('Error', style: TextStyle(color: Colors.white)),
+        loading: () => const Text(
+          'Loading Book...',
+          style: TextStyle(color: Colors.white),
+        ),
+        error: (error, stack) =>
+            const Text('Error', style: TextStyle(color: Colors.white)),
       ),
       centerTitle: true,
       actions: [
@@ -175,9 +228,16 @@ class BookOverviewDialog extends ConsumerWidget {
     );
   }
 
-  Widget _buildVisualsDisplay(BuildContext context, WidgetRef ref, String appwriteBookId, String bookTitle) {
+  Widget _buildVisualsDisplay(
+    BuildContext context,
+    WidgetRef ref,
+    String appwriteBookId,
+    String bookTitle,
+  ) {
     print('📚 DEBUG: Building visuals display for book ID: $appwriteBookId');
-    final visualsAsyncValue = ref.watch(generatedVisualsForAppwriteBookProvider(appwriteBookId));
+    final visualsAsyncValue = ref.watch(
+      generatedVisualsForAppwriteBookProvider(appwriteBookId),
+    );
 
     visualsAsyncValue.whenData((visuals) {
       print('📚 DEBUG: Loaded ${visuals.length} visuals for book');
@@ -208,8 +268,11 @@ class BookOverviewDialog extends ConsumerWidget {
             data: (visuals) {
               if (visuals.isEmpty) {
                 return const Center(
-                  child: Text('No visualizations found for this book yet. The backend might still be generating or failed to find relevant data.',
-                      textAlign: TextAlign.center, style: TextStyle(color: Colors.white70)),
+                  child: Text(
+                    'No visualizations found for this book yet. The backend might still be generating or failed to find relevant data.',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(color: Colors.white70),
+                  ),
                 );
               }
               return ListView.builder(
@@ -227,9 +290,15 @@ class BookOverviewDialog extends ConsumerWidget {
             },
             loading: () => _buildShimmerLoading(context),
             error: (error, stack) => Center(
-              child: _buildErrorWidget(context, "Failed to load visuals: $error", () {
-                ref.invalidate(generatedVisualsForAppwriteBookProvider(appwriteBookId));
-              }),
+              child: _buildErrorWidget(
+                context,
+                "Failed to load visuals: $error",
+                () {
+                  ref.invalidate(
+                    generatedVisualsForAppwriteBookProvider(appwriteBookId),
+                  );
+                },
+              ),
             ),
           ),
         ),
@@ -238,7 +307,9 @@ class BookOverviewDialog extends ConsumerWidget {
   }
 
   Widget _buildVisualCard(BuildContext context, GeneratedVisual visual) {
-    final appwriteService = ProviderScope.containerOf(context).read(appwriteServiceProvider);
+    final appwriteService = ProviderScope.containerOf(
+      context,
+    ).read(appwriteServiceProvider);
     final imageUrl = appwriteService.getImageUrl(visual.imageFileId);
 
     return SizedBox(
@@ -267,9 +338,13 @@ class BookOverviewDialog extends ConsumerWidget {
                             detail2Label: 'Visual ID',
                             detail2: visual.id,
                           ),
-                      transitionsBuilder: (context, animation, secondaryAnimation, child) {
-                        return FadeTransition(opacity: animation, child: child);
-                      },
+                      transitionsBuilder:
+                          (context, animation, secondaryAnimation, child) {
+                            return FadeTransition(
+                              opacity: animation,
+                              child: child,
+                            );
+                          },
                     ),
                   );
                 },
@@ -280,8 +355,10 @@ class BookOverviewDialog extends ConsumerWidget {
                     fit: BoxFit.cover,
                     width: 100,
                     height: 100,
-                    placeholder: (context, url) => const CircularProgressIndicator(),
-                    errorWidget: (context, url, error) => const Icon(Icons.error, color: Colors.white),
+                    placeholder: (context, url) =>
+                        const CircularProgressIndicator(),
+                    errorWidget: (context, url, error) =>
+                        const Icon(Icons.error, color: Colors.white),
                   ),
                 ),
               ),
@@ -303,8 +380,14 @@ class BookOverviewDialog extends ConsumerWidget {
     );
   }
 
-  Widget _buildGenerationRequestUI(BuildContext context, WidgetRef ref, bool isGenerating) {
-    print('📚 DEBUG: Building generation request UI, isGenerating: $isGenerating');
+  Widget _buildGenerationRequestUI(
+    BuildContext context,
+    WidgetRef ref,
+    bool isGenerating,
+  ) {
+    print(
+      '📚 DEBUG: Building generation request UI, isGenerating: $isGenerating',
+    );
     final appwriteService = ref.read(appwriteServiceProvider);
 
     return Padding(
@@ -312,67 +395,89 @@ class BookOverviewDialog extends ConsumerWidget {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(Icons.auto_awesome, size: 80, color: Theme.of(context).colorScheme.secondary),
+          Icon(
+            Icons.auto_awesome,
+            size: 80,
+            color: Theme.of(context).colorScheme.secondary,
+          ),
           const SizedBox(height: 24),
           Text(
             'Visualizations for "$bookTitleForLookup" not found in Appwrite.',
             textAlign: TextAlign.center,
-            style: Theme.of(context).textTheme.headlineSmall?.copyWith(color: Colors.white),
+            style: Theme.of(
+              context,
+            ).textTheme.headlineSmall?.copyWith(color: Colors.white),
           ),
           const SizedBox(height: 16),
           Text(
             'Do you want to request the backend to generate them?',
             textAlign: TextAlign.center,
-            style: Theme.of(context).textTheme.bodyLarge?.copyWith(color: Colors.white70),
+            style: Theme.of(
+              context,
+            ).textTheme.bodyLarge?.copyWith(color: Colors.white70),
           ),
           const SizedBox(height: 32),
           isGenerating
               ? Column(
-            children: [
-              const CircularProgressIndicator(color: Colors.white),
-              const SizedBox(height: 16),
-              Text(
-                'Requesting generation...',
-                style: Theme.of(context).textTheme.bodyLarge?.copyWith(color: Colors.white),
-              ),
-            ],
-          )
+                  children: [
+                    const CircularProgressIndicator(color: Colors.white),
+                    const SizedBox(height: 16),
+                    Text(
+                      'Requesting generation...',
+                      style: Theme.of(
+                        context,
+                      ).textTheme.bodyLarge?.copyWith(color: Colors.white),
+                    ),
+                  ],
+                )
               : ElevatedButton.icon(
-            onPressed: () async {
-              ref.read(generationLoadingProvider.notifier).state = true;
-              try {
-                // Call your backend endpoint here with chapter data
-                await appwriteService.requestVisualGeneration(
-                  bookTitle: bookTitleForLookup,
-                  bookISBN: localBookISBN, // Pass local book's ISBN
-                  chapterNumber: localChapterNumber, // Pass current chapter number
-                  chapterContent: localChapterContent, // Pass current chapter content
-                );
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Generation request sent! Visuals should appear soon. Try reopening this dialog in a bit.')),
-                );
-                // Invalidate the provider to force a re-check after generation request
-                // This assumes your backend pushes generated visuals to Appwrite
-                ref.invalidate(bookDetailsByTitleProvider(bookTitleForLookup));
-              } catch (e) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text('Failed to request generation: $e')),
-                );
-              } finally {
-                ref.read(generationLoadingProvider.notifier).state = false;
-              }
-            },
-            icon: const Icon(Icons.auto_awesome),
-            label: const Text('Generate Visuals'),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Theme.of(context).colorScheme.secondary,
-              foregroundColor: Theme.of(context).colorScheme.onSecondary,
-              padding: const EdgeInsets.symmetric(horizontal: 30, vertical: 15),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
-            ),
-          ),
+                  onPressed: () async {
+                    ref.read(generationLoadingProvider.notifier).state = true;
+                    try {
+                      // Call your backend endpoint here with chapter data
+                      await appwriteService.requestVisualGeneration(
+                        bookTitle: bookTitleForLookup,
+                        bookISBN: localBookISBN, // Pass local book's ISBN
+                        chapterNumber:
+                            localChapterNumber, // Pass current chapter number
+                        chapterContent:
+                            localChapterContent, // Pass current chapter content
+                      );
+                      ToastService.show(
+                        context,
+                        'Generation request sent! Visuals should appear soon. Try reopening this dialog in a bit.',
+                        type: ToastType.success,
+                      );
+                      // Invalidate the provider to force a re-check after generation request
+                      // This assumes your backend pushes generated visuals to Appwrite
+                      ref.invalidate(
+                        bookDetailsByTitleProvider(bookTitleForLookup),
+                      );
+                    } catch (e) {
+                      ToastService.show(
+                        context,
+                        'Failed to request generation: $e',
+                        type: ToastType.error,
+                      );
+                    } finally {
+                      ref.read(generationLoadingProvider.notifier).state =
+                          false;
+                    }
+                  },
+                  icon: const Icon(Icons.auto_awesome),
+                  label: const Text('Generate Visuals'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Theme.of(context).colorScheme.secondary,
+                    foregroundColor: Theme.of(context).colorScheme.onSecondary,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 30,
+                      vertical: 15,
+                    ),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                ),
         ],
       ),
     );
@@ -421,7 +526,11 @@ class BookOverviewDialog extends ConsumerWidget {
     );
   }
 
-  Widget _buildErrorWidget(BuildContext context, String message, VoidCallback onRetry) {
+  Widget _buildErrorWidget(
+    BuildContext context,
+    String message,
+    VoidCallback onRetry,
+  ) {
     return Column(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [

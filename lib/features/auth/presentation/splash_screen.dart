@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:visualit/core/theme/app_theme.dart';
 import 'package:visualit/features/auth/presentation/auth_controller.dart';
+import 'package:visualit/core/services/toast_service.dart';
 
 class SplashScreen extends ConsumerStatefulWidget {
   const SplashScreen({super.key});
@@ -22,11 +23,10 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
         await ref.read(authControllerProvider.notifier).initialize();
       } catch (e) {
         if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: const Text('Failed to initialize app'),
-            backgroundColor: AppTheme.grey,
-          ),
+        ToastService.show(
+          context,
+          'Failed to initialize app',
+          type: ToastType.error,
         );
       }
     });
@@ -39,7 +39,10 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Image.asset('assets/images/AppLogo_Dark_NoGB.png', height: 100), // Ensure this asset exists
+            Image.asset(
+              'assets/images/AppLogo_Dark_NoGB.png',
+              height: 100,
+            ), // Ensure this asset exists
             const SizedBox(height: 20),
             const CircularProgressIndicator(color: AppTheme.primaryGreen),
           ],

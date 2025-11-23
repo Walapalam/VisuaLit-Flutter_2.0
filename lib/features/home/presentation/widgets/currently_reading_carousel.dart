@@ -27,6 +27,17 @@ class CurrentlyReadingCarousel extends StatelessWidget {
         screenWidth * 0.40; // Slightly narrower for portrait
     final double carouselHeight = cardWidth * 1.5; // 2:3 aspect ratio
 
+    // Single book case: Show static card without carousel
+    if (books.length == 1) {
+      return Center(
+        child: SizedBox(
+          width: cardWidth,
+          height: carouselHeight,
+          child: _buildBookCardContent(context, books.first, true),
+        ),
+      );
+    }
+
     return Center(
       child: CustomOverlappedCarousel(
         items: List.generate(books.length, (index) {
@@ -49,167 +60,172 @@ class CurrentlyReadingCarousel extends StatelessWidget {
   }
 
   Widget _buildBookCard(BuildContext context, Book book, int index) {
-    // The container size is handled by the carousel wrapper,
-    // but we need to ensure the content fills it.
     return CustomOverlappedCarouselItem(
       index: index,
       builder: (context, isFocused) {
-        return Container(
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(20),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withOpacity(0.5),
-                blurRadius: 20,
-                offset: const Offset(0, 10),
-              ),
-            ],
-          ),
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(20),
-            child: Stack(
-              fit: StackFit.expand,
-              children: [
-                // Book Cover
-                if (book.coverImageBytes != null)
-                  Image.memory(
-                    Uint8List.fromList(book.coverImageBytes!),
-                    fit: BoxFit.cover,
-                  )
-                else
-                  Container(
-                    color: AppTheme.darkGrey,
-                    child: Center(
-                      child: Icon(
-                        Icons.book,
-                        size: 80,
-                        color: Colors.white.withOpacity(0.2),
-                      ),
-                    ),
-                  ),
+        return _buildBookCardContent(context, book, isFocused);
+      },
+    );
+  }
 
-                // Gradient Overlay - stronger at bottom for text visibility
-                Container(
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      begin: Alignment.topCenter,
-                      end: Alignment.bottomCenter,
-                      colors: [
-                        Colors.transparent,
-                        Colors.black.withOpacity(0.1),
-                        Colors.black.withOpacity(0.7),
-                        Colors.black.withOpacity(0.95),
-                      ],
-                      stops: const [0.0, 0.6, 0.85, 1.0],
-                    ),
+  Widget _buildBookCardContent(
+    BuildContext context,
+    Book book,
+    bool isFocused,
+  ) {
+    return Container(
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.5),
+            blurRadius: 20,
+            offset: const Offset(0, 10),
+          ),
+        ],
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(20),
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            // Book Cover
+            if (book.coverImageBytes != null)
+              Image.memory(
+                Uint8List.fromList(book.coverImageBytes!),
+                fit: BoxFit.cover,
+              )
+            else
+              Container(
+                color: AppTheme.darkGrey,
+                child: Center(
+                  child: Icon(
+                    Icons.book,
+                    size: 80,
+                    color: Colors.white.withOpacity(0.2),
                   ),
                 ),
+              ),
 
-                // Content
-                Positioned(
-                  bottom: 16,
-                  left: 12,
-                  right: 12,
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.center,
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(
-                        book.title ?? 'Untitled',
-                        textAlign: TextAlign.center,
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 14, // Reduced from 16
-                          fontWeight: FontWeight.bold,
-                          shadows: [Shadow(color: Colors.black, blurRadius: 4)],
-                        ),
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        book.author ?? 'Unknown Author',
-                        textAlign: TextAlign.center,
-                        style: TextStyle(
-                          color: Colors.white.withOpacity(0.8),
-                          fontSize: 11, // Reduced from 12
-                          fontWeight: FontWeight.w500,
-                          shadows: const [
-                            Shadow(color: Colors.black, blurRadius: 4),
-                          ],
-                        ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                      // Animated Continue Button - only show when focused
-                      AnimatedContainer(
-                        duration: const Duration(milliseconds: 300),
-                        curve: Curves.easeInOut,
-                        height: isFocused ? 35 : 0, // Increased from 40 to 50
-                        child: AnimatedOpacity(
-                          duration: const Duration(milliseconds: 300),
-                          opacity: isFocused ? 1.0 : 0.0,
-                          child: isFocused
-                              ? Padding(
-                                  padding: const EdgeInsets.only(
-                                    top: 3,
-                                  ), // Reduced from 10
-                                  child: GestureDetector(
-                                    onTap: () {
-                                      context.pushNamed(
-                                        'epubReader',
-                                        pathParameters: {
-                                          'bookId': book.id.toString(),
-                                        },
-                                      );
+            // Gradient Overlay - stronger at bottom for text visibility
+            Container(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: [
+                    Colors.transparent,
+                    Colors.black.withOpacity(0.1),
+                    Colors.black.withOpacity(0.7),
+                    Colors.black.withOpacity(0.95),
+                  ],
+                  stops: const [0.0, 0.6, 0.85, 1.0],
+                ),
+              ),
+            ),
+
+            // Content
+            Positioned(
+              bottom: 16,
+              left: 12,
+              right: 12,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.center,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    book.title ?? 'Untitled',
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 14, // Reduced from 16
+                      fontWeight: FontWeight.bold,
+                      shadows: [Shadow(color: Colors.black, blurRadius: 4)],
+                    ),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    book.author ?? 'Unknown Author',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      color: Colors.white.withOpacity(0.8),
+                      fontSize: 11, // Reduced from 12
+                      fontWeight: FontWeight.w500,
+                      shadows: const [
+                        Shadow(color: Colors.black, blurRadius: 4),
+                      ],
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  // Animated Continue Button - only show when focused
+                  AnimatedContainer(
+                    duration: const Duration(milliseconds: 300),
+                    curve: Curves.easeInOut,
+                    height: isFocused ? 35 : 0, // Increased from 40 to 50
+                    child: AnimatedOpacity(
+                      duration: const Duration(milliseconds: 300),
+                      opacity: isFocused ? 1.0 : 0.0,
+                      child: isFocused
+                          ? Padding(
+                              padding: const EdgeInsets.only(
+                                top: 3,
+                              ), // Reduced from 10
+                              child: GestureDetector(
+                                onTap: () {
+                                  context.pushNamed(
+                                    'epubReader',
+                                    pathParameters: {
+                                      'bookId': book.id.toString(),
                                     },
-                                    child: Container(
-                                      padding: const EdgeInsets.symmetric(
-                                        horizontal: 20,
-                                        vertical: 8,
+                                  );
+                                },
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 20,
+                                    vertical: 8,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: const Color(
+                                      0xFF1A1A1A,
+                                    ), // Match bottom nav
+                                    borderRadius: BorderRadius.circular(30),
+                                    border: Border.all(
+                                      color: AppTheme.primaryGreen.withOpacity(
+                                        0.3,
                                       ),
-                                      decoration: BoxDecoration(
-                                        color: const Color(
-                                          0xFF1A1A1A,
-                                        ), // Match bottom nav
-                                        borderRadius: BorderRadius.circular(30),
-                                        border: Border.all(
-                                          color: AppTheme.primaryGreen
-                                              .withOpacity(0.3),
-                                          width: 1,
-                                        ),
-                                        boxShadow: [
-                                          BoxShadow(
-                                            color: Colors.black.withOpacity(
-                                              0.3,
-                                            ),
-                                            blurRadius: 8,
-                                            offset: const Offset(0, 4),
-                                          ),
-                                        ],
+                                      width: 1,
+                                    ),
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color: Colors.black.withOpacity(0.3),
+                                        blurRadius: 8,
+                                        offset: const Offset(0, 4),
                                       ),
-                                      child: const Text(
-                                        'Continue',
-                                        style: TextStyle(
-                                          color: AppTheme.primaryGreen,
-                                          fontWeight: FontWeight.w600,
-                                          fontSize: 10,
-                                        ),
-                                      ),
+                                    ],
+                                  ),
+                                  child: const Text(
+                                    'Continue',
+                                    style: TextStyle(
+                                      color: AppTheme.primaryGreen,
+                                      fontWeight: FontWeight.w600,
+                                      fontSize: 10,
                                     ),
                                   ),
-                                )
-                              : const SizedBox.shrink(),
-                        ),
-                      ),
-                    ],
+                                ),
+                              ),
+                            )
+                          : const SizedBox.shrink(),
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
-          ),
-        );
-      },
+          ],
+        ),
+      ),
     );
   }
 

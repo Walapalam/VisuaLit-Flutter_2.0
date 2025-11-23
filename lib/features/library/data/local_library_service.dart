@@ -1,6 +1,8 @@
 import 'dart:io';
 import 'dart:typed_data';
 import 'package:file_picker/file_picker.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:path/path.dart' as p;
 
 // A new class to hold our picked file data securely
 class PickedFileData {
@@ -9,7 +11,6 @@ class PickedFileData {
 
   PickedFileData({required this.path, required this.bytes});
 }
-
 
 class LocalLibraryService {
   /// Opens the platform's file picker to select one or more EPUB files.
@@ -34,15 +35,18 @@ class LocalLibraryService {
       final List<PickedFileData> pickedFiles = [];
       for (final file in result.files) {
         if (file.path != null && file.bytes != null) {
-          print('LocalLibraryService: Read ${file.bytes!.lengthInBytes} bytes from ${file.name}');
+          print(
+            'LocalLibraryService: Read ${file.bytes!.lengthInBytes} bytes from ${file.name}',
+          );
           pickedFiles.add(PickedFileData(path: file.path!, bytes: file.bytes!));
         } else {
-          print('LocalLibraryService: Warning - picked file ${file.name} missing path or data.');
+          print(
+            'LocalLibraryService: Warning - picked file ${file.name} missing path or data.',
+          );
         }
       }
 
       return pickedFiles;
-
     } catch (e) {
       print('LocalLibraryService: Error picking EPUB files: $e');
       return [];
@@ -74,7 +78,6 @@ class LocalLibraryService {
     }
   }
 
-
   /// Opens the platform's directory picker and scans for all EPUB files within.
   /// Requires the user to select a directory; no broad storage permission needed.
   Future<List<PickedFileData>> scanAndLoadBooks() async {
@@ -99,15 +102,18 @@ class LocalLibraryService {
           try {
             final bytes = await entity.readAsBytes();
             pickedFiles.add(PickedFileData(path: entity.path, bytes: bytes));
-            print('LocalLibraryService: Scanned and read ${bytes.lengthInBytes} bytes from ${entity.path}');
+            print(
+              'LocalLibraryService: Scanned and read ${bytes.lengthInBytes} bytes from ${entity.path}',
+            );
           } catch (e) {
-            print('LocalLibraryService: Error reading scanned file ${entity.path}: $e');
+            print(
+              'LocalLibraryService: Error reading scanned file ${entity.path}: $e',
+            );
           }
         }
       }
       return pickedFiles;
-
-    } catch(e) {
+    } catch (e) {
       print('LocalLibraryService: Error scanning directory: $e');
       return [];
     }
@@ -149,18 +155,70 @@ class LocalLibraryService {
     print('LocalLibraryService: Loading file from path: $filePath');
 
     try {
-      final file = File(filePath);
+      // Resolve path if it's relative
+      final resolvedPath = await resolvePath(filePath);
+      final file = File(resolvedPath);
+
       if (!await file.exists()) {
-        print('LocalLibraryService: File does not exist at path: $filePath');
+        print(
+          'LocalLibraryService: File does not exist at path: $resolvedPath',
+        );
         return null;
       }
 
       final bytes = await file.readAsBytes();
-      print('LocalLibraryService: Successfully read ${bytes.lengthInBytes} bytes from $filePath');
-      return PickedFileData(path: filePath, bytes: bytes);
+      print(
+        'LocalLibraryService: Successfully read ${bytes.lengthInBytes} bytes from $resolvedPath',
+      );
+      return PickedFileData(path: resolvedPath, bytes: bytes);
     } catch (e) {
       print('LocalLibraryService: Error loading file from path: $e');
       return null;
     }
+  }
+
+  /// Returns the root directory for the app's library storage.
+  /// On Android: App-scoped external storage.
+  /// On iOS: Application Documents directory.
+  Future<Directory> getLibraryRoot() async {
+    if (Platform.isAndroid) {
+      final base = await getExternalStorageDirectory();
+      if (base == null) {
+        throw Exception("App external storage not accessible");
+      }
+      return Directory('${base.path}/VisuaLit');
+    } else {
+      final docs = await getApplicationDocumentsDirectory();
+      return Directory('${docs.path}/VisuaLit');
+    }
+  }
+
+  /// Resolves a potentially relative path to an absolute path.
+  /// If the path is already absolute, it returns it as is (unless it needs migration).
+  Future<String> resolvePath(String path) async {
+    if (path.isEmpty) return path;
+
+    // If it's already an absolute path, check if we need to fix it (migration scenario)
+    // or just return it.
+    if (path.startsWith('/')) {
+      // Simple check: if it exists, return it.
+      if (await File(path).exists()) {
+        return path;
+      }
+
+      // If it doesn't exist, it might be an old absolute path from a previous iOS container.
+      // We'll try to treat it as relative if it contains "VisuaLit".
+      if (path.contains('VisuaLit/')) {
+        final relativePart = path.split('VisuaLit/').last;
+        final root = await getLibraryRoot();
+        return '${root.path}/$relativePart';
+      }
+
+      return path;
+    }
+
+    // It's a relative path, append to library root
+    final root = await getLibraryRoot();
+    return '${root.path}/$path';
   }
 }

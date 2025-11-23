@@ -6,32 +6,32 @@ import 'package:flutter_html_table/flutter_html_table.dart';
 import 'package:flutter_html_svg/flutter_html_svg.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import '../application/epub_parser_service.dart';
-import 'package:isar/isar.dart';
-import 'package:visualit/features/reader/data/book_data.dart';
 import 'package:visualit/core/providers/isar_provider.dart';
 import 'dart:io';
 import 'dart:async';
+import 'dart:math' hide log;
+import 'dart:developer';
 import 'package:path/path.dart' as p;
+import 'package:path_provider/path_provider.dart'; // Added path_provider
 import 'package:html/parser.dart' as html_parser;
-import 'package:visualit/features/custom_reader/application/css_parser_service.dart';
-import 'package:visualit/features/custom_reader/application/epub_parser_service.dart';
 import 'package:visualit/features/custom_reader/new_reading_controller.dart';
 import 'package:visualit/features/custom_reader/model/new_reading_progress.dart';
-import 'dart:developer';
 import 'package:visualit/core/theme/app_theme.dart';
 import 'package:visualit/core/utils/responsive_helper.dart';
 import 'package:flutter_speed_dial/flutter_speed_dial.dart';
 import 'dart:ui';
 import 'package:visualit/features/custom_reader/presentation/widgets/custom_reading_settings_panel.dart';
 import 'package:visualit/features/custom_reader/presentation/reading_preferences_controller.dart';
-import 'package:visualit/features/custom_reader/presentation/widgets/book_visualization_overlay.dart';
 import 'package:flutter_svg/flutter_svg.dart';
+import 'package:visualit/features/custom_reader/application/epub_parser_service.dart';
+import 'package:visualit/features/custom_reader/application/css_parser_service.dart';
+import 'package:visualit/features/reader/data/book_data.dart';
+import 'package:visualit/features/custom_reader/presentation/widgets/book_visualization_overlay.dart';
+import 'package:visualit/core/services/toast_service.dart';
 import 'package:visualit/features/custom_reader/presentation/widgets/reading_app_bar.dart';
 import 'package:visualit/features/custom_reader/presentation/widgets/reading_navigation_bar.dart';
 import 'package:visualit/features/custom_reader/presentation/widgets/settings_speed_dial.dart';
 import 'package:visualit/features/custom_reader/presentation/widgets/visualization_speed_dial.dart';
-import 'package:flutter/services.dart';
 import 'package:visualit/features/reader/application/throttled_reading_progress_notifier.dart';
 
 class ReadingScreen extends ConsumerStatefulWidget {
@@ -161,14 +161,26 @@ class _ReadingScreenState extends ConsumerState<ReadingScreen> {
         return;
       }
 
-      _epubPath = book.epubFilePath;
+      // RESOLVE PATH: Convert potentially relative path to absolute
+      String absolutePath = book.epubFilePath;
+      if (!absolutePath.startsWith('/')) {
+        final dir = Platform.isAndroid
+            ? await getExternalStorageDirectory()
+            : await getApplicationDocumentsDirectory();
 
-      // Check if the file exists before trying to parse it
-      final file = File(_epubPath!);
+        if (dir != null) {
+          final libraryRoot = Directory('${dir.path}/VisuaLit');
+          absolutePath = '${libraryRoot.path}/$absolutePath';
+        }
+      }
+
+      // Update the state variable with the resolved path
+      _epubPath = absolutePath;
+
+      final file = File(absolutePath);
       if (!await file.exists()) {
-        // Check if this is a temporary cache path that no longer exists
-        if (_epubPath!.contains('/cache/file_picker/') ||
-            _epubPath!.contains('/cache/')) {
+        if (absolutePath.contains('/cache/file_picker/') ||
+            absolutePath.contains('/cache/')) {
           setState(() {
             _error =
                 'FILE_NOT_FOUND_CACHE'; // Special error code for UI handling
@@ -183,7 +195,7 @@ class _ReadingScreenState extends ConsumerState<ReadingScreen> {
         return;
       }
 
-      final epubData = await _epubParser.parseEpub(_epubPath!);
+      final epubData = await _epubParser.parseEpub(absolutePath);
 
       setState(() {
         _epubData = epubData;
@@ -478,13 +490,10 @@ class _ReadingScreenState extends ConsumerState<ReadingScreen> {
                         await isar.books.delete(widget.bookId);
                       });
                       if (context.mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text(
-                              'Book removed. You can now re-import it.',
-                            ),
-                            duration: Duration(seconds: 3),
-                          ),
+                        ToastService.show(
+                          context,
+                          'Book removed. You can now re-import it.',
+                          type: ToastType.success,
                         );
                         context.pop();
                       }
@@ -922,24 +931,26 @@ class _ReadingScreenState extends ConsumerState<ReadingScreen> {
                         onShowSettingsPanel: _showSettingsPanel,
                         onShowBookmark: () {
                           _cancelHideOverlayTimer();
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(content: Text('Bookmark added')),
+                          ToastService.show(
+                            context,
+                            'Bookmark added',
+                            type: ToastType.success,
                           );
                         },
                         onShare: () {
                           _cancelHideOverlayTimer();
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text('Share feature coming soon'),
-                            ),
+                          ToastService.show(
+                            context,
+                            'Share feature coming soon',
+                            type: ToastType.info,
                           );
                         },
                         onSearch: () {
                           _cancelHideOverlayTimer();
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text('Search feature coming soon'),
-                            ),
+                          ToastService.show(
+                            context,
+                            'Search feature coming soon',
+                            type: ToastType.info,
                           );
                         },
                         isVisible: _showOverlay,
@@ -949,12 +960,10 @@ class _ReadingScreenState extends ConsumerState<ReadingScreen> {
                         onToggleVisualization: _showBookOverviewDialog,
                         onAdjustVisualization: () {
                           _cancelHideOverlayTimer();
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text(
-                                'Visualization settings coming soon',
-                              ),
-                            ),
+                          ToastService.show(
+                            context,
+                            'Settings feature coming soon',
+                            type: ToastType.info,
                           );
                         },
                       ),

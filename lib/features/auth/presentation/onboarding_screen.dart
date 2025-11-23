@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:visualit/core/theme/app_theme.dart';
 import 'package:visualit/features/auth/presentation/auth_controller.dart';
+import 'package:visualit/core/services/toast_service.dart';
 
 class OnboardingScreen extends ConsumerWidget {
   const OnboardingScreen({super.key});
@@ -11,9 +12,7 @@ class OnboardingScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     ref.listen<AuthState>(authControllerProvider, (previous, next) {
       if (next.errorMessage != null) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(next.errorMessage!), backgroundColor: Colors.red),
-        );
+        ToastService.show(context, next.errorMessage!, type: ToastType.error);
       }
     });
 
@@ -24,7 +23,10 @@ class OnboardingScreen extends ConsumerWidget {
       body: Container(
         decoration: BoxDecoration(
           gradient: LinearGradient(
-            colors: [const Color(0xFF2ECC71).withOpacity(0.7), Theme.of(context).scaffoldBackgroundColor],
+            colors: [
+              const Color(0xFF2ECC71).withOpacity(0.7),
+              Theme.of(context).scaffoldBackgroundColor,
+            ],
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
             stops: const [0.0, 0.5],
@@ -38,7 +40,10 @@ class OnboardingScreen extends ConsumerWidget {
                 mainAxisAlignment: MainAxisAlignment.center,
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  Image.asset('assets/images/AppLogo_Dark_NoGB.png', height: 100), // Ensure this asset exists
+                  Image.asset(
+                    'assets/images/AppLogo_Dark_NoGB.png',
+                    height: 100,
+                  ), // Ensure this asset exists
                   const SizedBox(height: 24),
                   Text(
                     'VisuaLit',
@@ -54,11 +59,15 @@ class OnboardingScreen extends ConsumerWidget {
                       backgroundColor: AppTheme.primaryGreen,
                       foregroundColor: AppTheme.black,
                       minimumSize: const Size(220, 50),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
                     ),
                     onPressed: isLoading
                         ? null
-                        : () => ref.read(authControllerProvider.notifier).signInAsGuest(),
+                        : () => ref
+                              .read(authControllerProvider.notifier)
+                              .signInAsGuest(),
                     child: isLoading
                         ? const CircularProgressIndicator(color: AppTheme.black)
                         : const Text('Start Reading as Guest'),
@@ -69,9 +78,13 @@ class OnboardingScreen extends ConsumerWidget {
                       foregroundColor: AppTheme.primaryGreen,
                       side: const BorderSide(color: AppTheme.primaryGreen),
                       minimumSize: const Size(220, 50),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
                     ),
-                    onPressed: isLoading ? null : () => context.goNamed('login'),
+                    onPressed: isLoading
+                        ? null
+                        : () => context.goNamed('login'),
                     child: const Text('Continue with an Account'),
                   ),
                 ],

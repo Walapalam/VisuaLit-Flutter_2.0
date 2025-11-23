@@ -12,10 +12,11 @@ import 'package:visualit/features/reader/presentation/widgets/reading_settings_p
 // Import the BookOverviewDialog (and remove AllBooksOverviewDialog import if it was there)
 import 'package:visualit/features/reader/presentation/widgets/book_overview_dialog.dart';
 // Also need to import your local Book data models from Isar
-import 'package:visualit/features/reader/data/book_data.dart' as local_book_data;
+import 'package:visualit/features/reader/data/book_data.dart'
+    as local_book_data;
 
 import '../../../core/services/isbn_lookup_service.dart'; // Alias to avoid conflict
-
+import 'package:visualit/core/services/toast_service.dart';
 
 class ReadingScreen extends ConsumerStatefulWidget {
   final int bookId; // This is the Isar book ID
@@ -87,9 +88,13 @@ class _ReadingScreenState extends ConsumerState<ReadingScreen> {
     final readingState = ref.read(readingControllerProvider(widget.bookId));
     final localBook = readingState.book; // This is your local Isar Book object
 
-    if (localBook == null || localBook.title == null || localBook.title!.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Book data (title) not available for visualization lookup.')),
+    if (localBook == null ||
+        localBook.title == null ||
+        localBook.title!.isEmpty) {
+      ToastService.show(
+        context,
+        'Book data (title) not available for visualization lookup.',
+        type: ToastType.error,
       );
       return;
     }
@@ -104,8 +109,10 @@ class _ReadingScreenState extends ConsumerState<ReadingScreen> {
     // Perform ISBN lookup if missing
     String? localBookISBN = localBook.isbn;
     if (localBookISBN == null || localBookISBN.isEmpty) {
-      localBookISBN = await IsbnLookupService.lookupIsbnByTitle(localBook.title!);
-      print("ISBN fetched");// Static method call
+      localBookISBN = await IsbnLookupService.lookupIsbnByTitle(
+        localBook.title!,
+      );
+      print("ISBN fetched"); // Static method call
       // Optionally: Save the fetched ISBN to the local book model
     }
 
@@ -113,11 +120,15 @@ class _ReadingScreenState extends ConsumerState<ReadingScreen> {
     Navigator.of(context).pop();
 
     // Get current chapter index from the reading state
-    final currentChapterIndex = readingState.blocks[readingState.pageToBlockIndexMap[readingState.currentPage]!].chapterIndex;
+    final currentChapterIndex = readingState
+        .blocks[readingState.pageToBlockIndexMap[readingState.currentPage]!]
+        .chapterIndex;
 
     if (currentChapterIndex == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Chapter information not available for visualization.')),
+      ToastService.show(
+        context,
+        'Chapter information not available for visualization.',
+        type: ToastType.error,
       );
       return;
     }
@@ -191,8 +202,13 @@ class _ReadingScreenState extends ConsumerState<ReadingScreen> {
       }
     });
 
-    ref.listen(readingPreferencesProvider.select((p) => p.brightness), (_, next) async {
-      try { await ScreenBrightness().setScreenBrightness(next); } catch (_) {}
+    ref.listen(readingPreferencesProvider.select((p) => p.brightness), (
+      _,
+      next,
+    ) async {
+      try {
+        await ScreenBrightness().setScreenBrightness(next);
+      } catch (_) {}
     });
 
     final readerContent = Padding(
@@ -215,7 +231,9 @@ class _ReadingScreenState extends ConsumerState<ReadingScreen> {
             automaticallyImplyLeading: false,
             centerTitle: true,
             title: Text(
-              _isUiVisible ? state.chapterProgress : state.book?.title ?? "Loading...",
+              _isUiVisible
+                  ? state.chapterProgress
+                  : state.book?.title ?? "Loading...",
               style: TextStyle(color: prefs.textColor, fontSize: 12),
             ),
             actions: [
@@ -226,7 +244,7 @@ class _ReadingScreenState extends ConsumerState<ReadingScreen> {
                   icon: Icon(Icons.close, color: prefs.textColor),
                   onPressed: () => context.go('/home'),
                 ),
-              )
+              ),
             ],
           ),
         ),
@@ -261,8 +279,10 @@ class _ReadingScreenState extends ConsumerState<ReadingScreen> {
         ],
       ),
       body: GestureDetector(
-        behavior: HitTestBehavior.translucent, // Ensures taps are detected on empty spaces
-        onDoubleTap: _toggleUiVisibility, // Toggles the UI visibility on double-tap
+        behavior: HitTestBehavior
+            .translucent, // Ensures taps are detected on empty spaces
+        onDoubleTap:
+            _toggleUiVisibility, // Toggles the UI visibility on double-tap
         child: AbsorbPointer(
           absorbing: _isLocked, // Prevents interaction when locked
           child: Stack(
@@ -287,25 +307,32 @@ class _ReadingScreenState extends ConsumerState<ReadingScreen> {
       visible: _isUiVisible,
       children: [
         SpeedDialChild(
-            child: const Icon(Icons.bookmark_border),
-            label: 'Bookmark',
-            onTap: () {}),
+          child: const Icon(Icons.bookmark_border),
+          label: 'Bookmark',
+          onTap: () {},
+        ),
         SpeedDialChild(
-            child: const Icon(Icons.share_outlined),
-            label: 'Share',
-            onTap: () {}),
+          child: const Icon(Icons.share_outlined),
+          label: 'Share',
+          onTap: () {},
+        ),
         SpeedDialChild(
           child: Icon(
-              _isLocked ? Icons.lock_open_outlined : Icons.lock_outline),
+            _isLocked ? Icons.lock_open_outlined : Icons.lock_outline,
+          ),
           label: _isLocked ? 'Unlock' : 'Lock Screen',
           onTap: () => setState(() => _isLocked = !_isLocked),
         ),
         SpeedDialChild(
-            child: const Icon(Icons.search), label: 'Search', onTap: () {}),
+          child: const Icon(Icons.search),
+          label: 'Search',
+          onTap: () {},
+        ),
         SpeedDialChild(
-            child: const Icon(Icons.tune_outlined),
-            label: 'Theme & Settings',
-            onTap: _showMainSettingsPanel),
+          child: const Icon(Icons.tune_outlined),
+          label: 'Theme & Settings',
+          onTap: _showMainSettingsPanel,
+        ),
       ],
     );
   }
@@ -324,29 +351,33 @@ class _ReadingScreenState extends ConsumerState<ReadingScreen> {
       visible: _isUiVisible,
       children: [
         SpeedDialChild(
-            child: const Icon(Icons.visibility),
-            label: 'Toggle Visualization',
-            onTap: () {
-              _showBookOverviewDialog(); // Calls the updated method
-            }),
+          child: const Icon(Icons.visibility),
+          label: 'Toggle Visualization',
+          onTap: () {
+            _showBookOverviewDialog(); // Calls the updated method
+          },
+        ),
         SpeedDialChild(
-            child: const Icon(Icons.tune),
-            label: 'Adjust Visualization Settings',
-            onTap: () {
-              // TODO: open visualization settings
-            }),
+          child: const Icon(Icons.tune),
+          label: 'Adjust Visualization Settings',
+          onTap: () {
+            // TODO: open visualization settings
+          },
+        ),
       ],
     );
   }
 
   Widget _buildBody(
-      ReadingState state,
-      Size viewSize,
-      AutoDisposeStateNotifierProvider<ReadingController, ReadingState>
-      provider,
-      ReadingPreferences prefs) {
-    if (!state.isBookLoaded) return const Center(child: CircularProgressIndicator());
-    if (state.blocks.isEmpty) return const Center(child: Text('This book has no content.'));
+    ReadingState state,
+    Size viewSize,
+    AutoDisposeStateNotifierProvider<ReadingController, ReadingState> provider,
+    ReadingPreferences prefs,
+  ) {
+    if (!state.isBookLoaded)
+      return const Center(child: CircularProgressIndicator());
+    if (state.blocks.isEmpty)
+      return const Center(child: Text('This book has no content.'));
 
     if (prefs.pageTurnStyle == PageTurnStyle.scroll) {
       return ListView.builder(
@@ -368,7 +399,8 @@ class _ReadingScreenState extends ConsumerState<ReadingScreen> {
         onPageChanged: ref.read(provider.notifier).onPageChanged,
         itemBuilder: (context, index) {
           final startingBlockIndex = state.pageToBlockIndexMap[index];
-          if (startingBlockIndex == null) return const Center(child: CircularProgressIndicator());
+          if (startingBlockIndex == null)
+            return const Center(child: CircularProgressIndicator());
           return BookPageWidget(
             key: ValueKey('page_${index}_$startingBlockIndex'),
             allBlocks: state.blocks,
@@ -383,7 +415,8 @@ class _ReadingScreenState extends ConsumerState<ReadingScreen> {
   }
 
   Widget _buildBottomScrubber(ReadingState state, ReadingPreferences prefs) {
-    if (prefs.pageTurnStyle == PageTurnStyle.scroll) return const SizedBox.shrink();
+    if (prefs.pageTurnStyle == PageTurnStyle.scroll)
+      return const SizedBox.shrink();
 
     return BottomAppBar(
       color: Theme.of(context).colorScheme.surface.withAlpha(242),
@@ -392,29 +425,30 @@ class _ReadingScreenState extends ConsumerState<ReadingScreen> {
         padding: const EdgeInsets.symmetric(horizontal: 16.0),
         child: Row(
           children: [
-            Text('Page ${state.currentPage + 1}',
-                style: TextStyle(color: prefs.textColor, fontSize: 12)),
+            Text(
+              'Page ${state.currentPage + 1}',
+              style: TextStyle(color: prefs.textColor, fontSize: 12),
+            ),
             Expanded(
               child: Slider(
-                value: state.currentPage
-                    .toDouble()
-                    .clamp(0, (state.totalPages > 0 ? state.totalPages - 1 : 0).
-                toDouble()),
+                value: state.currentPage.toDouble().clamp(
+                  0,
+                  (state.totalPages > 0 ? state.totalPages - 1 : 0).toDouble(),
+                ),
                 min: 0,
-                max: (state.totalPages > 0
-                    ? state.totalPages - 1
-                    : 0)
+                max: (state.totalPages > 0 ? state.totalPages - 1 : 0)
                     .toDouble(),
                 onChanged: (value) => ref
-                    .read(readingControllerProvider(widget.bookId)
-                    .notifier)
+                    .read(readingControllerProvider(widget.bookId).notifier)
                     .onPageChanged(value.round()),
                 activeColor: prefs.textColor,
                 inactiveColor: prefs.textColor.withAlpha(77),
               ),
             ),
-            Text('${state.totalPages}',
-                style: TextStyle(color: prefs.textColor, fontSize: 12)),
+            Text(
+              '${state.totalPages}',
+              style: TextStyle(color: prefs.textColor, fontSize: 12),
+            ),
           ],
         ),
       ),

@@ -122,7 +122,9 @@ class _WelcomeScreenState extends ConsumerState<WelcomeScreen>
                                   decoration: BoxDecoration(
                                     shape: BoxShape.circle,
                                     border: Border.all(
-                                      color: Colors.white.withOpacity(0.2),
+                                      color: Theme.of(
+                                        context,
+                                      ).colorScheme.onSurface.withOpacity(0.2),
                                       width: 2,
                                     ),
                                   ),
@@ -134,13 +136,19 @@ class _WelcomeScreenState extends ConsumerState<WelcomeScreen>
                                       ),
                                       child: Container(
                                         decoration: BoxDecoration(
-                                          color: Colors.white.withOpacity(0.05),
+                                          color: Theme.of(context)
+                                              .colorScheme
+                                              .onSurface
+                                              .withOpacity(0.05),
                                           shape: BoxShape.circle,
                                         ),
                                         child: Padding(
                                           padding: const EdgeInsets.all(20.0),
                                           child: Image.asset(
-                                            'assets/images/AppLogo_Dark_NoGB.png',
+                                            Theme.of(context).brightness ==
+                                                    Brightness.dark
+                                                ? 'assets/images/AppLogo_Dark_NoGB.png'
+                                                : 'assets/images/AppLogo_NoBg.png',
                                             fit: BoxFit.contain,
                                           ),
                                         ),
@@ -166,10 +174,10 @@ class _WelcomeScreenState extends ConsumerState<WelcomeScreen>
                             const SizedBox(height: 32),
 
                             // App Name
-                            const Text(
+                            Text(
                               'VisuaLit',
                               style: TextStyle(
-                                color: Colors.white,
+                                color: Theme.of(context).colorScheme.onSurface,
                                 fontSize: 48,
                                 fontWeight: FontWeight.bold,
                                 letterSpacing: 1.5,
@@ -233,7 +241,9 @@ class _WelcomeScreenState extends ConsumerState<WelcomeScreen>
                       Text(
                         'By continuing, you agree to our Terms & Privacy Policy',
                         style: TextStyle(
-                          color: Colors.white.withOpacity(0.4),
+                          color: Theme.of(
+                            context,
+                          ).colorScheme.onSurface.withOpacity(0.4),
                           fontSize: 12,
                         ),
                         textAlign: TextAlign.center,

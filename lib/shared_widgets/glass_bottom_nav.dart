@@ -14,17 +14,28 @@ class GlassBottomNav extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
     return Container(
       margin: const EdgeInsets.only(left: 20, right: 20, bottom: 30),
       height: 70, // Fixed height for the bar
       decoration: BoxDecoration(
         // Semi-transparent with slight tint to avoid pure transparency artifacts
-        color: const Color(0xFF1A1A1A).withOpacity(0.7),
+        color: isDark
+            ? const Color(0xFF1A1A1A).withOpacity(0.7)
+            : Colors.white.withOpacity(0.8),
         borderRadius: BorderRadius.circular(35), // Pill shape
-        border: Border.all(color: Colors.white.withOpacity(0.1), width: 1.5),
+        border: Border.all(
+          color: isDark
+              ? Colors.white.withOpacity(0.1)
+              : Colors.white.withOpacity(0.6),
+          width: 1.5,
+        ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.3),
+            color: isDark
+                ? Colors.black.withOpacity(0.3)
+                : Colors.black.withOpacity(0.08),
             blurRadius: 20,
             offset: const Offset(0, 10),
           ),
@@ -46,6 +57,7 @@ class GlassBottomNav extends StatelessWidget {
                 Icons.home_outlined,
                 Icons.home,
                 'Home',
+                isDark,
               ),
               _buildNavItem(
                 context,
@@ -53,6 +65,7 @@ class GlassBottomNav extends StatelessWidget {
                 Icons.book_outlined,
                 Icons.book,
                 'Library',
+                isDark,
               ),
               _buildNavItem(
                 context,
@@ -60,6 +73,7 @@ class GlassBottomNav extends StatelessWidget {
                 Icons.headphones_outlined,
                 Icons.headphones,
                 'Audio',
+                isDark,
               ),
               _buildNavItem(
                 context,
@@ -67,6 +81,7 @@ class GlassBottomNav extends StatelessWidget {
                 Icons.storefront_outlined,
                 Icons.storefront,
                 'Market',
+                isDark,
               ),
               _buildNavItem(
                 context,
@@ -74,6 +89,7 @@ class GlassBottomNav extends StatelessWidget {
                 Icons.settings_outlined,
                 Icons.settings,
                 'Settings',
+                isDark,
               ),
             ],
           ),
@@ -88,6 +104,7 @@ class GlassBottomNav extends StatelessWidget {
     IconData icon,
     IconData activeIcon,
     String label,
+    bool isDark,
   ) {
     final isSelected = currentIndex == index;
 
@@ -105,15 +122,19 @@ class GlassBottomNav extends StatelessWidget {
               padding: const EdgeInsets.all(8),
               decoration: BoxDecoration(
                 color: isSelected
-                    ? AppTheme.primaryGreen.withOpacity(0.2)
+                    ? (isDark
+                          ? AppTheme.primaryGreen.withOpacity(0.2)
+                          : AppTheme.primaryGreen)
                     : Colors.transparent,
                 shape: BoxShape.circle,
               ),
               child: Icon(
                 isSelected ? activeIcon : icon,
                 color: isSelected
-                    ? AppTheme.primaryGreen
-                    : Colors.white.withOpacity(0.6),
+                    ? (isDark ? AppTheme.primaryGreen : Colors.white)
+                    : (isDark
+                          ? Colors.white.withOpacity(0.6)
+                          : Colors.black.withOpacity(0.5)),
                 size: 24,
               ),
             ),

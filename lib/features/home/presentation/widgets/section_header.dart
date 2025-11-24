@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:visualit/core/theme/app_theme.dart';
 
 class SectionHeader extends StatelessWidget {
   final String title;
@@ -22,8 +21,8 @@ class SectionHeader extends StatelessWidget {
         children: [
           Text(
             title,
-            style: const TextStyle(
-              color: AppTheme.white,
+            style: TextStyle(
+              color: Theme.of(context).colorScheme.onSurface,
               fontSize: 20,
               fontWeight: FontWeight.bold,
               letterSpacing: 0.5,
@@ -34,8 +33,8 @@ class SectionHeader extends StatelessWidget {
               onTap: onActionTap,
               child: Text(
                 actionLabel,
-                style: const TextStyle(
-                  color: AppTheme.primaryGreen,
+                style: TextStyle(
+                  color: Theme.of(context).colorScheme.primary,
                   fontSize: 14,
                   fontWeight: FontWeight.w600,
                 ),

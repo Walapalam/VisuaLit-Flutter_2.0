@@ -1,6 +1,5 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
-import 'package:visualit/core/theme/app_theme.dart';
 
 class GlassSearchBar extends StatelessWidget {
   final VoidCallback? onTap;
@@ -23,10 +22,10 @@ class GlassSearchBar extends StatelessWidget {
         child: Container(
           height: 50,
           decoration: BoxDecoration(
-            color: Colors.white.withOpacity(0.08),
+            color: Theme.of(context).colorScheme.onSurface.withOpacity(0.08),
             borderRadius: BorderRadius.circular(35), // Match bottom nav bar
             border: Border.all(
-              color: Colors.white.withOpacity(0.1),
+              color: Theme.of(context).colorScheme.onSurface.withOpacity(0.1),
               width: 1.5,
             ),
           ),
@@ -39,7 +38,12 @@ class GlassSearchBar extends StatelessWidget {
                 padding: const EdgeInsets.symmetric(horizontal: 16.0),
                 child: Row(
                   children: [
-                    Icon(Icons.search, color: AppTheme.white.withOpacity(0.6)),
+                    Icon(
+                      Icons.search,
+                      color: Theme.of(
+                        context,
+                      ).colorScheme.onSurface.withOpacity(0.6),
+                    ),
                     const SizedBox(width: 12),
                     Expanded(
                       child: IgnorePointer(
@@ -49,11 +53,15 @@ class GlassSearchBar extends StatelessWidget {
                         child: TextField(
                           controller: controller,
                           onChanged: onChanged,
-                          style: const TextStyle(color: AppTheme.white),
+                          style: TextStyle(
+                            color: Theme.of(context).colorScheme.onSurface,
+                          ),
                           decoration: InputDecoration(
                             hintText: 'Search books, authors...',
                             hintStyle: TextStyle(
-                              color: AppTheme.white.withOpacity(0.4),
+                              color: Theme.of(
+                                context,
+                              ).colorScheme.onSurface.withOpacity(0.4),
                               fontSize: 15,
                             ),
                             border: InputBorder.none,

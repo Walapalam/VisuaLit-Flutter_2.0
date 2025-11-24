@@ -278,14 +278,13 @@ class SettingsScreen extends ConsumerWidget {
     IconData icon,
     VoidCallback onTap,
   ) {
-    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
     return ListTile(
       leading: Icon(icon),
       title: Text(title),
       trailing: Icon(
         Icons.arrow_forward_ios,
         size: 16,
-        color: isDarkMode ? Colors.white70 : Colors.black54,
+        color: Theme.of(context).colorScheme.onSurface.withOpacity(0.7),
       ),
       contentPadding: const EdgeInsets.symmetric(horizontal: 16.0),
       onTap: onTap,
@@ -306,14 +305,11 @@ class SettingsScreen extends ConsumerWidget {
   }
 
   Widget _buildSection(BuildContext context, {required List<Widget> children}) {
-    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
     return Container(
       decoration: BoxDecoration(
         color: Theme.of(context).colorScheme.surface,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: isDarkMode ? Colors.grey[800]! : Colors.grey[200]!,
-        ),
+        border: Border.all(color: Theme.of(context).dividerColor),
       ),
       child: Column(children: children),
     );

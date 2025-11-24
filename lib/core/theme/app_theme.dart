@@ -72,47 +72,69 @@ class AppTheme {
     ),
   );
 
-  // Light Theme
+  // Premium Light Theme
   static final ThemeData lightTheme = ThemeData(
     useMaterial3: true,
     brightness: Brightness.light,
-    primaryColor: white,
+    primaryColor: primaryGreen,
+    scaffoldBackgroundColor: const Color(
+      0xFFF8F9FA,
+    ), // Soft off-white for premium feel
 
     colorScheme: const ColorScheme.light(
-      primary: white,
+      primary: primaryGreen,
       secondary: primaryGreen,
-      background: white,
+      background: Color(0xFFF8F9FA),
       surface: white,
-      onPrimary: black,
+      surfaceVariant: Color(0xFFF0F2F5), // Slightly darker surface for contrast
+      onPrimary: white,
       onSecondary: white,
-      onBackground: black,
-      onSurface: black,
+      onBackground: Color(0xFF1A1A1A), // Soft black for text
+      onSurface: Color(0xFF1A1A1A),
       error: Colors.redAccent,
       onError: white,
+      outline: Color(0xFFE0E0E0), // Light grey for borders
     ),
 
-    scaffoldBackgroundColor: white,
-
     appBarTheme: const AppBarTheme(
-      backgroundColor: white,
+      backgroundColor: Colors.transparent, // Transparent for glass effect
       elevation: 0,
-      iconTheme: IconThemeData(color: black),
+      iconTheme: IconThemeData(color: Color(0xFF1A1A1A)),
       titleTextStyle: TextStyle(
-        color: black,
+        color: Color(0xFF1A1A1A),
         fontSize: 20,
         fontWeight: FontWeight.bold,
+        fontFamily: 'Jersey20', // Consistent branding
       ),
     ),
 
     textTheme: const TextTheme(
-      bodyLarge: TextStyle(color: black),
-      bodyMedium: TextStyle(color: grey),
-      headlineMedium: TextStyle(fontWeight: FontWeight.bold, color: black),
+      displayLarge: TextStyle(
+        color: Color(0xFF1A1A1A),
+        fontWeight: FontWeight.bold,
+      ),
+      displayMedium: TextStyle(
+        color: Color(0xFF1A1A1A),
+        fontWeight: FontWeight.bold,
+      ),
+      bodyLarge: TextStyle(color: Color(0xFF1A1A1A)),
+      bodyMedium: TextStyle(
+        color: Color(0xFF4A4A4A),
+      ), // Medium grey for secondary text
+      titleMedium: TextStyle(
+        color: Color(0xFF1A1A1A),
+        fontWeight: FontWeight.w600,
+      ),
+      headlineMedium: TextStyle(
+        color: Color(0xFF1A1A1A),
+        fontWeight: FontWeight.bold,
+      ),
     ),
 
     floatingActionButtonTheme: const FloatingActionButtonThemeData(
       backgroundColor: primaryGreen,
       foregroundColor: white,
+      elevation: 4,
     ),
 
     bottomNavigationBarTheme: const BottomNavigationBarThemeData(
@@ -121,6 +143,7 @@ class AppTheme {
       unselectedItemColor: grey,
       showUnselectedLabels: false,
       type: BottomNavigationBarType.fixed,
+      elevation: 0,
     ),
   );
 }
@@ -138,11 +161,11 @@ class AppSpacing {
 // ✨ Typography Scale (separate class)
 class AppTypography {
   static double getResponsiveSize(
-      BuildContext context,
-      double baseSize, {
-        double minSize = 10.0,
-        double maxSize = 24.0,
-      }) {
+    BuildContext context,
+    double baseSize, {
+    double minSize = 10.0,
+    double maxSize = 24.0,
+  }) {
     final scale = MediaQuery.of(context).textScaleFactor;
     return (baseSize * scale).clamp(minSize, maxSize);
   }

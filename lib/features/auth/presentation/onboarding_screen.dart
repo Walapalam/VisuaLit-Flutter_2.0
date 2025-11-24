@@ -19,6 +19,8 @@ class OnboardingScreen extends ConsumerWidget {
     final authState = ref.watch(authControllerProvider);
     final isLoading = authState.status == AuthStatus.loading;
 
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
     return Scaffold(
       body: Container(
         decoration: BoxDecoration(
@@ -41,15 +43,17 @@ class OnboardingScreen extends ConsumerWidget {
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   Image.asset(
-                    'assets/images/AppLogo_Dark_NoGB.png',
+                    isDark
+                        ? 'assets/images/AppLogo_Dark.png'
+                        : 'assets/images/AppLogo.png',
                     height: 100,
-                  ), // Ensure this asset exists
+                  ),
                   const SizedBox(height: 24),
                   Text(
                     'VisuaLit',
                     textAlign: TextAlign.center,
                     style: Theme.of(context).textTheme.displaySmall?.copyWith(
-                      color: Colors.white,
+                      color: Theme.of(context).colorScheme.onSurface,
                       fontWeight: FontWeight.bold,
                     ),
                   ),
@@ -65,27 +69,10 @@ class OnboardingScreen extends ConsumerWidget {
                     ),
                     onPressed: isLoading
                         ? null
-                        : () => ref
-                              .read(authControllerProvider.notifier)
-                              .signInAsGuest(),
+                        : () => context.goNamed('themeSelection'),
                     child: isLoading
                         ? const CircularProgressIndicator(color: AppTheme.black)
-                        : const Text('Start Reading as Guest'),
-                  ),
-                  const SizedBox(height: 16),
-                  OutlinedButton(
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: AppTheme.primaryGreen,
-                      side: const BorderSide(color: AppTheme.primaryGreen),
-                      minimumSize: const Size(220, 50),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                    ),
-                    onPressed: isLoading
-                        ? null
-                        : () => context.goNamed('login'),
-                    child: const Text('Continue with an Account'),
+                        : const Text('Get Started'),
                   ),
                 ],
               ),

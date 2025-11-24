@@ -11,13 +11,19 @@ class AudiobooksScreen extends ConsumerWidget {
   const AudiobooksScreen({super.key});
 
   /// Shows a confirmation dialog before deleting an audiobook.
-  void _showDeleteConfirmationDialog(BuildContext context, WidgetRef ref, Audiobook book) {
+  void _showDeleteConfirmationDialog(
+    BuildContext context,
+    WidgetRef ref,
+    Audiobook book,
+  ) {
     showDialog(
       context: context,
       builder: (BuildContext dialogContext) {
         return AlertDialog(
           title: const Text('Delete Audiobook?'),
-          content: Text('Are you sure you want to delete "${book.displayTitle}"? This action cannot be undone.'),
+          content: Text(
+            'Are you sure you want to delete "${book.displayTitle}"? This action cannot be undone.',
+          ),
           actions: <Widget>[
             TextButton(
               child: const Text('Cancel'),
@@ -27,7 +33,9 @@ class AudiobooksScreen extends ConsumerWidget {
               style: TextButton.styleFrom(foregroundColor: Colors.red),
               child: const Text('Delete'),
               onPressed: () {
-                ref.read(audiobooksControllerProvider.notifier).deleteAudiobook(book.id);
+                ref
+                    .read(audiobooksControllerProvider.notifier)
+                    .deleteAudiobook(book.id);
                 Navigator.of(dialogContext).pop();
               },
             ),
@@ -43,8 +51,8 @@ class AudiobooksScreen extends ConsumerWidget {
     final theme = Theme.of(context);
 
     final ButtonStyle customButtonStyle = ElevatedButton.styleFrom(
-      backgroundColor: Colors.grey[850],
-      foregroundColor: Colors.white,
+      backgroundColor: Theme.of(context).colorScheme.surfaceContainerHighest,
+      foregroundColor: Theme.of(context).colorScheme.onSurface,
       padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12.0)),
       textStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
@@ -57,12 +65,16 @@ class AudiobooksScreen extends ConsumerWidget {
           IconButton(
             icon: const Icon(Icons.audio_file_outlined),
             tooltip: 'Add Single MP3 File',
-            onPressed: () => ref.read(audiobooksControllerProvider.notifier).addAudiobookFromFile(),
+            onPressed: () => ref
+                .read(audiobooksControllerProvider.notifier)
+                .addAudiobookFromFile(),
           ),
           IconButton(
             icon: const Icon(Icons.create_new_folder_outlined),
             tooltip: 'Add Audiobook Folder',
-            onPressed: () => ref.read(audiobooksControllerProvider.notifier).addAudiobookFromFolder(),
+            onPressed: () => ref
+                .read(audiobooksControllerProvider.notifier)
+                .addAudiobookFromFolder(),
           ),
         ],
       ),
@@ -70,8 +82,12 @@ class AudiobooksScreen extends ConsumerWidget {
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (err, stack) => Center(child: Text('Error: $err')),
         data: (audiobooks) {
-          final multiFileAudiobooks = audiobooks.where((b) => !b.isSingleFile).toList();
-          final singleFileAudiobooks = audiobooks.where((b) => b.isSingleFile).toList();
+          final multiFileAudiobooks = audiobooks
+              .where((b) => !b.isSingleFile)
+              .toList();
+          final singleFileAudiobooks = audiobooks
+              .where((b) => b.isSingleFile)
+              .toList();
 
           if (audiobooks.isEmpty) {
             return Center(
@@ -80,11 +96,28 @@ class AudiobooksScreen extends ConsumerWidget {
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Text('Your audiobook library is empty.', style: theme.textTheme.titleMedium),
+                    Text(
+                      'Your audiobook library is empty.',
+                      style: theme.textTheme.titleMedium,
+                    ),
                     const SizedBox(height: 32),
-                    ElevatedButton.icon(style: customButtonStyle, icon: const Icon(Icons.create_new_folder_outlined), label: const Text('Add Audiobook Folder'), onPressed: () => ref.read(audiobooksControllerProvider.notifier).addAudiobookFromFolder()),
+                    ElevatedButton.icon(
+                      style: customButtonStyle,
+                      icon: const Icon(Icons.create_new_folder_outlined),
+                      label: const Text('Add Audiobook Folder'),
+                      onPressed: () => ref
+                          .read(audiobooksControllerProvider.notifier)
+                          .addAudiobookFromFolder(),
+                    ),
                     const SizedBox(height: 16),
-                    ElevatedButton.icon(style: customButtonStyle, icon: const Icon(Icons.audio_file_outlined), label: const Text('Add Single MP3 File'), onPressed: () => ref.read(audiobooksControllerProvider.notifier).addAudiobookFromFile()),
+                    ElevatedButton.icon(
+                      style: customButtonStyle,
+                      icon: const Icon(Icons.audio_file_outlined),
+                      label: const Text('Add Single MP3 File'),
+                      onPressed: () => ref
+                          .read(audiobooksControllerProvider.notifier)
+                          .addAudiobookFromFile(),
+                    ),
                   ],
                 ),
               ),
@@ -97,19 +130,35 @@ class AudiobooksScreen extends ConsumerWidget {
                 _buildSectionHeader('Multi-File Audiobooks'),
                 _AudiobookCarousel(
                   books: multiFileAudiobooks,
-                  fallbackIcon: const Icon(Icons.folder_open, size: 80, color: Colors.orangeAccent),
-                  onDelete: (book) => _showDeleteConfirmationDialog(context, ref, book),
+                  fallbackIcon: Icon(
+                    Icons.folder_open,
+                    size: 80,
+                    color: Theme.of(context).colorScheme.tertiary,
+                  ),
+                  onDelete: (book) =>
+                      _showDeleteConfirmationDialog(context, ref, book),
                 ),
               ],
-              if (multiFileAudiobooks.isNotEmpty && singleFileAudiobooks.isNotEmpty)
-                const Divider(height: 48, indent: 16, endIndent: 16, thickness: 0.5),
+              if (multiFileAudiobooks.isNotEmpty &&
+                  singleFileAudiobooks.isNotEmpty)
+                const Divider(
+                  height: 48,
+                  indent: 16,
+                  endIndent: 16,
+                  thickness: 0.5,
+                ),
 
               if (singleFileAudiobooks.isNotEmpty) ...[
                 _buildSectionHeader('Single-File Audiobooks'),
                 _AudiobookCarousel(
                   books: singleFileAudiobooks,
-                  fallbackIcon: const Icon(Icons.music_note, size: 80, color: Colors.tealAccent),
-                  onDelete: (book) => _showDeleteConfirmationDialog(context, ref, book),
+                  fallbackIcon: Icon(
+                    Icons.music_note,
+                    size: 80,
+                    color: Theme.of(context).colorScheme.secondary,
+                  ),
+                  onDelete: (book) =>
+                      _showDeleteConfirmationDialog(context, ref, book),
                 ),
               ],
             ],
@@ -122,7 +171,18 @@ class AudiobooksScreen extends ConsumerWidget {
   Widget _buildSectionHeader(String title) {
     return Padding(
       padding: const EdgeInsets.fromLTRB(16.0, 16.0, 16.0, 12.0),
-      child: Text(title, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.grey)),
+      child: Builder(
+        builder: (context) {
+          return Text(
+            title,
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
+            ),
+          );
+        },
+      ),
     );
   }
 }
@@ -156,8 +216,13 @@ class _AudiobookCarousel extends ConsumerWidget {
             width: cardWidth,
             fallbackIcon: fallbackIcon,
             onTap: () {
-              ref.read(audiobookPlayerServiceProvider.notifier).loadAndPlay(book);
-              context.pushNamed('audiobookPlayer', pathParameters: {'audiobookId': book.id.toString()});
+              ref
+                  .read(audiobookPlayerServiceProvider.notifier)
+                  .loadAndPlay(book);
+              context.pushNamed(
+                'audiobookPlayer',
+                pathParameters: {'audiobookId': book.id.toString()},
+              );
             },
             onDelete: () => onDelete(book),
           );
@@ -193,8 +258,9 @@ class _AudiobookCard extends StatelessWidget {
         // --- MODIFICATION IS HERE ---
         // InkWell handles both tap and long press events.
         child: InkWell(
-          onTap: onTap,         // A short tap plays the book.
-          onLongPress: onDelete,  // A long press now triggers the delete confirmation.
+          onTap: onTap, // A short tap plays the book.
+          onLongPress:
+              onDelete, // A long press now triggers the delete confirmation.
           borderRadius: BorderRadius.circular(8.0),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -204,14 +270,16 @@ class _AudiobookCard extends StatelessWidget {
                 width: double.infinity,
                 child: Card(
                   clipBehavior: Clip.antiAlias,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8.0)),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8.0),
+                  ),
                   elevation: 4,
                   // The Stack is now simpler as we've removed the button from the corner.
                   child: book.coverImageBytes != null
                       ? Image.memory(
-                    Uint8List.fromList(book.coverImageBytes!),
-                    fit: BoxFit.cover,
-                  )
+                          Uint8List.fromList(book.coverImageBytes!),
+                          fit: BoxFit.cover,
+                        )
                       : Center(child: fallbackIcon),
                 ),
               ),
@@ -220,7 +288,9 @@ class _AudiobookCard extends StatelessWidget {
                 padding: const EdgeInsets.symmetric(horizontal: 4.0),
                 child: Text(
                   book.displayTitle,
-                  style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.bold),
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    fontWeight: FontWeight.bold,
+                  ),
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
                 ),

@@ -8,6 +8,7 @@ import 'package:visualit/features/auth/presentation/signup_screen.dart';
 import 'package:visualit/features/auth/presentation/welcome_screen.dart';
 import 'package:visualit/features/auth/presentation/onboarding/onboarding_screen.dart'
     as onboarding;
+import 'package:visualit/features/auth/presentation/onboarding/theme_selection_screen.dart';
 import 'package:visualit/features/auth/application/onboarding_notifier.dart';
 import 'package:visualit/features/auth/presentation/email_verification_screen.dart';
 import 'package:visualit/features/auth/presentation/splash_screen.dart';
@@ -46,6 +47,11 @@ final goRouterProvider = Provider<GoRouter>((ref) {
         path: '/onboarding',
         name: 'onboarding',
         builder: (context, state) => const onboarding.OnboardingScreen(),
+      ),
+      GoRoute(
+        path: '/theme-selection',
+        name: 'themeSelection',
+        builder: (context, state) => const ThemeSelectionScreen(),
       ),
       GoRoute(
         path: '/welcome',
@@ -184,6 +190,7 @@ final goRouterProvider = Provider<GoRouter>((ref) {
       final publicRoutes = [
         '/splash',
         '/onboarding',
+        '/theme-selection',
         '/welcome',
         '/login',
         '/signup',

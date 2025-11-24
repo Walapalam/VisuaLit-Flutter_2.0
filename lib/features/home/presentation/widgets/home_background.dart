@@ -7,10 +7,29 @@ class HomeBackground extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
     return Stack(
       children: [
-        // Deep dark background
-        Container(color: AppTheme.black),
+        // Deep dark background or Creative Green Gradient for Light Mode
+        Container(
+          decoration: BoxDecoration(
+            gradient: isDark
+                ? null
+                : const LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: [
+                      Color(0xFFE8F5E9), // Very light green
+                      Color(0xFFF1F8E9), // Light green-yellow tint
+                      Color(0xFFFFFFFF), // White center
+                      Color(0xFFE0F2F1), // Light teal tint
+                    ],
+                    stops: [0.0, 0.3, 0.6, 1.0],
+                  ),
+            color: isDark ? AppTheme.black : null,
+          ),
+        ),
         // Top-left subtle green glow
         Positioned(
           top: -100,
@@ -20,7 +39,16 @@ class HomeBackground extends StatelessWidget {
             height: 300,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
-              color: AppTheme.primaryGreen.withOpacity(0.15),
+              color: AppTheme.primaryGreen.withOpacity(
+                isDark ? 0.15 : 0.15,
+              ), // Increased opacity for light mode
+              boxShadow: [
+                BoxShadow(
+                  color: AppTheme.primaryGreen.withOpacity(0.2),
+                  blurRadius: 100,
+                  spreadRadius: 50,
+                ),
+              ],
             ),
           ),
         ),
@@ -33,7 +61,14 @@ class HomeBackground extends StatelessWidget {
             height: 250,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
-              color: AppTheme.primaryGreen.withOpacity(0.1),
+              color: AppTheme.primaryGreen.withOpacity(isDark ? 0.1 : 0.1),
+              boxShadow: [
+                BoxShadow(
+                  color: AppTheme.primaryGreen.withOpacity(0.15),
+                  blurRadius: 80,
+                  spreadRadius: 40,
+                ),
+              ],
             ),
           ),
         ),
@@ -48,11 +83,17 @@ class HomeBackground extends StatelessWidget {
             gradient: LinearGradient(
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
-              colors: [
-                Colors.white.withOpacity(0.02),
-                Colors.transparent,
-                Colors.black.withOpacity(0.4),
-              ],
+              colors: isDark
+                  ? [
+                      Colors.white.withOpacity(0.02),
+                      Colors.transparent,
+                      Colors.black.withOpacity(0.4),
+                    ]
+                  : [
+                      AppTheme.primaryGreen.withOpacity(0.05),
+                      Colors.transparent,
+                      Colors.white.withOpacity(0.2),
+                    ],
             ),
           ),
         ),

@@ -24,7 +24,7 @@ class MainShell extends StatelessWidget {
           'Visualit',
           style: TextStyle(
             fontFamily: 'Jersey20',
-            color: Theme.of(context).colorScheme.onPrimary,
+            color: Theme.of(context).colorScheme.onSurface,
             fontSize: 35.0,
             fontWeight: FontWeight.normal,
           ),

@@ -32,9 +32,9 @@ class _BookDetailsSheetState extends ConsumerState<BookDetailsSheet> {
       maxChildSize: 0.85, // limit to avoid covering the app bar
       builder: (context, scrollController) {
         return Container(
-          decoration: const BoxDecoration(
-            color: Color(0xFF1A1A1A),
-            borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+          decoration: BoxDecoration(
+            color: Theme.of(context).colorScheme.surface,
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
           ),
           child: Column(
             children: [
@@ -44,7 +44,9 @@ class _BookDetailsSheetState extends ConsumerState<BookDetailsSheet> {
                 width: 40,
                 height: 4,
                 decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.3),
+                  color: Theme.of(
+                    context,
+                  ).colorScheme.onSurface.withOpacity(0.3),
                   borderRadius: BorderRadius.circular(2),
                 ),
               ),
@@ -67,7 +69,9 @@ class _BookDetailsSheetState extends ConsumerState<BookDetailsSheet> {
                           child: Container(
                             width: 100,
                             height: 140,
-                            color: Colors.grey[900],
+                            color: Theme.of(
+                              context,
+                            ).colorScheme.surfaceContainerHighest,
                             child: widget.book.coverImageBytes != null
                                 ? Image.memory(
                                     Uint8List.fromList(
@@ -78,7 +82,9 @@ class _BookDetailsSheetState extends ConsumerState<BookDetailsSheet> {
                                 : Icon(
                                     Icons.book,
                                     size: 40,
-                                    color: Colors.grey[700],
+                                    color: Theme.of(
+                                      context,
+                                    ).colorScheme.onSurfaceVariant,
                                   ),
                           ),
                         ),
@@ -91,8 +97,10 @@ class _BookDetailsSheetState extends ConsumerState<BookDetailsSheet> {
                             children: [
                               Text(
                                 widget.book.title ?? 'Unknown Title',
-                                style: const TextStyle(
-                                  color: AppTheme.white,
+                                style: TextStyle(
+                                  color: Theme.of(
+                                    context,
+                                  ).colorScheme.onSurface,
                                   fontSize: 20,
                                   fontWeight: FontWeight.bold,
                                 ),
@@ -103,7 +111,9 @@ class _BookDetailsSheetState extends ConsumerState<BookDetailsSheet> {
                               Text(
                                 widget.book.author ?? 'Unknown Author',
                                 style: TextStyle(
-                                  color: AppTheme.white.withOpacity(0.7),
+                                  color: Theme.of(
+                                    context,
+                                  ).colorScheme.onSurface.withOpacity(0.7),
                                   fontSize: 15,
                                 ),
                               ),
@@ -112,7 +122,9 @@ class _BookDetailsSheetState extends ConsumerState<BookDetailsSheet> {
                                 Text(
                                   widget.book.publisher!,
                                   style: TextStyle(
-                                    color: AppTheme.white.withOpacity(0.5),
+                                    color: Theme.of(
+                                      context,
+                                    ).colorScheme.onSurface.withOpacity(0.5),
                                     fontSize: 13,
                                   ),
                                 ),
@@ -215,7 +227,7 @@ class _BookDetailsSheetState extends ConsumerState<BookDetailsSheet> {
             Text(
               'Reading Progress',
               style: TextStyle(
-                color: AppTheme.white.withOpacity(0.7),
+                color: Theme.of(context).colorScheme.onSurface.withOpacity(0.7),
                 fontSize: 14,
               ),
             ),
@@ -234,7 +246,9 @@ class _BookDetailsSheetState extends ConsumerState<BookDetailsSheet> {
           borderRadius: BorderRadius.circular(4),
           child: LinearProgressIndicator(
             value: progress,
-            backgroundColor: Colors.grey[800],
+            backgroundColor: Theme.of(
+              context,
+            ).colorScheme.surfaceContainerHighest,
             valueColor: const AlwaysStoppedAnimation<Color>(
               AppTheme.primaryGreen,
             ),
@@ -261,25 +275,33 @@ class _BookDetailsSheetState extends ConsumerState<BookDetailsSheet> {
           decoration: BoxDecoration(
             color: isPrimary
                 ? AppTheme.primaryGreen
-                : Colors.white.withOpacity(0.05),
+                : Theme.of(context).colorScheme.onSurface.withOpacity(0.05),
             borderRadius: BorderRadius.circular(12),
             border: isPrimary
                 ? null
-                : Border.all(color: Colors.white.withOpacity(0.1)),
+                : Border.all(
+                    color: Theme.of(
+                      context,
+                    ).colorScheme.onSurface.withOpacity(0.1),
+                  ),
           ),
           child: Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               Icon(
                 icon,
-                color: isPrimary ? AppTheme.black : AppTheme.white,
+                color: isPrimary
+                    ? Theme.of(context).colorScheme.onPrimary
+                    : Theme.of(context).colorScheme.onSurface,
                 size: 20,
               ),
               const SizedBox(width: 8),
               Text(
                 label,
                 style: TextStyle(
-                  color: isPrimary ? AppTheme.black : AppTheme.white,
+                  color: isPrimary
+                      ? Theme.of(context).colorScheme.onPrimary
+                      : Theme.of(context).colorScheme.onSurface,
                   fontSize: 15,
                   fontWeight: FontWeight.w600,
                 ),
@@ -303,11 +325,17 @@ class _BookDetailsSheetState extends ConsumerState<BookDetailsSheet> {
         child: Container(
           padding: const EdgeInsets.all(14),
           decoration: BoxDecoration(
-            color: Colors.white.withOpacity(0.05),
+            color: Theme.of(context).colorScheme.onSurface.withOpacity(0.05),
             borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: Colors.white.withOpacity(0.1)),
+            border: Border.all(
+              color: Theme.of(context).colorScheme.onSurface.withOpacity(0.1),
+            ),
           ),
-          child: Icon(icon, color: AppTheme.white, size: 20),
+          child: Icon(
+            icon,
+            color: Theme.of(context).colorScheme.onSurface,
+            size: 20,
+          ),
         ),
       ),
     );
@@ -361,8 +389,8 @@ class _BookDetailsSheetState extends ConsumerState<BookDetailsSheet> {
         const SizedBox(height: 8),
         Text(
           value,
-          style: const TextStyle(
-            color: AppTheme.white,
+          style: TextStyle(
+            color: Theme.of(context).colorScheme.onSurface,
             fontSize: 16,
             fontWeight: FontWeight.bold,
           ),
@@ -371,7 +399,7 @@ class _BookDetailsSheetState extends ConsumerState<BookDetailsSheet> {
         Text(
           label,
           style: TextStyle(
-            color: AppTheme.white.withOpacity(0.5),
+            color: Theme.of(context).colorScheme.onSurface.withOpacity(0.5),
             fontSize: 12,
           ),
         ),
@@ -383,7 +411,7 @@ class _BookDetailsSheetState extends ConsumerState<BookDetailsSheet> {
     return Container(
       padding: const EdgeInsets.all(4),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.05),
+        color: Theme.of(context).colorScheme.onSurface.withOpacity(0.05),
         borderRadius: BorderRadius.circular(12),
       ),
       child: Row(
@@ -425,8 +453,8 @@ class _BookDetailsSheetState extends ConsumerState<BookDetailsSheet> {
           textAlign: TextAlign.center,
           style: TextStyle(
             color: isSelected
-                ? AppTheme.black
-                : AppTheme.white.withOpacity(0.6),
+                ? Theme.of(context).colorScheme.onPrimary
+                : Theme.of(context).colorScheme.onSurface.withOpacity(0.6),
             fontSize: 14,
             fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
           ),
@@ -443,7 +471,7 @@ class _BookDetailsSheetState extends ConsumerState<BookDetailsSheet> {
           child: Text(
             'No chapters available',
             style: TextStyle(
-              color: AppTheme.white.withOpacity(0.5),
+              color: Theme.of(context).colorScheme.onSurface.withOpacity(0.5),
               fontSize: 14,
             ),
           ),
@@ -460,9 +488,11 @@ class _BookDetailsSheetState extends ConsumerState<BookDetailsSheet> {
         return Container(
           margin: const EdgeInsets.only(bottom: 8),
           decoration: BoxDecoration(
-            color: Colors.white.withOpacity(0.03),
+            color: Theme.of(context).colorScheme.onSurface.withOpacity(0.03),
             borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: Colors.white.withOpacity(0.05)),
+            border: Border.all(
+              color: Theme.of(context).colorScheme.onSurface.withOpacity(0.05),
+            ),
           ),
           child: ListTile(
             leading: Container(
@@ -471,7 +501,7 @@ class _BookDetailsSheetState extends ConsumerState<BookDetailsSheet> {
               decoration: BoxDecoration(
                 color: isRead
                     ? AppTheme.primaryGreen.withOpacity(0.2)
-                    : Colors.white.withOpacity(0.05),
+                    : Theme.of(context).colorScheme.onSurface.withOpacity(0.05),
                 borderRadius: BorderRadius.circular(8),
               ),
               child: Center(
@@ -480,7 +510,9 @@ class _BookDetailsSheetState extends ConsumerState<BookDetailsSheet> {
                   style: TextStyle(
                     color: isRead
                         ? AppTheme.primaryGreen
-                        : AppTheme.white.withOpacity(0.5),
+                        : Theme.of(
+                            context,
+                          ).colorScheme.onSurface.withOpacity(0.5),
                     fontSize: 12,
                     fontWeight: FontWeight.bold,
                   ),
@@ -491,8 +523,8 @@ class _BookDetailsSheetState extends ConsumerState<BookDetailsSheet> {
               chapter.title ?? 'Untitled Chapter',
               style: TextStyle(
                 color: isRead
-                    ? AppTheme.white
-                    : AppTheme.white.withOpacity(0.8),
+                    ? Theme.of(context).colorScheme.onSurface
+                    : Theme.of(context).colorScheme.onSurface.withOpacity(0.8),
                 fontSize: 14,
                 fontWeight: isRead ? FontWeight.w600 : FontWeight.normal,
               ),
@@ -527,13 +559,13 @@ class _BookDetailsSheetState extends ConsumerState<BookDetailsSheet> {
             Icon(
               Icons.image_outlined,
               size: 48,
-              color: AppTheme.white.withOpacity(0.3),
+              color: Theme.of(context).colorScheme.onSurface.withOpacity(0.3),
             ),
             const SizedBox(height: 16),
             Text(
               'Image gallery coming soon',
               style: TextStyle(
-                color: AppTheme.white.withOpacity(0.5),
+                color: Theme.of(context).colorScheme.onSurface.withOpacity(0.5),
                 fontSize: 14,
               ),
             ),
@@ -547,22 +579,24 @@ class _BookDetailsSheetState extends ConsumerState<BookDetailsSheet> {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        backgroundColor: const Color(0xFF1A1A1A),
+        backgroundColor: Theme.of(context).colorScheme.surface,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: const Text(
+        title: Text(
           'Remove from Library?',
-          style: TextStyle(color: AppTheme.white),
+          style: TextStyle(color: Theme.of(context).colorScheme.onSurface),
         ),
         content: Text(
           'Are you sure you want to remove "${widget.book.title}" from your library? This action cannot be undone.',
-          style: TextStyle(color: AppTheme.white.withOpacity(0.8)),
+          style: TextStyle(
+            color: Theme.of(context).colorScheme.onSurface.withOpacity(0.8),
+          ),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text(
+            child: Text(
               'Cancel',
-              style: TextStyle(color: AppTheme.white),
+              style: TextStyle(color: Theme.of(context).colorScheme.onSurface),
             ),
           ),
           ElevatedButton(

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:visualit/core/theme/app_theme.dart';
+import 'package:visualit/core/theme/theme_controller.dart';
 import 'package:visualit/features/auth/presentation/auth_controller.dart';
 import 'package:go_router/go_router.dart';
 
@@ -11,9 +12,12 @@ class AppDrawer extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final authState = ref.watch(authControllerProvider);
     final user = authState.user;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final backgroundColor = Theme.of(context).scaffoldBackgroundColor;
+    final textColor = Theme.of(context).colorScheme.onBackground;
 
     return Drawer(
-      backgroundColor: AppTheme.black,
+      backgroundColor: backgroundColor,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.only(
           topLeft: Radius.circular(20),
@@ -21,12 +25,12 @@ class AppDrawer extends ConsumerWidget {
         ),
       ),
       child: Container(
-        decoration: const BoxDecoration(
-          borderRadius: BorderRadius.only(
+        decoration: BoxDecoration(
+          borderRadius: const BorderRadius.only(
             topLeft: Radius.circular(20),
             bottomLeft: Radius.circular(20),
           ),
-          color: AppTheme.black,
+          color: backgroundColor,
         ),
         child: SafeArea(
           child: Padding(
@@ -61,7 +65,7 @@ class AppDrawer extends ConsumerWidget {
                             style: const TextStyle(
                               fontSize: 28,
                               fontWeight: FontWeight.bold,
-                              color: AppTheme.black,
+                              color: AppTheme.black, // Always black on green
                             ),
                           ),
                         ),
@@ -70,8 +74,8 @@ class AppDrawer extends ConsumerWidget {
                       // User Name
                       Text(
                         user?.displayName ?? 'Guest User',
-                        style: const TextStyle(
-                          color: AppTheme.white,
+                        style: TextStyle(
+                          color: textColor,
                           fontSize: 18,
                           fontWeight: FontWeight.bold,
                         ),
@@ -81,7 +85,7 @@ class AppDrawer extends ConsumerWidget {
                       Text(
                         user?.email ?? 'Sign in for full features',
                         style: TextStyle(
-                          color: AppTheme.white.withOpacity(0.5),
+                          color: textColor.withOpacity(0.5),
                           fontSize: 13,
                         ),
                         maxLines: 1,
@@ -110,6 +114,7 @@ class AppDrawer extends ConsumerWidget {
 
                 // Menu Items - Simpler design
                 _buildSimpleMenuItem(
+                  context,
                   icon: Icons.person_outline,
                   label: 'My Profile',
                   onTap: () {
@@ -119,12 +124,67 @@ class AppDrawer extends ConsumerWidget {
                 ),
                 const SizedBox(height: 8),
                 _buildSimpleMenuItem(
+                  context,
                   icon: Icons.leaderboard_outlined,
                   label: 'Leaderboards',
                   onTap: () {
                     Navigator.pop(context);
                     // TODO: Navigate to leaderboards screen
                   },
+                ),
+                const SizedBox(height: 8),
+
+                // Theme Toggle
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 24),
+                  child: Material(
+                    color: Colors.transparent,
+                    child: InkWell(
+                      onTap: () {
+                        ref
+                            .read(themeControllerProvider.notifier)
+                            .toggleTheme();
+                      },
+                      borderRadius: BorderRadius.circular(12),
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 14,
+                        ),
+                        child: Row(
+                          children: [
+                            Icon(
+                              isDark
+                                  ? Icons.dark_mode_outlined
+                                  : Icons.light_mode_outlined,
+                              color: AppTheme.primaryGreen,
+                              size: 22,
+                            ),
+                            const SizedBox(width: 16),
+                            Expanded(
+                              child: Text(
+                                isDark ? 'Dark Mode' : 'Light Mode',
+                                style: TextStyle(
+                                  color: textColor,
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                            ),
+                            Switch(
+                              value: !isDark,
+                              onChanged: (value) {
+                                ref
+                                    .read(themeControllerProvider.notifier)
+                                    .toggleTheme();
+                              },
+                              activeColor: AppTheme.primaryGreen,
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
                 ),
 
                 const Spacer(),
@@ -161,11 +221,14 @@ class AppDrawer extends ConsumerWidget {
     );
   }
 
-  Widget _buildSimpleMenuItem({
+  Widget _buildSimpleMenuItem(
+    BuildContext context, {
     required IconData icon,
     required String label,
     required VoidCallback onTap,
   }) {
+    final textColor = Theme.of(context).colorScheme.onBackground;
+
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 24),
       child: Material(
@@ -181,8 +244,8 @@ class AppDrawer extends ConsumerWidget {
                 const SizedBox(width: 16),
                 Text(
                   label,
-                  style: const TextStyle(
-                    color: AppTheme.white,
+                  style: TextStyle(
+                    color: textColor,
                     fontSize: 16,
                     fontWeight: FontWeight.w500,
                   ),

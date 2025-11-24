@@ -2,7 +2,6 @@ import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:visualit/core/theme/app_theme.dart';
 import 'package:visualit/features/library/presentation/library_controller.dart';
 import 'package:visualit/features/reader/data/book_data.dart' as db;
 import 'package:visualit/shared_widgets/book_card.dart';
@@ -26,16 +25,16 @@ class HomeScreen extends ConsumerWidget {
     final isarAsync = ref.watch(isarDBProvider);
 
     return isarAsync.when(
-      loading: () => const Scaffold(
-        backgroundColor: AppTheme.black,
-        body: Center(child: CircularProgressIndicator()),
+      loading: () => Scaffold(
+        backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+        body: const Center(child: CircularProgressIndicator()),
       ),
       error: (err, stack) => Scaffold(
-        backgroundColor: AppTheme.black,
+        backgroundColor: Theme.of(context).scaffoldBackgroundColor,
         body: Center(
           child: Text(
             'Database Error: $err',
-            style: const TextStyle(color: Colors.white),
+            style: TextStyle(color: Theme.of(context).colorScheme.error),
           ),
         ),
       ),
@@ -44,7 +43,9 @@ class HomeScreen extends ConsumerWidget {
         final libraryController = ref.read(libraryControllerProvider.notifier);
 
         return Scaffold(
-          backgroundColor: AppTheme.black, // Fallback
+          backgroundColor: Theme.of(
+            context,
+          ).scaffoldBackgroundColor, // Fallback
           body: Stack(
             children: [
               // 1. Background
@@ -58,7 +59,9 @@ class HomeScreen extends ConsumerWidget {
                   error: (err, _) => Center(
                     child: Text(
                       'Error: $err',
-                      style: const TextStyle(color: Colors.white),
+                      style: TextStyle(
+                        color: Theme.of(context).colorScheme.error,
+                      ),
                     ),
                   ),
                   data: (books) {
@@ -96,15 +99,19 @@ class HomeScreen extends ConsumerWidget {
                                             Text(
                                               'Good Evening,',
                                               style: TextStyle(
-                                                color: AppTheme.white
+                                                color: Theme.of(context)
+                                                    .colorScheme
+                                                    .onSurface
                                                     .withOpacity(0.7),
                                                 fontSize: 16,
                                               ),
                                             ),
                                             Text(
                                               firstName,
-                                              style: const TextStyle(
-                                                color: AppTheme.white,
+                                              style: TextStyle(
+                                                color: Theme.of(
+                                                  context,
+                                                ).colorScheme.onSurface,
                                                 fontSize: 28,
                                                 fontWeight: FontWeight.bold,
                                               ),
@@ -184,7 +191,7 @@ class HomeScreen extends ConsumerWidget {
                               crossAxisAlignment: CrossAxisAlignment.center,
                               children: [
                                 const SizedBox(height: 20),
-                                const Padding(
+                                Padding(
                                   padding: EdgeInsets.symmetric(
                                     horizontal: 10.0,
                                   ),
@@ -192,7 +199,9 @@ class HomeScreen extends ConsumerWidget {
                                     'Continue Reading',
                                     textAlign: TextAlign.center, // Centered
                                     style: TextStyle(
-                                      color: AppTheme.white,
+                                      color: Theme.of(
+                                        context,
+                                      ).colorScheme.onSurface,
                                       fontSize: 24,
                                       fontWeight: FontWeight.bold,
                                     ),
@@ -296,13 +305,15 @@ class _HorizontalBookList extends StatelessWidget {
         height: 150,
         margin: const EdgeInsets.symmetric(horizontal: 20),
         decoration: BoxDecoration(
-          color: Colors.white.withOpacity(0.03),
+          color: Theme.of(context).colorScheme.onSurface.withOpacity(0.03),
           borderRadius: BorderRadius.circular(16),
         ),
         child: Center(
           child: Text(
             'No books available',
-            style: TextStyle(color: Colors.white.withOpacity(0.4)),
+            style: TextStyle(
+              color: Theme.of(context).colorScheme.onSurface.withOpacity(0.4),
+            ),
           ),
         ),
       );
@@ -356,13 +367,15 @@ class _HorizontalMarketplaceBookList extends StatelessWidget {
         height: 150,
         margin: const EdgeInsets.symmetric(horizontal: 20),
         decoration: BoxDecoration(
-          color: Colors.white.withOpacity(0.03),
+          color: Theme.of(context).colorScheme.onSurface.withOpacity(0.03),
           borderRadius: BorderRadius.circular(16),
         ),
         child: Center(
           child: Text(
             'No books available',
-            style: TextStyle(color: Colors.white.withOpacity(0.4)),
+            style: TextStyle(
+              color: Theme.of(context).colorScheme.onSurface.withOpacity(0.4),
+            ),
           ),
         ),
       );

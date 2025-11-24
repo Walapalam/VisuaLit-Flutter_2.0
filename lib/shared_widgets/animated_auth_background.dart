@@ -40,10 +40,29 @@ class _AnimatedAuthBackgroundState extends State<AnimatedAuthBackground>
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
     return Stack(
       children: [
-        // 1. Deep dark background (Matches HomeBackground)
-        Container(color: AppTheme.black),
+        // 1. Deep dark background or Creative Green Gradient for Light Mode
+        Container(
+          decoration: BoxDecoration(
+            gradient: isDark
+                ? null
+                : const LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: [
+                      Color(0xFFE8F5E9), // Very light green
+                      Color(0xFFF1F8E9), // Light green-yellow tint
+                      Color(0xFFFFFFFF), // White center
+                      Color(0xFFE0F2F1), // Light teal tint
+                    ],
+                    stops: [0.0, 0.3, 0.6, 1.0],
+                  ),
+            color: isDark ? AppTheme.black : null,
+          ),
+        ),
 
         // 2. Top-left subtle green glow (Matches HomeBackground)
         Positioned(
@@ -99,11 +118,17 @@ class _AnimatedAuthBackgroundState extends State<AnimatedAuthBackground>
             gradient: LinearGradient(
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
-              colors: [
-                Colors.white.withOpacity(0.02),
-                Colors.transparent,
-                Colors.black.withOpacity(0.4),
-              ],
+              colors: isDark
+                  ? [
+                      Colors.white.withOpacity(0.02),
+                      Colors.transparent,
+                      Colors.black.withOpacity(0.4),
+                    ]
+                  : [
+                      AppTheme.primaryGreen.withOpacity(0.05),
+                      Colors.transparent,
+                      Colors.white.withOpacity(0.2),
+                    ],
             ),
           ),
         ),

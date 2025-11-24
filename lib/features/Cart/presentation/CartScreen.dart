@@ -116,22 +116,22 @@ class _CartScreenState extends ConsumerState<CartScreen> {
       extendBodyBehindAppBar: true,
       appBar: AppBar(
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
+          icon: Icon(Icons.arrow_back),
           onPressed: () {
             context.go('/marketplace');
           },
         ),
-        title: const Text(
+        title: Text(
           'Cart',
           style: TextStyle(
-            color: Colors.white,
+            color: Theme.of(context).colorScheme.onSurface,
             fontSize: 20,
             fontWeight: FontWeight.w600,
           ),
         ),
         backgroundColor: Colors.transparent,
         elevation: 0,
-        iconTheme: const IconThemeData(color: Colors.white),
+        iconTheme: IconThemeData(color: Theme.of(context).colorScheme.onSurface),
       ),
       body: Stack(
         children: [
@@ -152,7 +152,7 @@ class _CartScreenState extends ConsumerState<CartScreen> {
                         Text(
                           'Your cart is empty',
                           style: TextStyle(
-                            color: Colors.white.withOpacity(0.6),
+                            color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6),
                             fontSize: 18,
                           ),
                         ),
@@ -171,10 +171,10 @@ class _CartScreenState extends ConsumerState<CartScreen> {
                         margin: const EdgeInsets.only(bottom: 12),
                         padding: const EdgeInsets.all(12),
                         decoration: BoxDecoration(
-                          color: Colors.white.withOpacity(0.05),
+                          color: Theme.of(context).colorScheme.onSurface.withOpacity(0.05),
                           borderRadius: BorderRadius.circular(16),
                           border: Border.all(
-                            color: Colors.white.withOpacity(0.1),
+                            color: Theme.of(context).colorScheme.onSurface.withOpacity(0.1),
                           ),
                         ),
                         child: Row(
@@ -192,9 +192,9 @@ class _CartScreenState extends ConsumerState<CartScreen> {
                                       width: 60,
                                       height: 90,
                                       color: AppTheme.darkGrey,
-                                      child: const Icon(
+                                      child: Icon(
                                         Icons.book,
-                                        color: Colors.white,
+                                        color: Theme.of(context).colorScheme.onSurface,
                                       ),
                                     ),
                             ),
@@ -205,8 +205,8 @@ class _CartScreenState extends ConsumerState<CartScreen> {
                                 children: [
                                   Text(
                                     bookTitle,
-                                    style: const TextStyle(
-                                      color: Colors.white,
+                                    style: TextStyle(
+                                      color: Theme.of(context).colorScheme.onSurface,
                                       fontSize: 16,
                                       fontWeight: FontWeight.bold,
                                     ),
@@ -217,7 +217,7 @@ class _CartScreenState extends ConsumerState<CartScreen> {
                                   Text(
                                     book['author'] ?? 'Unknown Author',
                                     style: TextStyle(
-                                      color: Colors.white.withOpacity(0.6),
+                                      color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6),
                                       fontSize: 14,
                                     ),
                                     maxLines: 1,
@@ -245,7 +245,7 @@ class _CartScreenState extends ConsumerState<CartScreen> {
                                               ),
                                             )
                                           : IconButton(
-                                              icon: const Icon(
+                                              icon: Icon(
                                                 Icons.download,
                                                 color: Colors.blue,
                                               ),
@@ -280,12 +280,12 @@ class _CartScreenState extends ConsumerState<CartScreen> {
                                               },
                                             )
                                     else
-                                      const Icon(
+                                      Icon(
                                         Icons.check_circle,
                                         color: Colors.green,
                                       ),
                                     IconButton(
-                                      icon: const Icon(
+                                      icon: Icon(
                                         Icons.delete_outline,
                                         color: Colors.redAccent,
                                       ),

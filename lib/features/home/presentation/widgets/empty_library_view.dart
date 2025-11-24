@@ -17,10 +17,10 @@ class EmptyLibraryView extends StatelessWidget {
             color: AppTheme.primaryGreen.withOpacity(0.5),
           ),
           const SizedBox(height: 24),
-          const Text(
+          Text(
             "Your Library Awaits",
             style: TextStyle(
-              color: Colors.white,
+              color: Theme.of(context).colorScheme.onSurface,
               fontSize: 24,
               fontWeight: FontWeight.bold,
             ),
@@ -30,7 +30,7 @@ class EmptyLibraryView extends StatelessWidget {
           Text(
             "\"A room without books is like a body without a soul.\"\n– Cicero",
             style: TextStyle(
-              color: Colors.white.withOpacity(0.6),
+              color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6),
               fontSize: 16,
               fontStyle: FontStyle.italic,
               height: 1.5,
@@ -41,9 +41,11 @@ class EmptyLibraryView extends StatelessWidget {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
             decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.05),
+              color: Theme.of(context).colorScheme.onSurface.withOpacity(0.05),
               borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: Colors.white.withOpacity(0.1)),
+              border: Border.all(
+                color: Theme.of(context).colorScheme.onSurface.withOpacity(0.1),
+              ),
             ),
             child: Row(
               mainAxisSize: MainAxisSize.min,
@@ -57,7 +59,9 @@ class EmptyLibraryView extends StatelessWidget {
                 Text(
                   "Explore the Marketplace above",
                   style: TextStyle(
-                    color: Colors.white.withOpacity(0.8),
+                    color: Theme.of(
+                      context,
+                    ).colorScheme.onSurface.withOpacity(0.8),
                     fontSize: 14,
                     fontWeight: FontWeight.w500,
                   ),

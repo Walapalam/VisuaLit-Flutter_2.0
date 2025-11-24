@@ -1,6 +1,5 @@
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
-import 'package:visualit/core/theme/app_theme.dart';
 
 class BookCard extends StatelessWidget {
   final Uint8List? imageBytes;
@@ -70,7 +69,7 @@ class BookCard extends StatelessWidget {
                                     ? loadingProgress.cumulativeBytesLoaded /
                                           loadingProgress.expectedTotalBytes!
                                     : null,
-                                color: AppTheme.primaryGreen,
+                                color: Theme.of(context).colorScheme.primary,
                               ),
                             );
                           },
@@ -91,7 +90,7 @@ class BookCard extends StatelessWidget {
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               style: TextStyle(
-                color: Theme.of(context).colorScheme.onBackground,
+                color: Theme.of(context).colorScheme.onSurface,
                 fontWeight: FontWeight.bold,
                 fontSize: 16,
               ),
@@ -102,9 +101,7 @@ class BookCard extends StatelessWidget {
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               style: TextStyle(
-                color: Theme.of(
-                  context,
-                ).colorScheme.onBackground.withOpacity(0.7),
+                color: Theme.of(context).colorScheme.onSurface.withOpacity(0.7),
                 fontSize: 14,
               ),
             ),

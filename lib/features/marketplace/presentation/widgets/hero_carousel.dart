@@ -40,14 +40,15 @@ class HeroCarousel extends ConsumerWidget {
                       filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
                       child: Container(
                         decoration: BoxDecoration(
-                          color: Colors.white.withOpacity(
-                            0.05,
-                          ), // Very subtle fill
+                          color: Theme.of(context).colorScheme.onSurface
+                              .withOpacity(0.05), // Very subtle fill
                           borderRadius: BorderRadius.circular(
                             24,
                           ), // This borderRadius is redundant if ClipRRect handles it, but good for consistency
                           border: Border.all(
-                            color: Colors.white.withOpacity(0.1),
+                            color: Theme.of(
+                              context,
+                            ).colorScheme.onSurface.withOpacity(0.1),
                             width: 1,
                           ),
                         ),
@@ -61,7 +62,9 @@ class HeroCarousel extends ConsumerWidget {
                         width: 150,
                         height: 150,
                         decoration: BoxDecoration(
-                          color: Colors.white.withOpacity(0.1),
+                          color: Theme.of(
+                            context,
+                          ).colorScheme.onSurface.withOpacity(0.1),
                           shape: BoxShape.circle,
                         ),
                       ),
@@ -110,9 +113,10 @@ class HeroCarousel extends ConsumerWidget {
                                   title,
                                   maxLines: 3,
                                   overflow: TextOverflow.ellipsis,
-                                  style: const TextStyle(
-                                    color:
-                                        Colors.white, // White text for dark bg
+                                  style: TextStyle(
+                                    color: Theme.of(
+                                      context,
+                                    ).colorScheme.onSurface,
                                     fontSize: 22,
                                     fontWeight: FontWeight.bold,
                                     height: 1.1,
@@ -125,7 +129,9 @@ class HeroCarousel extends ConsumerWidget {
                                   maxLines: 1,
                                   overflow: TextOverflow.ellipsis,
                                   style: TextStyle(
-                                    color: Colors.white.withOpacity(0.7),
+                                    color: Theme.of(
+                                      context,
+                                    ).colorScheme.onSurface.withOpacity(0.7),
                                     fontSize: 14,
                                     fontWeight: FontWeight.w500,
                                   ),

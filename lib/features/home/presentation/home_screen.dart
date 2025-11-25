@@ -87,6 +87,22 @@ class HomeScreen extends ConsumerWidget {
                                     final firstName =
                                         user?.displayName?.split(' ').first ??
                                         'Reader';
+                                    final displayName = firstName.isEmpty
+                                        ? 'Reader'
+                                        : firstName;
+
+                                    // Greeting Logic
+                                    final hour = DateTime.now().hour;
+                                    String greeting;
+                                    if (hour >= 2 && hour < 5) {
+                                      greeting = 'No Sleep? 😴';
+                                    } else if (hour >= 5 && hour < 12) {
+                                      greeting = 'Good Morning,';
+                                    } else if (hour >= 12 && hour < 17) {
+                                      greeting = 'Good Afternoon,';
+                                    } else {
+                                      greeting = 'Good Evening,';
+                                    }
 
                                     return Row(
                                       mainAxisAlignment:
@@ -97,7 +113,7 @@ class HomeScreen extends ConsumerWidget {
                                               CrossAxisAlignment.start,
                                           children: [
                                             Text(
-                                              'Good Evening,',
+                                              greeting,
                                               style: TextStyle(
                                                 color: Theme.of(context)
                                                     .colorScheme
@@ -107,7 +123,7 @@ class HomeScreen extends ConsumerWidget {
                                               ),
                                             ),
                                             Text(
-                                              firstName,
+                                              displayName,
                                               style: TextStyle(
                                                 color: Theme.of(
                                                   context,

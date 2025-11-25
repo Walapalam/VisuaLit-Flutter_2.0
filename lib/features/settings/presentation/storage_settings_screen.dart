@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:visualit/features/settings/data/cache_manager.dart';
-import 'package:visualit/core/services/toast_service.dart';
 
 final cacheStatsProvider = FutureProvider.autoDispose<CacheStats>((ref) async {
   final cacheManager = ref.watch(cacheManagerProvider);
@@ -13,8 +12,7 @@ class StorageSettingsScreen extends ConsumerStatefulWidget {
   const StorageSettingsScreen({super.key});
 
   @override
-  ConsumerState<StorageSettingsScreen> createState() =>
-      _StorageSettingsScreenState();
+  ConsumerState<StorageSettingsScreen> createState() => _StorageSettingsScreenState();
 }
 
 class _StorageSettingsScreenState extends ConsumerState<StorageSettingsScreen> {
@@ -23,18 +21,21 @@ class _StorageSettingsScreenState extends ConsumerState<StorageSettingsScreen> {
   @override
   Widget build(BuildContext context) {
     final cacheStatsAsync = ref.watch(cacheStatsProvider);
-
+    
     return Scaffold(
-      appBar: AppBar(title: const Text('Storage Settings')),
+      appBar: AppBar(
+        title: const Text('Storage Settings'),
+      ),
       body: cacheStatsAsync.when(
         data: (stats) => _buildContent(stats),
         loading: () => const Center(child: CircularProgressIndicator()),
-        error: (error, stackTrace) =>
-            Center(child: Text('Error loading cache stats: $error')),
+        error: (error, stackTrace) => Center(
+          child: Text('Error loading cache stats: $error'),
+        ),
       ),
     );
   }
-
+  
   Widget _buildContent(CacheStats stats) {
     return RefreshIndicator(
       onRefresh: () async {
@@ -52,7 +53,7 @@ class _StorageSettingsScreenState extends ConsumerState<StorageSettingsScreen> {
       ),
     );
   }
-
+  
   Widget _buildCacheSummary(CacheStats stats) {
     return Card(
       elevation: 2,
@@ -73,12 +74,10 @@ class _StorageSettingsScreenState extends ConsumerState<StorageSettingsScreen> {
             _buildSummaryItem('Error Books', '${stats.errorBooks}'),
             const SizedBox(height: 16),
             LinearProgressIndicator(
-              value:
-                  stats.totalSizeInBytes / CacheManager.defaultCacheSizeLimit,
+              value: stats.totalSizeInBytes / CacheManager.defaultCacheSizeLimit,
               backgroundColor: Colors.grey[200],
               valueColor: AlwaysStoppedAnimation<Color>(
-                stats.totalSizeInBytes >
-                        CacheManager.defaultCacheSizeLimit * 0.8
+                stats.totalSizeInBytes > CacheManager.defaultCacheSizeLimit * 0.8
                     ? Colors.red
                     : Colors.green,
               ),
@@ -87,9 +86,7 @@ class _StorageSettingsScreenState extends ConsumerState<StorageSettingsScreen> {
             Text(
               '${stats.totalSizeFormatted} / ${_formatSize(CacheManager.defaultCacheSizeLimit)} used',
               style: TextStyle(
-                color:
-                    stats.totalSizeInBytes >
-                        CacheManager.defaultCacheSizeLimit * 0.8
+                color: stats.totalSizeInBytes > CacheManager.defaultCacheSizeLimit * 0.8
                     ? Colors.red
                     : Colors.black,
               ),
@@ -99,7 +96,7 @@ class _StorageSettingsScreenState extends ConsumerState<StorageSettingsScreen> {
       ),
     );
   }
-
+  
   Widget _buildSummaryItem(String label, String value) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 8),
@@ -112,7 +109,7 @@ class _StorageSettingsScreenState extends ConsumerState<StorageSettingsScreen> {
       ),
     );
   }
-
+  
   Widget _buildCacheActions() {
     return Card(
       elevation: 2,
@@ -150,10 +147,8 @@ class _StorageSettingsScreenState extends ConsumerState<StorageSettingsScreen> {
                       await cacheManager.applyCacheEvictionRules();
                       ref.refresh(cacheStatsProvider);
                       if (mounted) {
-                        ToastService.show(
-                          context,
-                          'Cache optimized',
-                          type: ToastType.success,
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('Cache optimized')),
                         );
                       }
                     },
@@ -167,11 +162,11 @@ class _StorageSettingsScreenState extends ConsumerState<StorageSettingsScreen> {
       ),
     );
   }
-
+  
   Widget _buildBookList(CacheStats stats) {
     final sortedBooks = stats.bookSizes.entries.toList()
       ..sort((a, b) => b.value.compareTo(a.value));
-
+    
     return Card(
       elevation: 2,
       child: Padding(
@@ -184,15 +179,13 @@ class _StorageSettingsScreenState extends ConsumerState<StorageSettingsScreen> {
               style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 16),
-            ...sortedBooks.map(
-              (entry) => _buildBookItem(entry.key, entry.value),
-            ),
+            ...sortedBooks.map((entry) => _buildBookItem(entry.key, entry.value)),
           ],
         ),
       ),
     );
   }
-
+  
   Widget _buildBookItem(String title, int size) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
@@ -224,10 +217,8 @@ class _StorageSettingsScreenState extends ConsumerState<StorageSettingsScreen> {
             onPressed: () {
               // We would need to map title to book ID here
               // For now, just show a message
-              ToastService.show(
-                context,
-                'Clear cache for "$title" (not implemented)',
-                type: ToastType.info,
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(content: Text('Clear cache for "$title" (not implemented)')),
               );
             },
           ),
@@ -235,14 +226,14 @@ class _StorageSettingsScreenState extends ConsumerState<StorageSettingsScreen> {
       ),
     );
   }
-
+  
   void _showClearCacheConfirmation() {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Clear All Cache'),
         content: const Text(
-          'This will clear the cache for all books. You will need to reprocess them the next time you open them. Are you sure?',
+          'This will clear the cache for all books. You will need to reprocess them the next time you open them. Are you sure?'
         ),
         actions: [
           TextButton(
@@ -255,21 +246,19 @@ class _StorageSettingsScreenState extends ConsumerState<StorageSettingsScreen> {
               setState(() {
                 _isClearing = true;
               });
-
+              
               final cacheManager = ref.read(cacheManagerProvider);
               await cacheManager.clearAllCache();
-
+              
               setState(() {
                 _isClearing = false;
               });
-
+              
               ref.refresh(cacheStatsProvider);
-
+              
               if (mounted) {
-                ToastService.show(
-                  context,
-                  'Cache cleared',
-                  type: ToastType.success,
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Cache cleared')),
                 );
               }
             },
@@ -279,7 +268,7 @@ class _StorageSettingsScreenState extends ConsumerState<StorageSettingsScreen> {
       ),
     );
   }
-
+  
   String _formatSize(int sizeInBytes) {
     if (sizeInBytes < 1024) {
       return '$sizeInBytes B';

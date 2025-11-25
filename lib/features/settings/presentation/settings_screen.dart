@@ -1,332 +1,430 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:visualit/features/auth/presentation/auth_controller.dart';
-import 'package:visualit/core/providers/font_providers.dart';
-import 'package:visualit/core/services/sync_service.dart';
-import 'package:visualit/core/theme/theme_controller.dart';
 import 'package:visualit/shared_widgets/sync_status_indicator.dart';
-import 'package:visualit/core/services/connectivity_provider.dart';
-import 'package:visualit/core/services/toast_service.dart';
+import '../../../core/providers/theme_provider.dart';
+import '../../../core/theme/theme_state.dart';
+import 'account_settings_screen.dart';
+import 'help_support.dart';
+import 'notification_provider.dart';
+import 'notification_screen.dart';
+import 'privacy_settings.dart';
+import 'storage_settings_screen.dart';
 
 class SettingsScreen extends ConsumerWidget {
   const SettingsScreen({super.key});
 
-  void _showLogoutConfirmation(BuildContext context, WidgetRef ref) {
-    showDialog(
-      context: context,
-      builder: (BuildContext dialogContext) {
-        return AlertDialog(
-          title: const Text('Log Out'),
-          content: const Text('Are you sure you want to log out?'),
-          actions: [
-            TextButton(
-              child: const Text('Cancel'),
-              onPressed: () => Navigator.of(dialogContext).pop(),
-            ),
-            TextButton(
-              child: const Text('Log Out', style: TextStyle(color: Colors.red)),
-              onPressed: () {
-                Navigator.of(dialogContext).pop();
-                ref.read(authControllerProvider.notifier).logout();
-              },
-            ),
-          ],
-        );
-      },
-    );
-  }
-
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final authState = ref.watch(authControllerProvider);
-    final user = authState.user;
-    final themeMode = ref.watch(themeControllerProvider);
-    final isDarkMode = themeMode == ThemeMode.dark;
+    final themeState = ref.watch(themeControllerProvider);
+    final isDarkMode = themeState.themeMode == ThemeMode.dark;
+    final fontFamily = themeState.fontFamily;
+    final fontSize = themeState.fontSize;
+    final notificationsEnabled = ref.watch(notificationControllerProvider);
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Settings'),
+        title: const Text("Settings"),
         centerTitle: true,
         elevation: 0,
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 24.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Account Section
-            _buildSectionHeader(context, 'Account'),
-            const SizedBox(height: 8),
-            _buildSection(
-              context,
-              children: [
-                if ((authState.status == AuthStatus.authenticated ||
-                        authState.status == AuthStatus.guest) &&
-                    user != null)
-                  ..._buildAuthenticatedAccountItems(context, ref, user)
-                else
-                  _buildGuestAccountItem(context, ref),
-              ],
-            ),
+      body: SafeArea(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // ---------------------------------------------------
+              // Profile Section
+              //
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(vertical: 24),
+                decoration: BoxDecoration(
+                  color: Theme.of(context).colorScheme.surface,
+                  borderRadius: BorderRadius.circular(20),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.03),
+                      blurRadius: 10,
+                      offset: const Offset(0, 3),
+                    )
+                  ],
+                ),
+                child: Stack(
+                  clipBehavior: Clip.none,
+                  children: [
+                    Positioned(
+                      top: -12,
+                      right: 0,
+                      child: IconButton(
+                        icon: const Icon(Icons.edit_outlined),
+                        onPressed: () {
+                          Navigator.of(context).push(
+                            MaterialPageRoute(builder: (context) => const AccountSettingsScreen()),
+                          );
+                        },
+                      ),
+                    ),
+                    const SizedBox(
+                      width: double.infinity,
+                      child: Column(
+                        children: [
+                          CircleAvatar(
+                            radius: 50,
+                            // You can use a NetworkImage or AssetImage for the profile picture
+                            // backgroundImage: NetworkImage('URL_TO_YOUR_IMAGE'),
+                            backgroundColor: Colors.black12,
+                            child: Icon(
+                              Icons.person,
+                              size: 50,
+                              color: Colors.white70,
+                            ),
+                          ),
+                          SizedBox(height: 12),
+                          Text(
+                            "User Name",
+                            style: TextStyle(
+                              fontSize: 22,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 20),
 
-            const SizedBox(height: 24),
-
-            // Preferences Section
-            _buildSectionHeader(context, 'Preferences'),
-            const SizedBox(height: 8),
-            _buildSection(
-              context,
-              children: [
-                _buildSettingItem(
-                  context,
-                  'Dark Mode',
-                  Switch.adaptive(
-                    value: isDarkMode,
-                    onChanged: (_) => ref
-                        .read(themeControllerProvider.notifier)
-                        .toggleTheme(),
+              // --- Section: Appearance & Accessibility ---
+              _buildSectionHeader("Appearance & Accessibility"),
+              _buildSettingsContainer(
+                context,
+                children: [
+                  _tile(
+                    context: context,
+                    icon: Icons.dark_mode_outlined,
+                    iconColor: Colors.deepPurple,
+                    title: "Dark Mode",
+                    trailing: Switch(
+                      value: isDarkMode,
+                      onChanged: (_) {
+                        ref.read(themeControllerProvider.notifier).toggleTheme();
+                      },
+                    ),
                   ),
-                ),
-                const Divider(height: 1),
-                _buildSettingItem(
-                  context,
-                  'Font Size',
-                  _buildFontSizeDropdown(context, ref),
-                ),
-                const Divider(height: 1),
-                _buildSettingItem(
-                  context,
-                  'Font Style',
-                  _buildFontStyleDropdown(context, ref),
-                ),
-                const Divider(height: 1),
-                _buildSettingItem(
-                  context,
-                  'Language',
-                  _buildLanguageDropdown(context),
-                ),
-              ],
-            ),
-
-            const SizedBox(height: 24),
-
-            // More Section
-            _buildSectionHeader(context, 'More'),
-            const SizedBox(height: 8),
-            _buildSection(
-              context,
-              children: [
-                _buildNavigationItem(
-                  context,
-                  'Notifications',
-                  Icons.notifications_outlined,
-                  () {
-                    // TODO: Navigate to notification settings screen
-                  },
-                ),
-                const Divider(height: 1),
-                _buildNavigationItem(
-                  context,
-                  'Privacy Settings',
-                  Icons.privacy_tip_outlined,
-                  () => Navigator.pushNamed(context, '/privacy-settings'),
-                ),
-                const Divider(height: 1),
-                _buildNavigationItem(
-                  context,
-                  'About',
-                  Icons.info_outline,
-                  () => Navigator.pushNamed(context, '/about'),
-                ),
-                const Divider(height: 1),
-                _buildNavigationItem(
-                  context,
-                  'Help & Support',
-                  Icons.help_outline,
-                  () => Navigator.pushNamed(context, '/help-support'),
-                ),
-                const Divider(height: 1),
-                _buildNavigationItem(
-                  context,
-                  'Storage & Cache',
-                  Icons.storage, // Fixed: add missing icon
-                  () => context.pushNamed('storageSettings'),
-                ),
-                const Divider(height: 1),
-                _buildSettingItem(
-                  context,
-                  'Sync Data',
-                  Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      const SyncStatusIndicator(showText: false),
-                      const SizedBox(width: 8),
-                      SyncButton(),
-                    ],
+                  _divider(context),
+                  _tile(
+                    context: context,
+                    icon: Icons.font_download_outlined,
+                    iconColor: Colors.blue,
+                    title: "Font Family",
+                    subtitle: fontFamily,
+                    trailing: const Icon(Icons.chevron_right),
+                    onTap: () => _showFontFamilyDialog(context, ref, fontFamily),
                   ),
-                ),
-              ],
-            ),
-          ],
+                  _divider(context),
+                  _tile(
+                    context: context,
+                    icon: Icons.format_size,
+                    iconColor: Colors.orange,
+                    title: "Font Size",
+                    subtitle: themeState.fontSizeLabel,
+                    trailing: const Icon(Icons.chevron_right),
+                    onTap: () => _showFontSizeDialog(context, ref, themeState.fontSize),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 20),
+
+              // --- Section: App Controls & Data ---
+              _buildSectionHeader("App Controls & Data"),
+              _buildSettingsContainer(
+                context,
+                children: [
+                  _tile(
+                    context: context,
+                    icon: Icons.notifications_outlined,
+                    iconColor: Colors.pink,
+                    title: "Notifications",
+                    trailing: const Icon(Icons.chevron_right),
+                    onTap: () {
+                      Navigator.of(context).push(
+                        MaterialPageRoute(builder: (context) => const NotificationScreen()),
+                      );
+                    },
+                  ),
+                  _divider(context),
+                  _tile(
+                    context: context,
+                    icon: Icons.sync,
+                    iconColor: Colors.indigo,
+                    title: "Sync Status",
+                    trailing: const SyncStatusIndicator(),
+                  ),
+                  _divider(context),
+                  _tile(
+                    context: context,
+                    icon: Icons.storage_outlined,
+                    iconColor: Colors.blueGrey,
+                    title: "Storage Settings",
+                    trailing: const Icon(Icons.chevron_right),
+                    onTap: () {
+                      Navigator.of(context).push(
+                        MaterialPageRoute(builder: (context) => const StorageSettingsScreen()),
+                      );
+                    },
+                  ),
+                ],
+              ),
+              const SizedBox(height: 20),
+
+              // --- Section: Privacy, Support & Account ---
+              _buildSectionHeader("Privacy, Support & Account"),
+              _buildSettingsContainer(
+                context,
+                children: [
+                  _tile(
+                    context: context,
+                    icon: Icons.privacy_tip_outlined,
+                    iconColor: Colors.green,
+                    title: "Privacy Settings",
+                    trailing: const Icon(Icons.chevron_right),
+                    onTap: () {
+                      Navigator.of(context).push(
+                        MaterialPageRoute(builder: (context) => const PrivacySettingsScreen()),
+                      );
+                    },
+                  ),
+                  _divider(context),
+                  _tile(
+                    context: context,
+                    icon: Icons.help_outline,
+                    iconColor: Colors.cyan,
+                    title: "Help & Support",
+                    trailing: const Icon(Icons.chevron_right),
+                    onTap: () {
+                      Navigator.of(context).push(
+                        MaterialPageRoute(builder: (context) => const HelpSupportScreen()),
+                      );
+                    },
+                  ),
+                  _divider(context),
+                  _tile(
+                    context: context,
+                    icon: Icons.logout_outlined,
+                    iconColor: Colors.redAccent,
+                    title: "Logout",
+                    titleColor: Colors.redAccent,
+                    onTap: () {
+                      // TODO: Implement logout functionality
+                    },
+                  ),
+                ],
+              ),
+            ],
+          ),
         ),
       ),
     );
   }
 
-  List<Widget> _buildAuthenticatedAccountItems(
-    BuildContext context,
-    WidgetRef ref,
-    user,
-  ) {
-    return [
-      ListTile(
-        leading: const CircleAvatar(child: Icon(Icons.person)),
-        title: Text(
-          user.displayName ?? 'No Name',
-          style: const TextStyle(fontWeight: FontWeight.bold),
-        ),
-        subtitle: Text(user.email ?? 'No Email'),
-        contentPadding: const EdgeInsets.symmetric(horizontal: 16.0),
-      ),
-      const Divider(height: 1),
-      _buildNavigationItem(
-        context,
-        'Account Settings',
-        Icons.manage_accounts_outlined,
-        () => context.pushNamed('accountSettings'),
-      ),
-      const Divider(height: 1),
-      ListTile(
-        leading: const Icon(Icons.logout, color: Colors.red),
-        title: const Text('Log Out', style: TextStyle(color: Colors.red)),
-        contentPadding: const EdgeInsets.symmetric(horizontal: 16.0),
-        onTap: () => _showLogoutConfirmation(context, ref),
-      ),
-    ];
-  }
-
-  Widget _buildGuestAccountItem(BuildContext context, WidgetRef ref) {
-    final isOnline = ref.watch(isOnlineProvider);
-    return ListTile(
-      leading: const Icon(Icons.no_accounts, color: Colors.grey),
-      title: const Text('You are browsing as a guest'),
-      subtitle: const Text('Log in to sync your data across devices'),
-      trailing: TextButton(
-        child: const Text('Sign In'),
-        onPressed: () {
-          if (isOnline) {
-            context.goNamed('login');
-          } else {
-            ToastService.show(
-              context,
-              'Login is not possible without internet connection.',
-              type: ToastType.error,
-            );
-          }
-        },
-      ),
-      contentPadding: const EdgeInsets.symmetric(horizontal: 16.0),
-    );
-  }
-
-  Widget _buildFontSizeDropdown(BuildContext context, WidgetRef ref) {
-    return DropdownButton<String>(
-      value: ref.watch(fontSizeProvider),
-      items: ['Small', 'Medium', 'Large'].map((size) {
-        return DropdownMenuItem(value: size, child: Text(size));
-      }).toList(),
-      onChanged: (value) {
-        if (value != null) {
-          ref.read(fontSizeProvider.notifier).setFontSize(value);
-        }
-      },
-      underline: Container(),
-    );
-  }
-
-  Widget _buildFontStyleDropdown(BuildContext context, WidgetRef ref) {
-    return DropdownButton<String>(
-      value: ref.watch(fontStyleProvider),
-      items: FontStyleNotifier.fontStyleOptions.map((style) {
-        return DropdownMenuItem(
-          value: style,
-          child: Text(style, style: TextStyle(fontFamily: style)),
-        );
-      }).toList(),
-      onChanged: (value) {
-        if (value != null) {
-          ref.read(fontStyleProvider.notifier).setFontStyle(value);
-        }
-      },
-      underline: Container(),
-    );
-  }
-
-  Widget _buildLanguageDropdown(BuildContext context) {
-    return DropdownButton<String>(
-      value: 'en',
-      items: const [DropdownMenuItem(value: 'en', child: Text('English'))],
-      onChanged: (_) {},
-      underline: Container(),
-    );
-  }
-
-  Widget _buildNavigationItem(
-    BuildContext context,
-    String title,
-    IconData icon,
-    VoidCallback onTap,
-  ) {
-    return ListTile(
-      leading: Icon(icon),
-      title: Text(title),
-      trailing: Icon(
-        Icons.arrow_forward_ios,
-        size: 16,
-        color: Theme.of(context).colorScheme.onSurface.withOpacity(0.7),
-      ),
-      contentPadding: const EdgeInsets.symmetric(horizontal: 16.0),
-      onTap: onTap,
-    );
-  }
-
-  Widget _buildSectionHeader(BuildContext context, String title) {
+  // ------------------ Reusable Widgets ------------------
+  Widget _buildSectionHeader(String title) {
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16.0),
+      padding: const EdgeInsets.only(left: 8.0, bottom: 8.0),
       child: Text(
-        title,
-        style: Theme.of(context).textTheme.titleMedium?.copyWith(
+        title.toUpperCase(),
+        style: const TextStyle(
           fontWeight: FontWeight.bold,
-          color: Theme.of(context).colorScheme.primary,
+          fontSize: 12,
+          color: Colors.grey,
         ),
       ),
     );
   }
 
-  Widget _buildSection(BuildContext context, {required List<Widget> children}) {
+  Widget _buildSettingsContainer(BuildContext context, {required List<Widget> children}) {
     return Container(
+      padding: const EdgeInsets.symmetric(vertical: 4),
       decoration: BoxDecoration(
         color: Theme.of(context).colorScheme.surface,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Theme.of(context).dividerColor),
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.03),
+            blurRadius: 10,
+            offset: const Offset(0, 3),
+          )
+        ],
       ),
-      child: Column(children: children),
+      child: Column(
+        children: children,
+      ),
     );
   }
 
-  Widget _buildSettingItem(
-    BuildContext context,
-    String title,
-    Widget trailing,
-  ) {
+  Widget _tile({
+    required BuildContext context,
+    required IconData icon,
+    required String title,
+    String? subtitle,
+    Color? iconColor,
+    Color? titleColor,
+    Widget? trailing,
+    VoidCallback? onTap,
+  }) {
     return ListTile(
+      onTap: onTap,
+      leading: CircleAvatar(
+        radius: 20,
+        backgroundColor: iconColor?.withOpacity(0.15),
+        child: Icon(icon, color: iconColor, size: 22),
+      ),
       title: Text(
         title,
-        style: TextStyle(color: Theme.of(context).colorScheme.onSurface),
+        style: TextStyle(
+          fontWeight: FontWeight.w500,
+          color: titleColor ?? Theme.of(context).colorScheme.onSurface,
+        ),
       ),
+      subtitle: subtitle != null
+          ? Text(subtitle, style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant))
+          : null,
       trailing: trailing,
-      contentPadding: const EdgeInsets.symmetric(horizontal: 16.0),
+    );
+  }
+
+  Widget _divider(BuildContext context) {
+    return Divider(
+      height: 1,
+      indent: 20,
+      endIndent: 20,
+      color: Theme.of(context).colorScheme.outline.withOpacity(0.15),
+    );
+  }
+
+  // ------------------ Font Dialogs ------------------
+  void _showFontFamilyDialog(BuildContext context, WidgetRef ref, String currentFont) {
+    final fonts = ['Dyslexie', 'OpenDyslexie', 'Jersey20'];
+    final isDarkMode = ref.read(themeControllerProvider).themeMode == ThemeMode.dark;
+
+    showDialog(
+      context: context,
+      barrierDismissible: true,
+      builder: (dialogContext) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15.0)),
+        title: const Text("Select Font Family"),
+        content: SizedBox(
+          width: double.minPositive,
+          child: Theme(
+            data: Theme.of(context).copyWith(
+              radioTheme: RadioThemeData(
+                fillColor: MaterialStateProperty.resolveWith<Color>((states) {
+                  if (states.contains(MaterialState.selected)) {
+                    return const Color(0xFF50C878); // Inner circle color when selected
+                  }
+                  return isDarkMode ? Colors.white : Colors.black; // Outer circle color
+                }),
+              ),
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: fonts.map((f) {
+                return RadioListTile(
+                  title: Text(f, style: TextStyle(fontFamily: f)),
+                  value: f,
+                  groupValue: currentFont,
+                  onChanged: (value) {
+                    Navigator.of(dialogContext).pop();
+
+                    WidgetsBinding.instance.addPostFrameCallback((_) {
+                      if (context.mounted) {
+                        ref.read(themeControllerProvider.notifier).setFontFamily(value!);
+                      }
+                    });
+                  },
+                );
+              }).toList(),
+            ),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(),
+            child: const Text(
+              "Cancel",
+              style: TextStyle(color: Color(0xFF50C878)),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+  void _showFontSizeDialog(BuildContext context, WidgetRef ref, double currentSize) {
+    final fontSizes = {
+      'Small': ThemeState.fontSmall,
+      'Medium': ThemeState.fontMedium,
+      'Large': ThemeState.fontLarge,
+    };
+    final isDarkMode = ref.read(themeControllerProvider).themeMode == ThemeMode.dark;
+
+    showDialog(
+      context: context,
+      barrierDismissible: true,
+      builder: (dialogContext) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15.0)),
+        title: const Text("Select Font Size"),
+        content: SizedBox(
+          width: double.minPositive,
+          child: Theme(
+            data: Theme.of(context).copyWith(
+              radioTheme: RadioThemeData(
+                fillColor: MaterialStateProperty.resolveWith<Color>((states) {
+                  if (states.contains(MaterialState.selected)) {
+                    return const Color(0xFF50C878); // Inner circle color when selected
+                  }
+                  return isDarkMode ? Colors.white : Colors.black; // Outer circle color
+                }),
+              ),
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: fontSizes.entries.map((entry) {
+                return RadioListTile<double>(
+                  title: Text(
+                    entry.key,
+                    style: TextStyle(fontSize: entry.value),
+                  ),
+                  value: entry.value,
+                  groupValue: currentSize,
+                  onChanged: (value) {
+                    // Close dialog immediately
+                    Navigator.of(dialogContext).pop();
+
+                    // Schedule state update after navigation completes
+                    WidgetsBinding.instance.addPostFrameCallback((_) {
+                      if (context.mounted) {
+                        ref.read(themeControllerProvider.notifier).setFontSize(value!);
+                      }
+                    });
+                  },
+                );
+              }).toList(),
+            ),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(),
+            child: const Text(
+              "Cancel",
+              style: TextStyle(color: Color(0xFF50C878)),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

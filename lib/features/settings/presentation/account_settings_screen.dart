@@ -1,4 +1,3 @@
-
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -12,7 +11,8 @@ class AccountSettingsScreen extends ConsumerStatefulWidget {
   const AccountSettingsScreen({super.key});
 
   @override
-  ConsumerState<AccountSettingsScreen> createState() => _AccountSettingsScreenState();
+  ConsumerState<AccountSettingsScreen> createState() =>
+      _AccountSettingsScreenState();
 }
 
 class _AccountSettingsScreenState extends ConsumerState<AccountSettingsScreen> {
@@ -98,7 +98,9 @@ class _AccountSettingsScreenState extends ConsumerState<AccountSettingsScreen> {
       await ref.read(authControllerProvider.notifier).initialize();
 
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Profile updated successfully!')));
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Profile updated successfully!')),
+        );
         setState(() {
           _isEditing = false;
           _passwordController.clear();
@@ -108,9 +110,15 @@ class _AccountSettingsScreenState extends ConsumerState<AccountSettingsScreen> {
       final message = e.code == 'requires-recent-login'
           ? 'Please re-authenticate to update your password.'
           : (e.message ?? 'Failed to save changes.');
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
+      if (mounted)
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(message)));
     } catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('An unexpected error occurred.')));
+      if (mounted)
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('An unexpected error occurred.')),
+        );
     } finally {
       if (mounted) setState(() => _isSaving = false);
     }
@@ -119,14 +127,20 @@ class _AccountSettingsScreenState extends ConsumerState<AccountSettingsScreen> {
   Future<void> _sendPasswordReset() async {
     final user = _auth.currentUser;
     if (user?.email == null) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('No email associated with this account.')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('No email associated with this account.')),
+      );
       return;
     }
     try {
       await _auth.sendPasswordResetEmail(email: user!.email!);
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Password reset link sent to ${user.email}')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Password reset link sent to ${user.email}')),
+      );
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Failed to send reset link.')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Failed to send reset link.')),
+      );
     }
   }
 
@@ -135,9 +149,14 @@ class _AccountSettingsScreenState extends ConsumerState<AccountSettingsScreen> {
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('Delete Account?'),
-        content: const Text('This action is permanent and cannot be undone. Are you sure you want to delete your account?'),
+        content: const Text(
+          'This action is permanent and cannot be undone. Are you sure you want to delete your account?',
+        ),
         actions: [
-          TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: const Text('Cancel')),
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('Cancel'),
+          ),
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(true),
             child: const Text('Delete', style: TextStyle(color: Colors.red)),
@@ -162,9 +181,15 @@ class _AccountSettingsScreenState extends ConsumerState<AccountSettingsScreen> {
       final message = e.code == 'requires-recent-login'
           ? 'Please sign out and sign back in to delete your account.'
           : (e.message ?? 'Failed to delete account.');
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
+      if (mounted)
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(message)));
     } catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('An unexpected error occurred.')));
+      if (mounted)
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('An unexpected error occurred.')),
+        );
     } finally {
       if (mounted) setState(() => _isSaving = false);
     }
@@ -175,78 +200,177 @@ class _AccountSettingsScreenState extends ConsumerState<AccountSettingsScreen> {
     final authState = ref.watch(authControllerProvider);
     final user = authState.user ?? _auth.currentUser;
     final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
 
     return Scaffold(
+      backgroundColor: isDark ? Colors.black : const Color(0xFFF5F5F7),
       appBar: AppBar(
-        title: const Text('Account Settings'),
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        leading: IconButton(
+          icon: Icon(
+            Icons.arrow_back_ios_new,
+            color: theme.colorScheme.onSurface,
+          ),
+          onPressed: () => context.pop(),
+        ),
+        title: Text(
+          'Account Settings',
+          style: theme.textTheme.titleLarge?.copyWith(
+            fontWeight: FontWeight.bold,
+            color: theme.colorScheme.onSurface,
+          ),
+        ),
+        centerTitle: true,
         actions: [
           if (!_isEditing)
             TextButton(
               onPressed: () => setState(() => _isEditing = true),
-              child: const Text('Edit'),
+              child: Text(
+                'Edit',
+                style: TextStyle(
+                  color: theme.colorScheme.primary,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 16,
+                ),
+              ),
             ),
         ],
       ),
       body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16.0),
+        padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 10),
         child: Form(
           key: _formKey,
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               _buildAvatarSection(user),
-              const SizedBox(height: 24),
-              _buildInfoCard(
-                children: [
-                  _buildSectionHeader('User Information', theme),
-                  _buildEditableTextField(
-                    controller: _nameController,
-                    label: 'Name',
-                    icon: Icons.person_outline,
-                    validator: (v) => (v == null || v.trim().isEmpty) ? 'Name cannot be empty' : null,
-                  ),
-                  const Divider(height: 1),
-                  _buildReadOnlyField(
-                    label: 'Email',
-                    value: user?.email ?? 'Not available',
-                    icon: Icons.email_outlined,
-                  ),
-                  const SizedBox(height: 16),
-                  _buildSectionHeader('Security', theme),
-                  if (_isEditing)
-                    _buildEditableTextField(
-                      controller: _passwordController,
-                      label: 'New Password (optional)',
-                      icon: Icons.lock_outline,
-                      obscureText: true,
-                      validator: (v) => (v != null && v.isNotEmpty && v.length < 6) ? 'Password must be at least 6 characters' : null,
-                    )
-                  else
-                    _buildReadOnlyField(
-                      label: 'Password',
-                      value: '********',
-                      icon: Icons.lock_outline,
-                    ),
-                  const Divider(height: 1),
-                  ListTile(
-                    leading: const Icon(Icons.password),
-                    title: const Text('Reset Password'),
-                    subtitle: const Text('Send a password reset link to your email'),
-                    onTap: _sendPasswordReset,
-                    dense: true,
-                  ),
-                  if (_isEditing) ...[
-                    Padding(
-                      padding: const EdgeInsets.fromLTRB(16, 24, 16, 8),
-                      child: _buildActionButtons(),
+              const SizedBox(height: 32),
+
+              _buildSectionTitle('Personal Information'),
+              const SizedBox(height: 12),
+              Container(
+                decoration: BoxDecoration(
+                  color: theme.colorScheme.surface,
+                  borderRadius: BorderRadius.circular(16),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.05),
+                      blurRadius: 10,
+                      offset: const Offset(0, 4),
                     ),
                   ],
-                  const SizedBox(height: 16),
-                  const Divider(height: 1),
-                  const SizedBox(height: 8),
-                  _buildDangerZone(theme),
-                ],
+                ),
+                child: Column(
+                  children: [
+                    _buildEditableTextField(
+                      controller: _nameController,
+                      label: 'Full Name',
+                      icon: Icons.person_outline_rounded,
+                      iconColor: Colors.blue,
+                      validator: (v) => (v == null || v.trim().isEmpty)
+                          ? 'Name cannot be empty'
+                          : null,
+                      isLast: false,
+                    ),
+                    const Divider(
+                      height: 1,
+                      indent: 70,
+                    ), // Indent adjusted for larger icon
+                    _buildReadOnlyField(
+                      label: 'Email',
+                      value: user?.email ?? 'Not available',
+                      icon: Icons.email_outlined,
+                      iconColor: Colors.purple,
+                      isLast: true,
+                    ),
+                  ],
+                ),
               ),
+
+              const SizedBox(height: 32),
+              _buildSectionTitle('Security'),
+              const SizedBox(height: 12),
+              Container(
+                decoration: BoxDecoration(
+                  color: theme.colorScheme.surface,
+                  borderRadius: BorderRadius.circular(16),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.05),
+                      blurRadius: 10,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
+                ),
+                child: Column(
+                  children: [
+                    if (_isEditing)
+                      _buildEditableTextField(
+                        controller: _passwordController,
+                        label: 'New Password',
+                        icon: Icons.lock_outline_rounded,
+                        iconColor: Colors.orange,
+                        obscureText: true,
+                        validator: (v) =>
+                            (v != null && v.isNotEmpty && v.length < 6)
+                            ? 'Min 6 characters'
+                            : null,
+                        isLast: false,
+                      )
+                    else
+                      _buildReadOnlyField(
+                        label: 'Password',
+                        value: '••••••••',
+                        icon: Icons.lock_outline_rounded,
+                        iconColor: Colors.orange,
+                        isLast: false,
+                      ),
+                    const Divider(height: 1, indent: 70),
+                    ListTile(
+                      leading: _buildIcon(
+                        Icons.key_rounded,
+                        theme.colorScheme.primary,
+                      ),
+                      title: const Text(
+                        'Reset Password',
+                        style: TextStyle(
+                          fontWeight: FontWeight.w600,
+                          fontSize: 15,
+                        ),
+                      ),
+                      subtitle: Text(
+                        'Send reset link to email',
+                        style: TextStyle(
+                          color: theme.textTheme.bodySmall?.color,
+                          fontSize: 13,
+                        ),
+                      ),
+                      trailing: Icon(
+                        Icons.arrow_forward_ios_rounded,
+                        size: 16,
+                        color: theme.disabledColor,
+                      ),
+                      onTap: _sendPasswordReset,
+                      contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 8,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+
+              if (_isEditing) ...[
+                const SizedBox(height: 32),
+                _buildActionButtons(),
+              ],
+
+              const SizedBox(height: 40),
+              _buildDangerZone(theme),
+
+              // Bottom Padding for Nav Bar
+              const SizedBox(height: 140),
             ],
           ),
         ),
@@ -264,25 +388,56 @@ class _AccountSettingsScreenState extends ConsumerState<AccountSettingsScreen> {
               backgroundColor: Theme.of(context).colorScheme.surfaceVariant,
               backgroundImage: _pickedImage != null
                   ? FileImage(_pickedImage!)
-                  : (user?.photoURL != null ? NetworkImage(user!.photoURL!) : null) as ImageProvider?,
+                  : (user?.photoURL != null
+                            ? NetworkImage(user!.photoURL!)
+                            : null)
+                        as ImageProvider?,
               child: (_pickedImage == null && user?.photoURL == null)
-                  ? Icon(Icons.person, size: 50, color: Theme.of(context).colorScheme.onSurfaceVariant)
+                  ? Icon(
+                      Icons.person,
+                      size: 50,
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    )
                   : null,
             ),
             Positioned(
               right: 0,
+              bottom: 0,
               child: GestureDetector(
                 onTap: () => showModalBottomSheet(
                   context: context,
-                  builder: (ctx) => Wrap(children: [
-                    ListTile(leading: const Icon(Icons.photo_library), title: const Text('Gallery'), onTap: () { Navigator.of(ctx).pop(); _pickImage(ImageSource.gallery); }),
-                    ListTile(leading: const Icon(Icons.camera_alt), title: const Text('Camera'), onTap: () { Navigator.of(ctx).pop(); _pickImage(ImageSource.camera); }),
-                  ]),
+                  builder: (ctx) => Wrap(
+                    children: [
+                      ListTile(
+                        leading: const Icon(Icons.photo_library),
+                        title: const Text('Gallery'),
+                        onTap: () {
+                          Navigator.of(ctx).pop();
+                          _pickImage(ImageSource.gallery);
+                        },
+                      ),
+                      ListTile(
+                        leading: const Icon(Icons.camera_alt),
+                        title: const Text('Camera'),
+                        onTap: () {
+                          Navigator.of(ctx).pop();
+                          _pickImage(ImageSource.camera);
+                        },
+                      ),
+                    ],
+                  ),
                 ),
-                child: CircleAvatar(
-                  radius: 18,
-                  backgroundColor: Theme.of(context).colorScheme.primary,
-                  child: const Icon(Icons.edit, size: 20, color: Colors.white),
+                child: Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: Theme.of(context).colorScheme.primary,
+                    shape: BoxShape.circle,
+                    border: Border.all(
+                      color: Theme.of(context).scaffoldBackgroundColor,
+                      width: 2,
+                    ),
+                  ),
+                  child: const Icon(Icons.edit, size: 16, color: Colors.white),
                 ),
               ),
             ),
@@ -292,31 +447,57 @@ class _AccountSettingsScreenState extends ConsumerState<AccountSettingsScreen> {
     );
   }
 
-  Widget _buildSectionHeader(String title, ThemeData theme) {
+  Widget _buildSectionTitle(String title) {
     return Padding(
-      padding: const EdgeInsets.only(bottom: 8.0),
-      child: Text(title, style: theme.textTheme.titleSmall?.copyWith(color: theme.colorScheme.primary)),
-    );
-  }
-
-  Widget _buildInfoCard({required List<Widget> children}) {
-    return Card(
-      elevation: 0,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-        side: BorderSide(color: Theme.of(context).dividerColor),
+      padding: const EdgeInsets.only(left: 4, bottom: 4),
+      child: Text(
+        title.toUpperCase(),
+        style: TextStyle(
+          fontSize: 12,
+          fontWeight: FontWeight.bold,
+          color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6),
+          letterSpacing: 1.0,
+        ),
       ),
-      clipBehavior: Clip.antiAlias,
-      child: Column(children: children),
     );
   }
 
-  Widget _buildReadOnlyField({required String label, required String value, required IconData icon}) {
+  Widget _buildIcon(IconData icon, Color color) {
+    return Container(
+      padding: const EdgeInsets.all(10),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: Icon(icon, color: color, size: 22),
+    );
+  }
+
+  Widget _buildReadOnlyField({
+    required String label,
+    required String value,
+    required IconData icon,
+    required Color iconColor,
+    bool isLast = false,
+  }) {
     return ListTile(
-      leading: Icon(icon),
-      title: Text(label),
-      subtitle: Text(value, style: Theme.of(context).textTheme.bodyLarge),
-      dense: true,
+      leading: _buildIcon(icon, iconColor),
+      title: Text(
+        label,
+        style: TextStyle(
+          fontSize: 13,
+          color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6),
+        ),
+      ),
+      subtitle: Text(
+        value,
+        style: TextStyle(
+          fontSize: 16,
+          color: Theme.of(context).colorScheme.onSurface,
+          fontWeight: FontWeight.w600,
+        ),
+      ),
+      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
     );
   }
 
@@ -324,22 +505,45 @@ class _AccountSettingsScreenState extends ConsumerState<AccountSettingsScreen> {
     required TextEditingController controller,
     required String label,
     required IconData icon,
+    required Color iconColor,
     String? Function(String?)? validator,
     bool obscureText = false,
+    bool isLast = false,
   }) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      child: TextFormField(
-        controller: controller,
-        obscureText: obscureText,
-        decoration: InputDecoration(
-          labelText: label,
-          prefixIcon: Icon(icon),
-          border: InputBorder.none,
-          isDense: true,
-          contentPadding: const EdgeInsets.symmetric(vertical: 8),
-        ),
-        validator: validator,
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          _buildIcon(icon, iconColor),
+          const SizedBox(width: 16),
+          Expanded(
+            child: TextFormField(
+              controller: controller,
+              obscureText: obscureText,
+              style: TextStyle(
+                fontWeight: FontWeight.w600,
+                fontSize: 16,
+                color: Theme.of(context).colorScheme.onSurface,
+              ),
+              decoration: InputDecoration(
+                labelText: label,
+                labelStyle: TextStyle(
+                  color: Theme.of(
+                    context,
+                  ).colorScheme.onSurface.withOpacity(0.6),
+                  fontSize: 14,
+                ),
+                border: InputBorder.none,
+                enabledBorder: InputBorder.none,
+                focusedBorder: InputBorder.none,
+                contentPadding: EdgeInsets.zero,
+                isDense: true,
+              ),
+              validator: validator,
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -352,6 +556,12 @@ class _AccountSettingsScreenState extends ConsumerState<AccountSettingsScreen> {
               Expanded(
                 child: OutlinedButton(
                   onPressed: _cancelChanges,
+                  style: OutlinedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
                   child: const Text('Cancel'),
                 ),
               ),
@@ -359,6 +569,14 @@ class _AccountSettingsScreenState extends ConsumerState<AccountSettingsScreen> {
               Expanded(
                 child: ElevatedButton(
                   onPressed: _saveChanges,
+                  style: ElevatedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    backgroundColor: Theme.of(context).colorScheme.primary,
+                    foregroundColor: Colors.white,
+                  ),
                   child: const Text('Save Changes'),
                 ),
               ),
@@ -370,20 +588,49 @@ class _AccountSettingsScreenState extends ConsumerState<AccountSettingsScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text('Danger Zone', style: theme.textTheme.titleSmall?.copyWith(color: theme.colorScheme.error)),
-        const SizedBox(height: 10),
-        Card(
-          elevation: 0,
-          color: theme.colorScheme.errorContainer.withOpacity(0.5),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
-            side: BorderSide(color: theme.colorScheme.error),
+        Padding(
+          padding: const EdgeInsets.only(left: 4, bottom: 8),
+          child: Text(
+            'DANGER ZONE',
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.bold,
+              color: theme.colorScheme.error,
+              letterSpacing: 1.0,
+            ),
+          ),
+        ),
+        Container(
+          decoration: BoxDecoration(
+            color: theme.colorScheme.errorContainer.withOpacity(0.1),
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: theme.colorScheme.error.withOpacity(0.3)),
           ),
           child: ListTile(
-            leading: Icon(Icons.delete_forever, color: theme.colorScheme.error),
-            title: Text('Delete Account', style: TextStyle(color: theme.colorScheme.onErrorContainer)),
-            subtitle: Text('This action is permanent', style: TextStyle(color: theme.colorScheme.onErrorContainer.withOpacity(0.7))),
+            leading: _buildIcon(
+              Icons.delete_forever_rounded,
+              theme.colorScheme.error,
+            ),
+            title: Text(
+              'Delete Account',
+              style: TextStyle(
+                color: theme.colorScheme.error,
+                fontWeight: FontWeight.bold,
+                fontSize: 15,
+              ),
+            ),
+            subtitle: Text(
+              'This action is permanent',
+              style: TextStyle(
+                color: theme.colorScheme.error.withOpacity(0.8),
+                fontSize: 13,
+              ),
+            ),
             onTap: _isSaving ? null : _confirmDeleteAccount,
+            contentPadding: const EdgeInsets.symmetric(
+              horizontal: 16,
+              vertical: 8,
+            ),
           ),
         ),
       ],

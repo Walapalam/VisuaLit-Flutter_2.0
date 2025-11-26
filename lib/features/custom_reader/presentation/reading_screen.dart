@@ -1,37 +1,32 @@
-// dart
+import 'dart:async';
+import 'dart:io';
+import 'dart:developer';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart'; // Import the services package
+import 'package:flutter/services.dart';
 import 'package:flutter_html/flutter_html.dart';
 import 'package:flutter_html_table/flutter_html_table.dart';
 import 'package:flutter_html_svg/flutter_html_svg.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:visualit/core/providers/isar_provider.dart';
-import 'dart:io';
-import 'dart:async';
-import 'dart:math' hide log;
-import 'dart:developer';
 import 'package:path/path.dart' as p;
-import 'package:path_provider/path_provider.dart'; // Added path_provider
+import 'package:path_provider/path_provider.dart';
 import 'package:html/parser.dart' as html_parser;
 import 'package:visualit/features/custom_reader/new_reading_controller.dart';
-import 'package:visualit/features/custom_reader/model/new_reading_progress.dart';
-import 'package:visualit/core/theme/app_theme.dart';
-import 'package:visualit/core/utils/responsive_helper.dart';
-import 'package:flutter_speed_dial/flutter_speed_dial.dart';
-import 'dart:ui';
-import 'package:visualit/features/custom_reader/presentation/widgets/custom_reading_settings_panel.dart';
-import 'package:visualit/features/custom_reader/presentation/reading_preferences_controller.dart';
-import 'package:flutter_svg/flutter_svg.dart';
 import 'package:visualit/features/custom_reader/application/epub_parser_service.dart';
 import 'package:visualit/features/custom_reader/application/css_parser_service.dart';
 import 'package:visualit/features/reader/data/book_data.dart';
+import 'package:visualit/features/custom_reader/presentation/reading_preferences_controller.dart';
+import 'package:visualit/features/custom_reader/presentation/widgets/custom_reading_settings_panel.dart';
+import 'package:visualit/features/custom_reader/presentation/widgets/apple_reading_settings_panel.dart';
+import 'package:visualit/features/custom_reader/presentation/widgets/chapter_list_sheet.dart';
 import 'package:visualit/features/custom_reader/presentation/widgets/book_visualization_overlay.dart';
 import 'package:visualit/core/services/toast_service.dart';
 import 'package:visualit/features/custom_reader/presentation/widgets/reading_app_bar.dart';
 import 'package:visualit/features/custom_reader/presentation/widgets/reading_navigation_bar.dart';
 import 'package:visualit/features/custom_reader/presentation/widgets/settings_speed_dial.dart';
 import 'package:visualit/features/custom_reader/presentation/widgets/visualization_speed_dial.dart';
+import 'package:visualit/features/custom_reader/presentation/reading_constants.dart';
 import 'package:visualit/features/reader/application/throttled_reading_progress_notifier.dart';
 
 class ReadingScreen extends ConsumerStatefulWidget {
@@ -127,6 +122,12 @@ class _ReadingScreenState extends ConsumerState<ReadingScreen> {
 
   void _startHideOverlayTimer() {
     _cancelHideOverlayTimer();
+    // Don't start timer if any overlay is visible
+    if (_isSettingsOverlayVisible ||
+        _isVisualizationOverlayVisible ||
+        _isLocked) {
+      return;
+    }
     _hideOverlayTimer = Timer(const Duration(seconds: 5), _hideOverlay);
   }
 
@@ -871,108 +872,140 @@ class _ReadingScreenState extends ConsumerState<ReadingScreen> {
               ),
             ),
             // Overlay AppBar
-            Positioned(
-              top: 0,
-              left: 0,
-              right: 0,
-              child: IgnorePointer(
-                ignoring: !_showOverlay,
-                child: AnimatedOpacity(
-                  opacity: _showOverlay ? 1.0 : 0.0,
-                  duration: const Duration(milliseconds: 300),
-                  child: ReadingAppBar(
-                    bookTitle: _epubData?.title ?? 'Unknown',
-                    chapterTitle:
-                        _currentChapterIndex < (_epubData?.chapters.length ?? 0)
-                        ? _epubData!.chapters[_currentChapterIndex].title
-                        : 'Chapter ${_currentChapterIndex + 1}',
-                  ),
-                ),
-              ),
-            ),
-            // Overlay navigation bar
-            Positioned(
-              left: 0,
-              right: 0,
-              bottom: 0,
-              child: IgnorePointer(
-                ignoring: !_showOverlay,
-                child: AnimatedOpacity(
-                  opacity: _showOverlay ? 1.0 : 0.0,
-                  duration: const Duration(milliseconds: 300),
-                  child: SafeArea(
-                    child: ReadingNavigationBar(
-                      onPreviousChapter: _currentChapterIndex > 0
-                          ? () {
-                              _cancelHideOverlayTimer();
-                              _previousChapter();
-                            }
-                          : null,
-                      onNextChapter:
+            if (!_isLocked)
+              Positioned(
+                top: 0,
+                left: 0,
+                right: 0,
+                child: IgnorePointer(
+                  ignoring: !_showOverlay,
+                  child: AnimatedOpacity(
+                    opacity: _showOverlay ? 1.0 : 0.0,
+                    duration: const Duration(milliseconds: 300),
+                    child: ReadingAppBar(
+                      bookTitle: _epubData?.title ?? 'Unknown',
+                      chapterTitle:
                           _currentChapterIndex <
-                              (_epubData?.chapters.length ?? 0) - 1
-                          ? () {
-                              _cancelHideOverlayTimer();
-                              _nextChapter();
-                            }
-                          : null,
-                      onChapterListTap: () {
-                        _cancelHideOverlayTimer();
-                        _showChapterBottomSheet();
-                      },
-                      currentChapterIndex: _currentChapterIndex,
-                      totalChapters: _epubData?.chapters.length ?? 0,
-                      settingsSpeedDial: SettingsSpeedDial(
-                        isLocked: _isLocked,
-                        onToggleLock: () {
-                          _cancelHideOverlayTimer();
-                          setState(() => _isLocked = !_isLocked);
-                        },
-                        onShowSettingsPanel: _showSettingsPanel,
-                        onShowBookmark: () {
-                          _cancelHideOverlayTimer();
-                          ToastService.show(
-                            context,
-                            'Bookmark added',
-                            type: ToastType.success,
-                          );
-                        },
-                        onShare: () {
-                          _cancelHideOverlayTimer();
-                          ToastService.show(
-                            context,
-                            'Share feature coming soon',
-                            type: ToastType.info,
-                          );
-                        },
-                        onSearch: () {
-                          _cancelHideOverlayTimer();
-                          ToastService.show(
-                            context,
-                            'Search feature coming soon',
-                            type: ToastType.info,
-                          );
-                        },
-                        isVisible: _showOverlay,
-                      ),
-                      visualizationSpeedDial: VisualizationSpeedDial(
-                        isVisible: _showOverlay,
-                        onToggleVisualization: _showBookOverviewDialog,
-                        onAdjustVisualization: () {
-                          _cancelHideOverlayTimer();
-                          ToastService.show(
-                            context,
-                            'Settings feature coming soon',
-                            type: ToastType.info,
-                          );
-                        },
-                      ),
-                      backgroundColor: Colors.transparent,
+                              (_epubData?.chapters.length ?? 0)
+                          ? _epubData!.chapters[_currentChapterIndex].title
+                          : 'Chapter ${_currentChapterIndex + 1}',
                     ),
                   ),
                 ),
               ),
-            ),
+            // Overlay navigation bar
+            if (!_isLocked)
+              Positioned(
+                left: 0,
+                right: 0,
+                bottom: 0,
+                child: IgnorePointer(
+                  ignoring: !_showOverlay,
+                  child: AnimatedOpacity(
+                    opacity: _showOverlay ? 1.0 : 0.0,
+                    duration: const Duration(milliseconds: 300),
+                    child: SafeArea(
+                      child: ReadingNavigationBar(
+                        onPreviousChapter: _currentChapterIndex > 0
+                            ? () {
+                                _cancelHideOverlayTimer();
+                                _previousChapter();
+                              }
+                            : null,
+                        onNextChapter:
+                            _currentChapterIndex <
+                                (_epubData?.chapters.length ?? 0) - 1
+                            ? () {
+                                _cancelHideOverlayTimer();
+                                _nextChapter();
+                              }
+                            : null,
+                        onChapterListTap: () {
+                          _cancelHideOverlayTimer();
+                          _showChapterBottomSheet();
+                        },
+                        currentChapterIndex: _currentChapterIndex,
+                        totalChapters: _epubData?.chapters.length ?? 0,
+                        settingsSpeedDial: SettingsSpeedDial(
+                          isLocked: _isLocked,
+                          onToggleLock: () {
+                            _cancelHideOverlayTimer();
+                            setState(() => _isLocked = !_isLocked);
+                          },
+                          onShowSettingsPanel: _showSettingsPanel,
+                          onShowBookmark: () {
+                            _cancelHideOverlayTimer();
+                            ToastService.show(
+                              context,
+                              'Bookmark added',
+                              type: ToastType.success,
+                            );
+                          },
+                          onShare: () {
+                            _cancelHideOverlayTimer();
+                            ToastService.show(
+                              context,
+                              'Share feature coming soon',
+                              type: ToastType.info,
+                            );
+                          },
+                          onSearch: () {
+                            _cancelHideOverlayTimer();
+                            ToastService.show(
+                              context,
+                              'Search feature coming soon',
+                              type: ToastType.info,
+                            );
+                          },
+                          isVisible: _showOverlay,
+                        ),
+                        visualizationSpeedDial: VisualizationSpeedDial(
+                          isVisible: _showOverlay,
+                          onToggleVisualization: _showBookOverviewDialog,
+                          onAdjustVisualization: () {
+                            _cancelHideOverlayTimer();
+                            ToastService.show(
+                              context,
+                              'Settings feature coming soon',
+                              type: ToastType.info,
+                            );
+                          },
+                        ),
+                        backgroundColor: Colors.transparent,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+
+            // Unlock Button (Only visible when locked)
+            if (_isLocked)
+              Positioned(
+                bottom: 32,
+                left: 32,
+                child: GestureDetector(
+                  onTap: () {
+                    setState(() {
+                      _isLocked = false;
+                      _showOverlay = true;
+                      _startHideOverlayTimer();
+                    });
+                  },
+                  child: Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: Colors.black.withOpacity(0.6),
+                      shape: BoxShape.circle,
+                      border: Border.all(color: Colors.white24),
+                    ),
+                    child: const Icon(
+                      Icons.lock_outline,
+                      color: Colors.white,
+                      size: 24,
+                    ),
+                  ),
+                ),
+              ),
 
             if (_isSettingsOverlayVisible)
               GestureDetector(
@@ -993,10 +1026,10 @@ class _ReadingScreenState extends ConsumerState<ReadingScreen> {
               ),
             if (_isVisualizationOverlayVisible)
               Positioned(
-                top: 130, // Adjust based on your app bar height
+                top: kReadingTopBarHeight,
+                bottom: kReadingBottomBarHeight,
                 left: 0,
                 right: 0,
-                bottom: 80, // Adjust based on your navigation bar height
                 child: BookVisualizationOverlay(
                   bookTitleForLookup: _epubData?.title ?? 'Unknown',
                   localBookISBN: null,
@@ -1089,61 +1122,26 @@ class _ReadingScreenState extends ConsumerState<ReadingScreen> {
     _cancelHideOverlayTimer();
     showModalBottomSheet(
       context: context,
-      backgroundColor: Colors.transparent, // Make the sheet itself transparent
+      backgroundColor: Colors.transparent,
       isScrollControlled: true,
       builder: (context) => DraggableScrollableSheet(
-        initialChildSize: 0.6,
-        minChildSize: 0.3,
-        maxChildSize: 0.6,
+        initialChildSize: 0.8, // Taller to show "fake" nav bar effect
+        minChildSize: 0.5,
+        maxChildSize: 0.95,
         expand: false,
-        builder: (context, scrollController) => Container(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              // _buildNavigationBar(backgroundColor: Colors.transparent),
-              Expanded(
-                child: Container(
-                  decoration: BoxDecoration(
-                    color: Colors.black.withOpacity(
-                      0.9,
-                    ), // Your desired background color
-                    borderRadius: const BorderRadius.vertical(
-                      top: Radius.circular(20),
-                    ),
-                  ),
-                  child: ListView.builder(
-                    controller: scrollController,
-                    itemCount: _epubData?.chapters.length ?? 0,
-                    itemBuilder: (context, index) {
-                      final chapter = _epubData!.chapters[index];
-                      return ListTile(
-                        title: Text(
-                          chapter.title,
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontWeight: _currentChapterIndex == index
-                                ? FontWeight.bold
-                                : FontWeight.normal,
-                          ),
-                        ),
-                        trailing: _currentChapterIndex == index
-                            ? Icon(Icons.check_circle, color: Colors.blue)
-                            : null,
-                        onTap: () {
-                          Navigator.pop(context);
-                          _pageController.animateToPage(
-                            index,
-                            duration: const Duration(milliseconds: 300),
-                            curve: Curves.easeInOut,
-                          );
-                        },
-                      );
-                    },
-                  ),
-                ),
-              ),
-            ],
-          ),
+        builder: (context, scrollController) => ChapterListSheet(
+          scrollController: scrollController,
+          chapters: _epubData?.chapters ?? [],
+          currentChapterIndex: _currentChapterIndex,
+          onChapterSelected: (index) {
+            Navigator.pop(context);
+            _pageController.animateToPage(
+              index,
+              duration: const Duration(milliseconds: 300),
+              curve: Curves.easeInOut,
+            );
+          },
+          onClose: () => Navigator.pop(context),
         ),
       ),
     );
@@ -1174,14 +1172,13 @@ class _ReadingScreenState extends ConsumerState<ReadingScreen> {
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      isDismissible: true, // Allow dismissal by tapping outside
+      isDismissible: true,
       builder: (context) => DraggableScrollableSheet(
-        initialChildSize: 0.40,
-        minChildSize: 0.40,
-        maxChildSize: 0.70,
-        expand: true, // Locks the sheet at 55% height
-        builder: (context, scrollController) => CustomReadingSettingsPanel(
-          category: 'text',
+        initialChildSize: 0.5,
+        minChildSize: 0.4,
+        maxChildSize: 0.8,
+        expand: false,
+        builder: (context, scrollController) => AppleReadingSettingsPanel(
           onBack: () => Navigator.pop(context),
           scrollController: scrollController,
         ),
@@ -1192,6 +1189,8 @@ class _ReadingScreenState extends ConsumerState<ReadingScreen> {
   void _showBookOverviewDialog() {
     setState(() {
       _isVisualizationOverlayVisible = true;
+      _showOverlay = true; // Ensure UI is visible
+      _cancelHideOverlayTimer(); // Cancel timer so UI stays visible
     });
   }
 

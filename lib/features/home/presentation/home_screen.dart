@@ -278,7 +278,7 @@ class HomeScreen extends ConsumerWidget {
                         ),
 
                         // Bottom padding
-                        const SliverToBoxAdapter(child: SizedBox(height: 100)),
+                        const SliverToBoxAdapter(child: SizedBox(height: 140)),
                       ],
                     );
                   },

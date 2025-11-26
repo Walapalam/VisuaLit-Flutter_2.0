@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:visualit/core/theme/app_theme.dart';
+import 'package:visualit/features/custom_reader/presentation/reading_constants.dart';
 
 class ReadingNavigationBar extends StatelessWidget {
   final VoidCallback? onPreviousChapter;
@@ -26,6 +27,7 @@ class ReadingNavigationBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
+      height: kReadingBottomBarHeight,
       padding: const EdgeInsets.symmetric(vertical: 16.0),
       color: backgroundColor ?? Colors.black.withOpacity(0.8),
       child: Row(
@@ -38,7 +40,10 @@ class ReadingNavigationBar extends StatelessWidget {
           Expanded(
             child: Center(
               child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 4.0),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 8.0,
+                  vertical: 4.0,
+                ),
                 decoration: BoxDecoration(
                   color: Colors.black.withOpacity(0.8),
                   borderRadius: BorderRadius.circular(30.0),
@@ -47,7 +52,11 @@ class ReadingNavigationBar extends StatelessWidget {
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     IconButton(
-                      icon: const Icon(Icons.arrow_back_ios, color: AppTheme.primaryGreen, size: 20),
+                      icon: const Icon(
+                        Icons.arrow_back_ios,
+                        color: AppTheme.primaryGreen,
+                        size: 20,
+                      ),
                       onPressed: onPreviousChapter,
                     ),
                     GestureDetector(
@@ -61,7 +70,11 @@ class ReadingNavigationBar extends StatelessWidget {
                       ),
                     ),
                     IconButton(
-                      icon: const Icon(Icons.arrow_forward_ios, color: AppTheme.primaryGreen, size: 20),
+                      icon: const Icon(
+                        Icons.arrow_forward_ios,
+                        color: AppTheme.primaryGreen,
+                        size: 20,
+                      ),
                       onPressed: onNextChapter,
                     ),
                   ],

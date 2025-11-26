@@ -319,7 +319,7 @@ class LibraryScreen extends ConsumerWidget {
               ),
             ),
 
-          const SliverToBoxAdapter(child: SizedBox(height: 100)),
+          const SliverToBoxAdapter(child: SizedBox(height: 140)),
         ],
       ),
     );

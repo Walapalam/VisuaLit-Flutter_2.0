@@ -70,6 +70,10 @@ class AppTheme {
       showUnselectedLabels: false,
       type: BottomNavigationBarType.fixed,
     ),
+
+    textButtonTheme: TextButtonThemeData(
+      style: TextButton.styleFrom(foregroundColor: primaryGreen),
+    ),
   );
 
   // Premium Light Theme
@@ -144,6 +148,10 @@ class AppTheme {
       showUnselectedLabels: false,
       type: BottomNavigationBarType.fixed,
       elevation: 0,
+    ),
+
+    textButtonTheme: TextButtonThemeData(
+      style: TextButton.styleFrom(foregroundColor: primaryGreen),
     ),
   );
 }

@@ -87,20 +87,20 @@ class MarketplaceNotifier extends StateNotifier<MarketplaceState> {
     _loadInitialData();
   }
 
-  void retryInitialLoad() {
+  Future<void> retryInitialLoad() async {
     state = state.copyWith(
       isInitialLoading: true,
       errorMessage: null,
       isOffline: false,
       loadedCategories: [],
     );
-    _loadInitialData();
+    await _loadInitialData();
   }
 
   Future<void> _loadInitialData() async {
     debugPrint('Loading initial data...');
     final connectivityResult = await Connectivity().checkConnectivity();
-    final isOffline = connectivityResult == ConnectivityResult.none;
+    final isOffline = connectivityResult.contains(ConnectivityResult.none);
 
     if (_isar != null) {
       final cachedBestsellers = await _loadFromCache('bestsellers');

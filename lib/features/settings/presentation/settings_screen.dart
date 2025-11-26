@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
 import 'package:visualit/shared_widgets/sync_status_indicator.dart';
 import '../../../core/providers/theme_provider.dart';
@@ -7,6 +8,7 @@ import '../../../core/theme/theme_state.dart';
 import 'account_settings_screen.dart';
 import 'help_support.dart';
 import 'notification_provider.dart';
+import '../../auth/presentation/auth_controller.dart';
 import 'notification_screen.dart';
 import 'privacy_settings.dart';
 import 'storage_settings_screen.dart';
@@ -32,13 +34,25 @@ class SettingsScreen extends ConsumerWidget {
               // Custom Header matching Library style
               Padding(
                 padding: const EdgeInsets.only(bottom: 24, top: 8, left: 4),
-                child: Text(
-                  "Settings",
-                  style: TextStyle(
-                    color: Theme.of(context).colorScheme.onSurface,
-                    fontSize: 22,
-                    fontWeight: FontWeight.bold,
-                  ),
+                child: Row(
+                  children: [
+                    IconButton(
+                      icon: Icon(
+                        Icons.arrow_back_ios_new,
+                        color: Theme.of(context).colorScheme.onSurface,
+                      ),
+                      onPressed: () => context.go('/home'),
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      "Settings",
+                      style: TextStyle(
+                        color: Theme.of(context).colorScheme.onSurface,
+                        fontSize: 22,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ],
                 ),
               ),
               // ---------------------------------------------------
@@ -78,29 +92,7 @@ class SettingsScreen extends ConsumerWidget {
                     ),
                     const SizedBox(
                       width: double.infinity,
-                      child: Column(
-                        children: [
-                          CircleAvatar(
-                            radius: 50,
-                            // You can use a NetworkImage or AssetImage for the profile picture
-                            // backgroundImage: NetworkImage('URL_TO_YOUR_IMAGE'),
-                            backgroundColor: Colors.black12,
-                            child: Icon(
-                              Icons.person,
-                              size: 50,
-                              color: Colors.white70,
-                            ),
-                          ),
-                          SizedBox(height: 12),
-                          Text(
-                            "User Name",
-                            style: TextStyle(
-                              fontSize: 22,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ],
-                      ),
+                      child: _UserProfileSection(),
                     ),
                   ],
                 ),
@@ -245,13 +237,11 @@ class SettingsScreen extends ConsumerWidget {
                   ),
                 ],
               ),
+              const SizedBox(height: 140), // Add padding for bottom nav
             ],
           ),
         ),
       ),
-      bottomNavigationBar: const SizedBox(
-        height: 80,
-      ), // Add padding for bottom nav
     );
   }
 
@@ -397,10 +387,7 @@ class SettingsScreen extends ConsumerWidget {
         actions: [
           TextButton(
             onPressed: () => Navigator.of(dialogContext).pop(),
-            child: const Text(
-              "Cancel",
-              style: TextStyle(color: Color(0xFF50C878)),
-            ),
+            child: const Text("Cancel"),
           ),
         ],
       ),
@@ -476,13 +463,44 @@ class SettingsScreen extends ConsumerWidget {
         actions: [
           TextButton(
             onPressed: () => Navigator.of(dialogContext).pop(),
-            child: const Text(
-              "Cancel",
-              style: TextStyle(color: Color(0xFF50C878)),
-            ),
+            child: const Text("Cancel"),
           ),
         ],
       ),
+    );
+  }
+}
+
+class _UserProfileSection extends ConsumerWidget {
+  const _UserProfileSection();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final authState = ref.watch(authControllerProvider);
+    final user = authState.user;
+    final displayName = user?.displayName ?? 'Guest';
+    final photoUrl = user?.photoURL;
+
+    return Column(
+      children: [
+        CircleAvatar(
+          radius: 50,
+          backgroundColor: Colors.black12,
+          backgroundImage: photoUrl != null ? NetworkImage(photoUrl) : null,
+          child: photoUrl == null
+              ? const Icon(Icons.person, size: 50, color: Colors.white70)
+              : null,
+        ),
+        const SizedBox(height: 12),
+        Text(
+          displayName,
+          style: TextStyle(
+            fontSize: 22,
+            fontWeight: FontWeight.bold,
+            color: Theme.of(context).colorScheme.onSurface,
+          ),
+        ),
+      ],
     );
   }
 }

@@ -76,13 +76,25 @@ class ReadingPreferences {
   TextStyle getStyleForHeading(int level) {
     switch (level) {
       case 1:
-        return baseTextStyle.copyWith(fontSize: fontSize * 2.0, fontWeight: FontWeight.bold);
+        return baseTextStyle.copyWith(
+          fontSize: fontSize * 2.0,
+          fontWeight: FontWeight.bold,
+        );
       case 2:
-        return baseTextStyle.copyWith(fontSize: fontSize * 1.5, fontWeight: FontWeight.bold);
+        return baseTextStyle.copyWith(
+          fontSize: fontSize * 1.5,
+          fontWeight: FontWeight.bold,
+        );
       case 3:
-        return baseTextStyle.copyWith(fontSize: fontSize * 1.25, fontWeight: FontWeight.w600);
+        return baseTextStyle.copyWith(
+          fontSize: fontSize * 1.25,
+          fontWeight: FontWeight.w600,
+        );
       case 4:
-        return baseTextStyle.copyWith(fontSize: fontSize * 1.15, fontWeight: FontWeight.w600);
+        return baseTextStyle.copyWith(
+          fontSize: fontSize * 1.15,
+          fontWeight: FontWeight.w600,
+        );
       default:
         return baseTextStyle.copyWith(fontWeight: FontWeight.w600);
     }
@@ -117,4 +129,5 @@ class ReadingPreferences {
     bottomPadding: 16.0,
     lineHeight: 1.6,
   );
+  static ReadingPreferences defaultPreferences() => dark;
 }

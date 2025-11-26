@@ -27,7 +27,9 @@ class _PrivacySettingsScreenState extends State<PrivacySettingsScreen> {
   }
 
   Future<List<_PolicySectionData>> _loadAndParsePolicy() async {
-    final rawText = await rootBundle.loadString('lib/features/settings/data/privacyPolicy.md');
+    final rawText = await rootBundle.loadString(
+      'lib/features/settings/data/privacyPolicy.md',
+    );
     final lines = rawText.split('\n');
 
     if (mounted) {
@@ -49,8 +51,11 @@ class _PrivacySettingsScreenState extends State<PrivacySettingsScreen> {
 
       if (titleMatch != null) {
         // If we have content for the previous section, save it
-        if (currentTitle != null && currentContent.toString().trim().isNotEmpty) {
-          sections.add(_PolicySectionData(currentTitle, currentContent.toString().trim()));
+        if (currentTitle != null &&
+            currentContent.toString().trim().isNotEmpty) {
+          sections.add(
+            _PolicySectionData(currentTitle, currentContent.toString().trim()),
+          );
         }
         // Start a new section
         currentTitle = titleMatch.group(1)!.trim();
@@ -63,7 +68,9 @@ class _PrivacySettingsScreenState extends State<PrivacySettingsScreen> {
 
     // Add the last section
     if (currentTitle != null && currentContent.toString().trim().isNotEmpty) {
-      sections.add(_PolicySectionData(currentTitle, currentContent.toString().trim()));
+      sections.add(
+        _PolicySectionData(currentTitle, currentContent.toString().trim()),
+      );
     }
 
     return sections;
@@ -74,17 +81,16 @@ class _PrivacySettingsScreenState extends State<PrivacySettingsScreen> {
     final theme = Theme.of(context);
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Privacy Policy'),
-        elevation: 0,
-      ),
+      appBar: AppBar(title: const Text('Privacy Policy'), elevation: 0),
       body: FutureBuilder<List<_PolicySectionData>>(
         future: _policyFuture,
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
             return const Center(child: CircularProgressIndicator());
           }
-          if (snapshot.hasError || !snapshot.hasData || snapshot.data!.isEmpty) {
+          if (snapshot.hasError ||
+              !snapshot.hasData ||
+              snapshot.data!.isEmpty) {
             return const Center(child: Text("Could not load privacy policy."));
           }
 
@@ -95,7 +101,9 @@ class _PrivacySettingsScreenState extends State<PrivacySettingsScreen> {
             children: [
               Text(
                 _mainTitle,
-                style: theme.textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold),
+                style: theme.textTheme.headlineSmall?.copyWith(
+                  fontWeight: FontWeight.bold,
+                ),
               ),
               const SizedBox(height: 4),
               Text(
@@ -105,10 +113,12 @@ class _PrivacySettingsScreenState extends State<PrivacySettingsScreen> {
                 ),
               ),
               const SizedBox(height: 24),
-              ...sections.map((section) => _PolicySection(
-                    title: section.title,
-                    content: section.content,
-                  )),
+              ...sections.map(
+                (section) => _PolicySection(
+                  title: section.title,
+                  content: section.content,
+                ),
+              ),
               const SizedBox(height: 30),
             ],
           );
@@ -140,7 +150,8 @@ class _PolicySectionState extends State<_PolicySection> {
     String displayedContent;
     if (isLongText && !_isExpanded) {
       int lastSpace = widget.content.lastIndexOf(' ', _trimLength);
-      displayedContent = '${widget.content.substring(0, lastSpace != -1 ? lastSpace : _trimLength)}...';
+      displayedContent =
+          '${widget.content.substring(0, lastSpace != -1 ? lastSpace : _trimLength)}...';
     } else {
       displayedContent = widget.content;
     }
@@ -153,7 +164,9 @@ class _PolicySectionState extends State<_PolicySection> {
         children: [
           Text(
             widget.title,
-            style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+            style: theme.textTheme.titleMedium?.copyWith(
+              fontWeight: FontWeight.bold,
+            ),
           ),
           const SizedBox(height: 12),
           MarkdownBody(

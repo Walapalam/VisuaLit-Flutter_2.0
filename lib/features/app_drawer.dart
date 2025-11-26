@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:visualit/core/theme/app_theme.dart';
-import 'package:visualit/core/theme/theme_controller.dart';
+import 'package:visualit/core/providers/theme_provider.dart';
 import 'package:visualit/features/auth/presentation/auth_controller.dart';
 import 'package:go_router/go_router.dart';
 

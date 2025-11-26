@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:visualit/core/theme/app_theme.dart';
+
 import 'package:visualit/features/auth/presentation/auth_controller.dart';
 import 'app_drawer.dart';
 import 'audiobook_player/presentation/mini_audio_player.dart';
@@ -18,60 +18,62 @@ class MainShell extends StatelessWidget {
       backgroundColor: Colors.transparent,
       extendBody: true,
       extendBodyBehindAppBar: true,
-      // The AppBar and endDrawer remain unchanged
-      appBar: AppBar(
-        title: Text(
-          'Visualit',
-          style: TextStyle(
-            fontFamily: 'Jersey20',
-            color: Theme.of(context).colorScheme.onSurface,
-            fontSize: 35.0,
-            fontWeight: FontWeight.normal,
-          ),
-        ),
-        centerTitle: true, // Center the logo
-        backgroundColor: Theme.of(context).colorScheme.primary.withOpacity(0.0),
-        elevation: 0,
-        // Add empty leading to balance the profile icon on right
-        leading: const SizedBox(width: 56), // Same width as IconButton
-        leadingWidth: 56,
-        actions: [
-          // Profile icon aligned with home screen content
-          Padding(
-            padding: const EdgeInsets.only(
-              right: 20,
-            ), // Match home screen padding
-            child: Consumer(
-              builder: (context, ref, child) {
-                final authState = ref.watch(authControllerProvider);
-                final user = authState.user;
+      appBar: navigationShell.currentIndex == 0
+          ? AppBar(
+              title: const Text(
+                'VisuaLit',
+                style: TextStyle(
+                  fontFamily: 'Jersey20',
+                  fontSize: 35.0,
+                  fontWeight: FontWeight.normal,
+                ),
+              ),
+              centerTitle: true,
+              backgroundColor: Colors.transparent,
+              elevation: 0,
+              leading: const SizedBox(
+                width: 48,
+              ), // Balance the profile icon (16 padding + 32 avatar)
+              actions: [
+                Consumer(
+                  builder: (context, ref, child) {
+                    final authState = ref.watch(authControllerProvider);
+                    final user = authState.user;
 
-                return Builder(
-                  builder: (context) => IconButton(
-                    icon: CircleAvatar(
-                      backgroundColor: AppTheme.primaryGreen,
-                      radius: 16,
-                      child: Text(
-                        user?.displayName?.isNotEmpty == true
-                            ? user!.displayName![0].toUpperCase()
-                            : 'G',
-                        style: const TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                          color: AppTheme.black,
+                    return Padding(
+                      padding: const EdgeInsets.only(right: 16.0),
+                      child: GestureDetector(
+                        onTap: () => Scaffold.of(context).openEndDrawer(),
+                        child: CircleAvatar(
+                          radius: 20,
+                          backgroundColor: Theme.of(
+                            context,
+                          ).colorScheme.primary,
+                          backgroundImage: user?.photoURL != null
+                              ? NetworkImage(user!.photoURL!)
+                              : null,
+                          child: user?.photoURL == null
+                              ? Text(
+                                  user?.displayName?.isNotEmpty == true
+                                      ? user!.displayName![0].toUpperCase()
+                                      : 'G',
+                                  style: TextStyle(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.bold,
+                                    color: Theme.of(
+                                      context,
+                                    ).colorScheme.onPrimary,
+                                  ),
+                                )
+                              : null,
                         ),
                       ),
-                    ),
-                    onPressed: () {
-                      Scaffold.of(context).openEndDrawer();
-                    },
-                  ),
-                );
-              },
-            ),
-          ),
-        ],
-      ),
+                    );
+                  },
+                ),
+              ],
+            )
+          : null,
       endDrawer: const AppDrawer(),
       body: Stack(
         children: [

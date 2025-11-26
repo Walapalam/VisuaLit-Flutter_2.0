@@ -56,8 +56,11 @@ class LibraryController extends StateNotifier<AsyncValue<List<db.Book>>> {
     });
   }
 
+  StreamSubscription<List<db.Book>>? _booksSubscription;
+
   @override
   void dispose() {
+    _booksSubscription?.cancel();
     _fileWatcher?.events.drain();
     super.dispose();
   }
@@ -211,81 +214,109 @@ class LibraryController extends StateNotifier<AsyncValue<List<db.Book>>> {
       await _isar.writeTxn(() async {
         await _isar.books.delete(book.id);
       });
-      await loadBooksFromDb();
+      // await loadBooksFromDb(); // No longer needed as watcher will pick it up
     }
   }
 
   Future<void> loadBooksFromDb() async {
-    print("🔄 [LibraryController] Loading all books from database...");
+    print(
+      "🔄 [LibraryController] Initializing library and starting watcher...",
+    );
     state = const AsyncValue.loading();
+
     try {
-      final books = await _isar.books.where().sortByTitle().findAll();
-      print("  [LibraryController] Found ${books.length} books in DB.");
+      // 1. Perform initial maintenance (migrations, cache checks)
+      await _performLibraryMaintenance();
 
-      // MIGRATION LOGIC: Check for absolute paths and convert to relative
-      bool migrationNeeded = false;
-
-      for (final book in books) {
-        if (book.epubFilePath.startsWith('/')) {
-          // It's an absolute path. Try to migrate.
-          String? relativePath;
-
-          if (book.epubFilePath.contains('/VisuaLit/books/')) {
-            relativePath =
-                'books/${book.epubFilePath.split('/VisuaLit/books/').last}';
-          } else if (book.epubFilePath.contains('/VisuaLit/')) {
-            // Legacy marketplace downloads in root
-            relativePath = book.epubFilePath.split('/VisuaLit/').last;
-          } else if (book.epubFilePath.contains('/books/')) {
-            // Fallback for standard structure
-            relativePath = 'books/${book.epubFilePath.split('/books/').last}';
-          }
-
-          if (relativePath != null) {
-            print(
-              "⚠️ [LibraryController] Migrating book '${book.title}' from absolute to relative path.",
-            );
-            print("   Old: ${book.epubFilePath}");
-            print("   New: $relativePath");
-
-            await _isar.writeTxn(() async {
-              book.epubFilePath = relativePath!;
-              await _isar.books.put(book);
-            });
-            migrationNeeded = true;
-          }
-        }
-      }
-
-      if (migrationNeeded) {
-        print("✅ [LibraryController] Migration completed. Reloading books...");
-        // Recursive call to reload with migrated paths
-        return loadBooksFromDb();
-      }
-
-      // Check for books with temporary cache paths
-      final booksWithCachePaths = books
-          .where(
-            (book) =>
-                book.epubFilePath.contains('/cache/file_picker/') ||
-                book.epubFilePath.contains('/cache/'),
-          )
-          .toList();
-
-      if (booksWithCachePaths.isNotEmpty) {
-        print(
-          "⚠️ [LibraryController] Found ${booksWithCachePaths.length} books with temporary cache paths:",
-        );
-        for (final book in booksWithCachePaths) {
-          print("   - ${book.title ?? 'Unknown'} (ID: ${book.id})");
-        }
-        print("   These books need to be re-imported to work properly.");
-      }
-
-      state = AsyncValue.data(books);
+      // 2. Start watching for changes
+      _startBookWatcher();
     } catch (e, st) {
       print("❌ [LibraryController] FATAL ERROR loading books: $e");
       state = AsyncValue.error(e, st);
+    }
+  }
+
+  void _startBookWatcher() {
+    _booksSubscription?.cancel();
+
+    final query = _isar.books.where().sortByTitle();
+
+    // Immediate load
+    query.findAll().then((books) {
+      if (mounted) state = AsyncValue.data(books);
+    });
+
+    // Watch for subsequent changes
+    _booksSubscription = query.watch(fireImmediately: true).listen((books) {
+      print(
+        "📚 [LibraryController] Database update detected. Books count: ${books.length}",
+      );
+      if (mounted) state = AsyncValue.data(books);
+    });
+  }
+
+  Future<void> _performLibraryMaintenance() async {
+    final books = await _isar.books.where().sortByTitle().findAll();
+    print(
+      "  [LibraryController] Found ${books.length} books in DB for maintenance check.",
+    );
+
+    // MIGRATION LOGIC: Check for absolute paths and convert to relative
+    bool migrationNeeded = false;
+
+    for (final book in books) {
+      if (book.epubFilePath.startsWith('/')) {
+        // It's an absolute path. Try to migrate.
+        String? relativePath;
+
+        if (book.epubFilePath.contains('/VisuaLit/books/')) {
+          relativePath =
+              'books/${book.epubFilePath.split('/VisuaLit/books/').last}';
+        } else if (book.epubFilePath.contains('/VisuaLit/')) {
+          // Legacy marketplace downloads in root
+          relativePath = book.epubFilePath.split('/VisuaLit/').last;
+        } else if (book.epubFilePath.contains('/books/')) {
+          // Fallback for standard structure
+          relativePath = 'books/${book.epubFilePath.split('/books/').last}';
+        }
+
+        if (relativePath != null) {
+          print(
+            "⚠️ [LibraryController] Migrating book '${book.title}' from absolute to relative path.",
+          );
+          print("   Old: ${book.epubFilePath}");
+          print("   New: $relativePath");
+
+          await _isar.writeTxn(() async {
+            book.epubFilePath = relativePath!;
+            await _isar.books.put(book);
+          });
+          migrationNeeded = true;
+        }
+      }
+    }
+
+    if (migrationNeeded) {
+      print("✅ [LibraryController] Migration completed.");
+    }
+
+    // Check for books with temporary cache paths
+    final booksWithCachePaths = books
+        .where(
+          (book) =>
+              book.epubFilePath.contains('/cache/file_picker/') ||
+              book.epubFilePath.contains('/cache/'),
+        )
+        .toList();
+
+    if (booksWithCachePaths.isNotEmpty) {
+      print(
+        "⚠️ [LibraryController] Found ${booksWithCachePaths.length} books with temporary cache paths:",
+      );
+      for (final book in booksWithCachePaths) {
+        print("   - ${book.title ?? 'Unknown'} (ID: ${book.id})");
+      }
+      print("   These books need to be re-imported to work properly.");
     }
   }
 
@@ -389,6 +420,23 @@ class LibraryController extends StateNotifier<AsyncValue<List<db.Book>>> {
     // Convert to permanent storage for consistency and safety
     final permanentFiles = await _copyFilesToPermanentStorage(files);
     await _processFiles(permanentFiles);
+  }
+
+  /// Manually import a book file (e.g. after download)
+  Future<void> importBook(File file) async {
+    print("ℹ️ [LibraryController] Importing book from file: ${file.path}");
+    try {
+      final bytes = await file.readAsBytes();
+      // We don't need to copy to permanent storage if it's already there (which it is for downloads)
+      // But _processFiles expects PickedFileData.
+      // If the file is already in the library folder, _processFiles handles the path correction.
+
+      final fileData = PickedFileData(path: file.path, bytes: bytes);
+
+      await _processFiles([fileData]);
+    } catch (e) {
+      print("❌ [LibraryController] Failed to import book: $e");
+    }
   }
 
   Future<void> retryProcessingBook(int bookId) async {

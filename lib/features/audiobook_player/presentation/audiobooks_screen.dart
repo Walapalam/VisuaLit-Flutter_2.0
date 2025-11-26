@@ -59,111 +59,144 @@ class AudiobooksScreen extends ConsumerWidget {
     );
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('My Audiobooks'),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.audio_file_outlined),
-            tooltip: 'Add Single MP3 File',
-            onPressed: () => ref
-                .read(audiobooksControllerProvider.notifier)
-                .addAudiobookFromFile(),
-          ),
-          IconButton(
-            icon: const Icon(Icons.create_new_folder_outlined),
-            tooltip: 'Add Audiobook Folder',
-            onPressed: () => ref
-                .read(audiobooksControllerProvider.notifier)
-                .addAudiobookFromFolder(),
-          ),
-        ],
-      ),
-      body: audiobooksAsync.when(
-        loading: () => const Center(child: CircularProgressIndicator()),
-        error: (err, stack) => Center(child: Text('Error: $err')),
-        data: (audiobooks) {
-          final multiFileAudiobooks = audiobooks
-              .where((b) => !b.isSingleFile)
-              .toList();
-          final singleFileAudiobooks = audiobooks
-              .where((b) => b.isSingleFile)
-              .toList();
+      body: SafeArea(
+        child: audiobooksAsync.when(
+          loading: () => const Center(child: CircularProgressIndicator()),
+          error: (err, stack) => Center(child: Text('Error: $err')),
+          data: (audiobooks) {
+            final multiFileAudiobooks = audiobooks
+                .where((b) => !b.isSingleFile)
+                .toList();
+            final singleFileAudiobooks = audiobooks
+                .where((b) => b.isSingleFile)
+                .toList();
 
-          if (audiobooks.isEmpty) {
-            return Center(
-              child: Padding(
-                padding: const EdgeInsets.all(24.0),
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Text(
-                      'Your audiobook library is empty.',
-                      style: theme.textTheme.titleMedium,
+            if (audiobooks.isEmpty) {
+              return CustomScrollView(
+                slivers: [
+                  SliverFillRemaining(
+                    child: Center(
+                      child: Padding(
+                        padding: const EdgeInsets.all(24.0),
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Text(
+                              'Your audiobook library is empty.',
+                              style: theme.textTheme.titleMedium,
+                            ),
+                            const SizedBox(height: 32),
+                            ElevatedButton.icon(
+                              style: customButtonStyle,
+                              icon: const Icon(
+                                Icons.create_new_folder_outlined,
+                              ),
+                              label: const Text('Add Audiobook Folder'),
+                              onPressed: () => ref
+                                  .read(audiobooksControllerProvider.notifier)
+                                  .addAudiobookFromFolder(),
+                            ),
+                            const SizedBox(height: 16),
+                            ElevatedButton.icon(
+                              style: customButtonStyle,
+                              icon: const Icon(Icons.audio_file_outlined),
+                              label: const Text('Add Single MP3 File'),
+                              onPressed: () => ref
+                                  .read(audiobooksControllerProvider.notifier)
+                                  .addAudiobookFromFile(),
+                            ),
+                          ],
+                        ),
+                      ),
                     ),
-                    const SizedBox(height: 32),
-                    ElevatedButton.icon(
-                      style: customButtonStyle,
-                      icon: const Icon(Icons.create_new_folder_outlined),
-                      label: const Text('Add Audiobook Folder'),
-                      onPressed: () => ref
-                          .read(audiobooksControllerProvider.notifier)
-                          .addAudiobookFromFolder(),
+                  ),
+                ],
+              );
+            }
+
+            return CustomScrollView(
+              slivers: [
+                SliverToBoxAdapter(
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          'My Audiobooks',
+                          style: TextStyle(
+                            color: Theme.of(context).colorScheme.onSurface,
+                            fontSize: 22,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        Row(
+                          children: [
+                            IconButton(
+                              icon: const Icon(Icons.audio_file_outlined),
+                              tooltip: 'Add Single MP3 File',
+                              onPressed: () => ref
+                                  .read(audiobooksControllerProvider.notifier)
+                                  .addAudiobookFromFile(),
+                            ),
+                            IconButton(
+                              icon: const Icon(
+                                Icons.create_new_folder_outlined,
+                              ),
+                              tooltip: 'Add Audiobook Folder',
+                              onPressed: () => ref
+                                  .read(audiobooksControllerProvider.notifier)
+                                  .addAudiobookFromFolder(),
+                            ),
+                          ],
+                        ),
+                      ],
                     ),
-                    const SizedBox(height: 16),
-                    ElevatedButton.icon(
-                      style: customButtonStyle,
-                      icon: const Icon(Icons.audio_file_outlined),
-                      label: const Text('Add Single MP3 File'),
-                      onPressed: () => ref
-                          .read(audiobooksControllerProvider.notifier)
-                          .addAudiobookFromFile(),
-                    ),
-                  ],
+                  ),
                 ),
-              ),
+                SliverList(
+                  delegate: SliverChildListDelegate([
+                    if (multiFileAudiobooks.isNotEmpty) ...[
+                      _buildSectionHeader('Multi-File Audiobooks'),
+                      _AudiobookCarousel(
+                        books: multiFileAudiobooks,
+                        fallbackIcon: Icon(
+                          Icons.folder_open,
+                          size: 80,
+                          color: Theme.of(context).colorScheme.tertiary,
+                        ),
+                        onDelete: (book) =>
+                            _showDeleteConfirmationDialog(context, ref, book),
+                      ),
+                    ],
+                    if (multiFileAudiobooks.isNotEmpty &&
+                        singleFileAudiobooks.isNotEmpty)
+                      const Divider(
+                        height: 48,
+                        indent: 16,
+                        endIndent: 16,
+                        thickness: 0.5,
+                      ),
+                    if (singleFileAudiobooks.isNotEmpty) ...[
+                      _buildSectionHeader('Single-File Audiobooks'),
+                      _AudiobookCarousel(
+                        books: singleFileAudiobooks,
+                        fallbackIcon: Icon(
+                          Icons.music_note,
+                          size: 80,
+                          color: Theme.of(context).colorScheme.secondary,
+                        ),
+                        onDelete: (book) =>
+                            _showDeleteConfirmationDialog(context, ref, book),
+                      ),
+                    ],
+                    const SizedBox(height: 100), // Bottom padding
+                  ]),
+                ),
+              ],
             );
-          }
-
-          return ListView(
-            children: [
-              if (multiFileAudiobooks.isNotEmpty) ...[
-                _buildSectionHeader('Multi-File Audiobooks'),
-                _AudiobookCarousel(
-                  books: multiFileAudiobooks,
-                  fallbackIcon: Icon(
-                    Icons.folder_open,
-                    size: 80,
-                    color: Theme.of(context).colorScheme.tertiary,
-                  ),
-                  onDelete: (book) =>
-                      _showDeleteConfirmationDialog(context, ref, book),
-                ),
-              ],
-              if (multiFileAudiobooks.isNotEmpty &&
-                  singleFileAudiobooks.isNotEmpty)
-                const Divider(
-                  height: 48,
-                  indent: 16,
-                  endIndent: 16,
-                  thickness: 0.5,
-                ),
-
-              if (singleFileAudiobooks.isNotEmpty) ...[
-                _buildSectionHeader('Single-File Audiobooks'),
-                _AudiobookCarousel(
-                  books: singleFileAudiobooks,
-                  fallbackIcon: Icon(
-                    Icons.music_note,
-                    size: 80,
-                    color: Theme.of(context).colorScheme.secondary,
-                  ),
-                  onDelete: (book) =>
-                      _showDeleteConfirmationDialog(context, ref, book),
-                ),
-              ],
-            ],
-          );
-        },
+          },
+        ),
       ),
     );
   }

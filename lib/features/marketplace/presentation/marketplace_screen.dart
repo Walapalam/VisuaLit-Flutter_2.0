@@ -14,6 +14,7 @@ import 'widgets/bestsellers_section.dart';
 import 'widgets/marketplace_card.dart';
 import 'widgets/categories_section.dart';
 import 'widgets/book_dialog.dart';
+import 'widgets/welcome_carousel_card.dart';
 
 class MarketplaceScreen extends ConsumerStatefulWidget {
   const MarketplaceScreen({super.key});
@@ -85,10 +86,7 @@ class _MarketplaceScreenState extends ConsumerState<MarketplaceScreen> {
                 'New & Trending',
                 style: Theme.of(context).textTheme.headlineMedium,
               ),
-              TextButton(
-                onPressed: _showAllBooks,
-                child: Text('View All'),
-              ),
+              TextButton(onPressed: _showAllBooks, child: Text('View All')),
             ],
           ),
         ),
@@ -149,18 +147,24 @@ class _MarketplaceScreenState extends ConsumerState<MarketplaceScreen> {
                           controller: _searchController,
                           focusNode: _searchFocusNode,
                           textInputAction: TextInputAction.search,
-                          style: TextStyle(color: Theme.of(context).colorScheme.onSurface),
+                          style: TextStyle(
+                            color: Theme.of(context).colorScheme.onSurface,
+                          ),
                           decoration: InputDecoration(
                             hintText: 'Search books...',
                             hintStyle: TextStyle(
-                              color: Theme.of(context).colorScheme.onSurface.withOpacity(0.5),
+                              color: Theme.of(
+                                context,
+                              ).colorScheme.onSurface.withOpacity(0.5),
                             ),
                             border: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(16),
                               borderSide: BorderSide.none,
                             ),
                             filled: true,
-                            fillColor: Theme.of(context).colorScheme.onSurface.withOpacity(0.1),
+                            fillColor: Theme.of(
+                              context,
+                            ).colorScheme.onSurface.withOpacity(0.1),
                             contentPadding: const EdgeInsets.symmetric(
                               horizontal: 20,
                               vertical: 16,
@@ -174,14 +178,19 @@ class _MarketplaceScreenState extends ConsumerState<MarketplaceScreen> {
                                       height: 20,
                                       child: CircularProgressIndicator(
                                         strokeWidth: 2,
-                                        color: Theme.of(context).colorScheme.onSurface.withOpacity(0.7),
+                                        color: Theme.of(context)
+                                            .colorScheme
+                                            .onSurface
+                                            .withOpacity(0.7),
                                       ),
                                     ),
                                   )
                                 : IconButton(
                                     icon: Icon(
                                       Icons.search,
-                                      color: Theme.of(context).colorScheme.onSurface.withOpacity(0.7),
+                                      color: Theme.of(
+                                        context,
+                                      ).colorScheme.onSurface.withOpacity(0.7),
                                     ),
                                     onPressed: () {
                                       _searchFocusNode.unfocus();
@@ -203,7 +212,9 @@ class _MarketplaceScreenState extends ConsumerState<MarketplaceScreen> {
                                   IconButton(
                                     icon: Icon(
                                       Icons.clear,
-                                      color: Theme.of(context).colorScheme.onSurface,
+                                      color: Theme.of(
+                                        context,
+                                      ).colorScheme.onSurface,
                                     ),
                                     onPressed: _clearSearch,
                                   ),
@@ -212,7 +223,9 @@ class _MarketplaceScreenState extends ConsumerState<MarketplaceScreen> {
                                     IconButton(
                                       icon: Icon(
                                         Icons.shopping_cart,
-                                        color: Theme.of(context).colorScheme.onSurface,
+                                        color: Theme.of(
+                                          context,
+                                        ).colorScheme.onSurface,
                                       ),
                                       onPressed: () {
                                         context.go('/marketplace/cart');
@@ -287,16 +300,26 @@ class _MarketplaceScreenState extends ConsumerState<MarketplaceScreen> {
                               Icon(
                                 Icons.wifi_off,
                                 size: 50,
-                                color: Theme.of(context).colorScheme.onSurface.withOpacity(0.54),
+                                color: Theme.of(
+                                  context,
+                                ).colorScheme.onSurface.withOpacity(0.54),
                               ),
                               const SizedBox(height: 10),
                               Text(
                                 'You are offline.',
-                                style: TextStyle(color: Theme.of(context).colorScheme.onSurface),
+                                style: TextStyle(
+                                  color: Theme.of(
+                                    context,
+                                  ).colorScheme.onSurface,
+                                ),
                               ),
                               Text(
                                 'Connect to the internet to discover new books.',
-                                style: TextStyle(color: Theme.of(context).colorScheme.onSurface.withOpacity(0.7)),
+                                style: TextStyle(
+                                  color: Theme.of(
+                                    context,
+                                  ).colorScheme.onSurface.withOpacity(0.7),
+                                ),
                               ),
                               const SizedBox(height: 20),
                               ElevatedButton(
@@ -324,7 +347,11 @@ class _MarketplaceScreenState extends ConsumerState<MarketplaceScreen> {
                               const SizedBox(height: 10),
                               Text(
                                 state.errorMessage!,
-                                style: TextStyle(color: Theme.of(context).colorScheme.onSurface),
+                                style: TextStyle(
+                                  color: Theme.of(
+                                    context,
+                                  ).colorScheme.onSurface,
+                                ),
                               ),
                               const SizedBox(height: 20),
                               ElevatedButton(
@@ -349,6 +376,7 @@ class _MarketplaceScreenState extends ConsumerState<MarketplaceScreen> {
                               bottom: 10.0,
                             ),
                             child: HeroCarousel(
+                              leadingWidget: const WelcomeCarouselCard(),
                               books: state.bestsellers
                                   .where((book) {
                                     // Only show books with cover images

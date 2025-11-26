@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:visualit/features/Cart/presentation/CartNotifier.dart';
+import 'package:visualit/features/library/presentation/library_controller.dart';
 import 'package:go_router/go_router.dart';
 import 'package:http/http.dart' as http;
 import 'dart:io';
@@ -131,7 +132,9 @@ class _CartScreenState extends ConsumerState<CartScreen> {
         ),
         backgroundColor: Colors.transparent,
         elevation: 0,
-        iconTheme: IconThemeData(color: Theme.of(context).colorScheme.onSurface),
+        iconTheme: IconThemeData(
+          color: Theme.of(context).colorScheme.onSurface,
+        ),
       ),
       body: Stack(
         children: [
@@ -152,7 +155,9 @@ class _CartScreenState extends ConsumerState<CartScreen> {
                         Text(
                           'Your cart is empty',
                           style: TextStyle(
-                            color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6),
+                            color: Theme.of(
+                              context,
+                            ).colorScheme.onSurface.withOpacity(0.6),
                             fontSize: 18,
                           ),
                         ),
@@ -171,10 +176,14 @@ class _CartScreenState extends ConsumerState<CartScreen> {
                         margin: const EdgeInsets.only(bottom: 12),
                         padding: const EdgeInsets.all(12),
                         decoration: BoxDecoration(
-                          color: Theme.of(context).colorScheme.onSurface.withOpacity(0.05),
+                          color: Theme.of(
+                            context,
+                          ).colorScheme.onSurface.withOpacity(0.05),
                           borderRadius: BorderRadius.circular(16),
                           border: Border.all(
-                            color: Theme.of(context).colorScheme.onSurface.withOpacity(0.1),
+                            color: Theme.of(
+                              context,
+                            ).colorScheme.onSurface.withOpacity(0.1),
                           ),
                         ),
                         child: Row(
@@ -194,7 +203,9 @@ class _CartScreenState extends ConsumerState<CartScreen> {
                                       color: AppTheme.darkGrey,
                                       child: Icon(
                                         Icons.book,
-                                        color: Theme.of(context).colorScheme.onSurface,
+                                        color: Theme.of(
+                                          context,
+                                        ).colorScheme.onSurface,
                                       ),
                                     ),
                             ),
@@ -206,7 +217,9 @@ class _CartScreenState extends ConsumerState<CartScreen> {
                                   Text(
                                     bookTitle,
                                     style: TextStyle(
-                                      color: Theme.of(context).colorScheme.onSurface,
+                                      color: Theme.of(
+                                        context,
+                                      ).colorScheme.onSurface,
                                       fontSize: 16,
                                       fontWeight: FontWeight.bold,
                                     ),
@@ -217,7 +230,9 @@ class _CartScreenState extends ConsumerState<CartScreen> {
                                   Text(
                                     book['author'] ?? 'Unknown Author',
                                     style: TextStyle(
-                                      color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6),
+                                      color: Theme.of(
+                                        context,
+                                      ).colorScheme.onSurface.withOpacity(0.6),
                                       fontSize: 14,
                                     ),
                                     maxLines: 1,
@@ -263,6 +278,32 @@ class _CartScreenState extends ConsumerState<CartScreen> {
                                                       '$bookTitle downloaded',
                                                       type: ToastType.success,
                                                     );
+
+                                                    // Import the book into the library system
+                                                    final targetDir =
+                                                        await _getAppLibraryDir();
+                                                    if (targetDir != null) {
+                                                      final safeTitle =
+                                                          _sanitizeFileName(
+                                                            bookTitle,
+                                                          );
+                                                      final filePath =
+                                                          '${targetDir.path}/$safeTitle.epub';
+                                                      final file = File(
+                                                        filePath,
+                                                      );
+                                                      if (await file.exists()) {
+                                                        await ref
+                                                            .read(
+                                                              libraryControllerProvider
+                                                                  .notifier,
+                                                            )
+                                                            .importBook(file);
+                                                      }
+                                                    }
+
+                                                    // Navigate to home
+                                                    // context.go('/');  <-- Removed as per user request
                                                   }
                                                 } catch (e) {
                                                   if (mounted) {

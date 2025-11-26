@@ -1,13 +1,14 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import '../../../core/services/notification_service.dart';
+import 'package:visualit/core/services/notification_service.dart';
 
 // --- Marketing Notifications Provider ---
 const String _marketingNotificationsKey = 'marketing_notifications_enabled';
 
-final notificationControllerProvider = StateNotifierProvider<NotificationController, bool>((ref) {
-  return NotificationController(ref);
-});
+final notificationControllerProvider =
+    StateNotifierProvider<NotificationController, bool>((ref) {
+      return NotificationController(ref);
+    });
 
 class NotificationController extends StateNotifier<bool> {
   final Ref _ref;
@@ -18,7 +19,9 @@ class NotificationController extends StateNotifier<bool> {
   Future<void> _loadPreference() async {
     final prefs = await SharedPreferences.getInstance();
     state = prefs.getBool(_marketingNotificationsKey) ?? true;
-    print('📱 Marketing Notification preference loaded: ${state ? "ENABLED" : "DISABLED"}');
+    print(
+      '📱 Marketing Notification preference loaded: ${state ? "ENABLED" : "DISABLED"}',
+    );
   }
 
   Future<void> toggleNotifications(bool isEnabled) async {
@@ -47,9 +50,10 @@ final accountAlertsProvider = StateNotifierProvider<ToggleStateNotifier, bool>(
   (ref) => ToggleStateNotifier('account_alerts_enabled'),
 );
 
-final generalNotificationsProvider = StateNotifierProvider<ToggleStateNotifier, bool>(
-  (ref) => ToggleStateNotifier('general_notifications_enabled'),
-);
+final generalNotificationsProvider =
+    StateNotifierProvider<ToggleStateNotifier, bool>(
+      (ref) => ToggleStateNotifier('general_notifications_enabled'),
+    );
 
 class ToggleStateNotifier extends StateNotifier<bool> {
   final String _prefsKey;

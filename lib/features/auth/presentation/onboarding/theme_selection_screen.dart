@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:visualit/core/theme/app_theme.dart';
-import 'package:visualit/core/theme/theme_controller.dart';
+import 'package:visualit/core/providers/theme_provider.dart';
 import 'package:visualit/features/auth/application/onboarding_notifier.dart';
 
 class ThemeSelectionScreen extends ConsumerWidget {
@@ -43,7 +43,7 @@ class ThemeSelectionScreen extends ConsumerWidget {
                     child: _ThemeCard(
                       title: 'Light',
                       icon: Icons.light_mode_outlined,
-                      isSelected: currentTheme == ThemeMode.light,
+                      isSelected: currentTheme.themeMode == ThemeMode.light,
                       onTap: () => ref
                           .read(themeControllerProvider.notifier)
                           .setTheme(ThemeMode.light),
@@ -54,7 +54,7 @@ class ThemeSelectionScreen extends ConsumerWidget {
                     child: _ThemeCard(
                       title: 'Dark',
                       icon: Icons.dark_mode_outlined,
-                      isSelected: currentTheme == ThemeMode.dark,
+                      isSelected: currentTheme.themeMode == ThemeMode.dark,
                       onTap: () => ref
                           .read(themeControllerProvider.notifier)
                           .setTheme(ThemeMode.dark),

@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
+
 import 'package:visualit/shared_widgets/sync_status_indicator.dart';
 import '../../../core/providers/theme_provider.dart';
 import '../../../core/theme/theme_state.dart';
@@ -23,17 +23,24 @@ class SettingsScreen extends ConsumerWidget {
     final notificationsEnabled = ref.watch(notificationControllerProvider);
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text("Settings"),
-        centerTitle: true,
-        elevation: 0,
-      ),
       body: SafeArea(
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(16),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              // Custom Header matching Library style
+              Padding(
+                padding: const EdgeInsets.only(bottom: 24, top: 8, left: 4),
+                child: Text(
+                  "Settings",
+                  style: TextStyle(
+                    color: Theme.of(context).colorScheme.onSurface,
+                    fontSize: 22,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
               // ---------------------------------------------------
               // Profile Section
               //
@@ -48,7 +55,7 @@ class SettingsScreen extends ConsumerWidget {
                       color: Colors.black.withOpacity(0.03),
                       blurRadius: 10,
                       offset: const Offset(0, 3),
-                    )
+                    ),
                   ],
                 ),
                 child: Stack(
@@ -61,7 +68,10 @@ class SettingsScreen extends ConsumerWidget {
                         icon: const Icon(Icons.edit_outlined),
                         onPressed: () {
                           Navigator.of(context).push(
-                            MaterialPageRoute(builder: (context) => const AccountSettingsScreen()),
+                            MaterialPageRoute(
+                              builder: (context) =>
+                                  const AccountSettingsScreen(),
+                            ),
                           );
                         },
                       ),
@@ -110,7 +120,9 @@ class SettingsScreen extends ConsumerWidget {
                     trailing: Switch(
                       value: isDarkMode,
                       onChanged: (_) {
-                        ref.read(themeControllerProvider.notifier).toggleTheme();
+                        ref
+                            .read(themeControllerProvider.notifier)
+                            .toggleTheme();
                       },
                     ),
                   ),
@@ -122,7 +134,8 @@ class SettingsScreen extends ConsumerWidget {
                     title: "Font Family",
                     subtitle: fontFamily,
                     trailing: const Icon(Icons.chevron_right),
-                    onTap: () => _showFontFamilyDialog(context, ref, fontFamily),
+                    onTap: () =>
+                        _showFontFamilyDialog(context, ref, fontFamily),
                   ),
                   _divider(context),
                   _tile(
@@ -132,7 +145,8 @@ class SettingsScreen extends ConsumerWidget {
                     title: "Font Size",
                     subtitle: themeState.fontSizeLabel,
                     trailing: const Icon(Icons.chevron_right),
-                    onTap: () => _showFontSizeDialog(context, ref, themeState.fontSize),
+                    onTap: () =>
+                        _showFontSizeDialog(context, ref, themeState.fontSize),
                   ),
                 ],
               ),
@@ -151,7 +165,9 @@ class SettingsScreen extends ConsumerWidget {
                     trailing: const Icon(Icons.chevron_right),
                     onTap: () {
                       Navigator.of(context).push(
-                        MaterialPageRoute(builder: (context) => const NotificationScreen()),
+                        MaterialPageRoute(
+                          builder: (context) => const NotificationScreen(),
+                        ),
                       );
                     },
                   ),
@@ -172,7 +188,9 @@ class SettingsScreen extends ConsumerWidget {
                     trailing: const Icon(Icons.chevron_right),
                     onTap: () {
                       Navigator.of(context).push(
-                        MaterialPageRoute(builder: (context) => const StorageSettingsScreen()),
+                        MaterialPageRoute(
+                          builder: (context) => const StorageSettingsScreen(),
+                        ),
                       );
                     },
                   ),
@@ -193,7 +211,9 @@ class SettingsScreen extends ConsumerWidget {
                     trailing: const Icon(Icons.chevron_right),
                     onTap: () {
                       Navigator.of(context).push(
-                        MaterialPageRoute(builder: (context) => const PrivacySettingsScreen()),
+                        MaterialPageRoute(
+                          builder: (context) => const PrivacySettingsScreen(),
+                        ),
                       );
                     },
                   ),
@@ -206,7 +226,9 @@ class SettingsScreen extends ConsumerWidget {
                     trailing: const Icon(Icons.chevron_right),
                     onTap: () {
                       Navigator.of(context).push(
-                        MaterialPageRoute(builder: (context) => const HelpSupportScreen()),
+                        MaterialPageRoute(
+                          builder: (context) => const HelpSupportScreen(),
+                        ),
                       );
                     },
                   ),
@@ -227,6 +249,9 @@ class SettingsScreen extends ConsumerWidget {
           ),
         ),
       ),
+      bottomNavigationBar: const SizedBox(
+        height: 80,
+      ), // Add padding for bottom nav
     );
   }
 
@@ -245,7 +270,10 @@ class SettingsScreen extends ConsumerWidget {
     );
   }
 
-  Widget _buildSettingsContainer(BuildContext context, {required List<Widget> children}) {
+  Widget _buildSettingsContainer(
+    BuildContext context, {
+    required List<Widget> children,
+  }) {
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 4),
       decoration: BoxDecoration(
@@ -256,12 +284,10 @@ class SettingsScreen extends ConsumerWidget {
             color: Colors.black.withOpacity(0.03),
             blurRadius: 10,
             offset: const Offset(0, 3),
-          )
+          ),
         ],
       ),
-      child: Column(
-        children: children,
-      ),
+      child: Column(children: children),
     );
   }
 
@@ -290,7 +316,12 @@ class SettingsScreen extends ConsumerWidget {
         ),
       ),
       subtitle: subtitle != null
-          ? Text(subtitle, style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant))
+          ? Text(
+              subtitle,
+              style: TextStyle(
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
+            )
           : null,
       trailing: trailing,
     );
@@ -306,15 +337,22 @@ class SettingsScreen extends ConsumerWidget {
   }
 
   // ------------------ Font Dialogs ------------------
-  void _showFontFamilyDialog(BuildContext context, WidgetRef ref, String currentFont) {
+  void _showFontFamilyDialog(
+    BuildContext context,
+    WidgetRef ref,
+    String currentFont,
+  ) {
     final fonts = ['Dyslexie', 'OpenDyslexie', 'Jersey20'];
-    final isDarkMode = ref.read(themeControllerProvider).themeMode == ThemeMode.dark;
+    final isDarkMode =
+        ref.read(themeControllerProvider).themeMode == ThemeMode.dark;
 
     showDialog(
       context: context,
       barrierDismissible: true,
       builder: (dialogContext) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15.0)),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(15.0),
+        ),
         title: const Text("Select Font Family"),
         content: SizedBox(
           width: double.minPositive,
@@ -323,9 +361,13 @@ class SettingsScreen extends ConsumerWidget {
               radioTheme: RadioThemeData(
                 fillColor: MaterialStateProperty.resolveWith<Color>((states) {
                   if (states.contains(MaterialState.selected)) {
-                    return const Color(0xFF50C878); // Inner circle color when selected
+                    return const Color(
+                      0xFF50C878,
+                    ); // Inner circle color when selected
                   }
-                  return isDarkMode ? Colors.white : Colors.black; // Outer circle color
+                  return isDarkMode
+                      ? Colors.white
+                      : Colors.black; // Outer circle color
                 }),
               ),
             ),
@@ -341,7 +383,9 @@ class SettingsScreen extends ConsumerWidget {
 
                     WidgetsBinding.instance.addPostFrameCallback((_) {
                       if (context.mounted) {
-                        ref.read(themeControllerProvider.notifier).setFontFamily(value!);
+                        ref
+                            .read(themeControllerProvider.notifier)
+                            .setFontFamily(value!);
                       }
                     });
                   },
@@ -362,19 +406,27 @@ class SettingsScreen extends ConsumerWidget {
       ),
     );
   }
-  void _showFontSizeDialog(BuildContext context, WidgetRef ref, double currentSize) {
+
+  void _showFontSizeDialog(
+    BuildContext context,
+    WidgetRef ref,
+    double currentSize,
+  ) {
     final fontSizes = {
       'Small': ThemeState.fontSmall,
       'Medium': ThemeState.fontMedium,
       'Large': ThemeState.fontLarge,
     };
-    final isDarkMode = ref.read(themeControllerProvider).themeMode == ThemeMode.dark;
+    final isDarkMode =
+        ref.read(themeControllerProvider).themeMode == ThemeMode.dark;
 
     showDialog(
       context: context,
       barrierDismissible: true,
       builder: (dialogContext) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15.0)),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(15.0),
+        ),
         title: const Text("Select Font Size"),
         content: SizedBox(
           width: double.minPositive,
@@ -383,9 +435,13 @@ class SettingsScreen extends ConsumerWidget {
               radioTheme: RadioThemeData(
                 fillColor: MaterialStateProperty.resolveWith<Color>((states) {
                   if (states.contains(MaterialState.selected)) {
-                    return const Color(0xFF50C878); // Inner circle color when selected
+                    return const Color(
+                      0xFF50C878,
+                    ); // Inner circle color when selected
                   }
-                  return isDarkMode ? Colors.white : Colors.black; // Outer circle color
+                  return isDarkMode
+                      ? Colors.white
+                      : Colors.black; // Outer circle color
                 }),
               ),
             ),
@@ -406,7 +462,9 @@ class SettingsScreen extends ConsumerWidget {
                     // Schedule state update after navigation completes
                     WidgetsBinding.instance.addPostFrameCallback((_) {
                       if (context.mounted) {
-                        ref.read(themeControllerProvider.notifier).setFontSize(value!);
+                        ref
+                            .read(themeControllerProvider.notifier)
+                            .setFontSize(value!);
                       }
                     });
                   },

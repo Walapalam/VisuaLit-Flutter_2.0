@@ -6,20 +6,31 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 class HeroCarousel extends ConsumerWidget {
   final List<dynamic> books;
+  final Widget? leadingWidget;
 
-  const HeroCarousel({super.key, required this.books});
+  const HeroCarousel({super.key, required this.books, this.leadingWidget});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    if (books.isEmpty) return const SizedBox.shrink();
+    if (books.isEmpty && leadingWidget == null) return const SizedBox.shrink();
+
+    final int itemCount = books.length + (leadingWidget != null ? 1 : 0);
 
     return SizedBox(
       height: 220,
       child: PageView.builder(
         controller: PageController(viewportFraction: 0.9),
-        itemCount: books.length,
+        itemCount: itemCount,
         itemBuilder: (context, index) {
-          final book = books[index];
+          if (leadingWidget != null && index == 0) {
+            return Container(
+              margin: const EdgeInsets.symmetric(horizontal: 6),
+              child: leadingWidget!,
+            );
+          }
+
+          final bookIndex = leadingWidget != null ? index - 1 : index;
+          final book = books[bookIndex];
           final coverUrl = book['formats']['image/jpeg'];
           final title = book['title'] ?? 'Unknown Title';
           final author = book['authors']?.isNotEmpty == true

@@ -39,9 +39,16 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Image.asset(
-              'assets/images/AppLogo_Dark_NoGB.png',
-              height: 100,
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Colors.black,
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: Image.asset(
+                'assets/images/AppLogo_Dark_NoGB.png',
+                height: 100,
+              ),
             ), // Ensure this asset exists
             const SizedBox(height: 20),
             const CircularProgressIndicator(color: AppTheme.primaryGreen),

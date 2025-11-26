@@ -13,18 +13,18 @@ class OnboardingData {
 
   static List<OnboardingData> get pages => [
     const OnboardingData(
-      title: 'Transform Words\ninto Worlds',
-      subtitle: 'Visualize Your Reading',
-      imagePath: 'assets/onboarding/visualize.png',
-      description:
-          'Experience books like never before with AI-powered visualizations that bring stories to life',
-    ),
-    const OnboardingData(
       title: 'Build Your\nReading Habit',
       subtitle: 'Track Your Journey',
       imagePath: 'assets/onboarding/streak.png',
       description:
           'Track streaks, set goals, and watch your progress grow with our intelligent reading analytics',
+    ),
+    const OnboardingData(
+      title: 'Transform Words\ninto Worlds',
+      subtitle: 'Visualize Your Reading',
+      imagePath: 'assets/onboarding/visualize.png',
+      description:
+          'Experience books like never before with AI-powered visualizations that bring stories to life',
     ),
     const OnboardingData(
       title: 'Your Personal\nLibrary Awaits',

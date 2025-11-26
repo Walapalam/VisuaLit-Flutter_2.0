@@ -14,7 +14,14 @@ class BestsellersSection extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final state = ref.watch(marketplaceProvider);
-    final bestsellers = state.bestsellers;
+    final bestsellers = state.bestsellers.where((book) {
+      final formats = book['formats'] as Map<String, dynamic>?;
+      return formats != null &&
+          (formats['image/jpeg'] != null ||
+              formats.containsKey('image/jpeg')) &&
+          (formats['application/epub+zip'] != null ||
+              formats.containsKey('application/epub+zip'));
+    }).toList();
     final loaded = state.loadedCategories.contains('bestsellers');
 
     // If bestsellers list is present and loaded, show the row
@@ -23,17 +30,25 @@ class BestsellersSection extends ConsumerWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Padding(
-            padding: EdgeInsets.symmetric(horizontal: context.isMobile ? AppSpacing.md : AppSpacing.lg),
-            child: Text('Bestsellers', style: Theme.of(context).textTheme.headlineMedium),
+            padding: EdgeInsets.symmetric(
+              horizontal: context.isMobile ? AppSpacing.md : AppSpacing.lg,
+            ),
+            child: Text(
+              'Bestsellers',
+              style: Theme.of(context).textTheme.headlineMedium,
+            ),
           ),
           const SizedBox(height: 12),
           SizedBox(
             height: context.bookShelfHeight,
             child: ListView.builder(
               scrollDirection: Axis.horizontal,
-              padding: EdgeInsets.symmetric(horizontal: context.isMobile ? AppSpacing.md : AppSpacing.lg),
+              padding: EdgeInsets.symmetric(
+                horizontal: context.isMobile ? AppSpacing.md : AppSpacing.lg,
+              ),
               itemCount: bestsellers.length,
-              itemBuilder: (context, index) => HorizontalBookCard(book: bestsellers[index]),
+              itemBuilder: (context, index) =>
+                  HorizontalBookCard(book: bestsellers[index]),
             ),
           ),
         ],
@@ -41,14 +56,22 @@ class BestsellersSection extends ConsumerWidget {
     }
 
     // Not loaded yet: show skeleton with a loading overlay if initial loading is happening
-    final showOverlay = state.isInitialLoading || state.isLoadingFromCache || (!loaded && bestsellers.isEmpty);
+    final showOverlay =
+        state.isInitialLoading ||
+        state.isLoadingFromCache ||
+        (!loaded && bestsellers.isEmpty);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Padding(
-          padding: EdgeInsets.symmetric(horizontal: context.isMobile ? AppSpacing.md : AppSpacing.lg),
-          child: Text('Bestsellers', style: Theme.of(context).textTheme.headlineMedium),
+          padding: EdgeInsets.symmetric(
+            horizontal: context.isMobile ? AppSpacing.md : AppSpacing.lg,
+          ),
+          child: Text(
+            'Bestsellers',
+            style: Theme.of(context).textTheme.headlineMedium,
+          ),
         ),
         const SizedBox(height: 12),
         SizedBox(
@@ -57,16 +80,22 @@ class BestsellersSection extends ConsumerWidget {
             children: [
               ListView.builder(
                 scrollDirection: Axis.horizontal,
-                padding: EdgeInsets.symmetric(horizontal: context.isMobile ? AppSpacing.md : AppSpacing.lg),
+                padding: EdgeInsets.symmetric(
+                  horizontal: context.isMobile ? AppSpacing.md : AppSpacing.lg,
+                ),
                 itemCount: 6,
-                itemBuilder: (context, index) => const HorizontalBookCardSkeleton(),
+                itemBuilder: (context, index) =>
+                    const HorizontalBookCardSkeleton(),
               ),
               if (showOverlay)
                 Positioned(
                   left: context.isMobile ? AppSpacing.md : AppSpacing.lg,
                   top: 8,
                   child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 6,
+                    ),
                     decoration: BoxDecoration(
                       color: Colors.black.withOpacity(0.6),
                       borderRadius: BorderRadius.circular(8),
@@ -76,10 +105,16 @@ class BestsellersSection extends ConsumerWidget {
                         SizedBox(
                           width: 14,
                           height: 14,
-                          child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: Colors.white,
+                          ),
                         ),
                         SizedBox(width: 8),
-                        Text('Loading...', style: TextStyle(color: Colors.white)),
+                        Text(
+                          'Loading...',
+                          style: TextStyle(color: Colors.white),
+                        ),
                       ],
                     ),
                   ),

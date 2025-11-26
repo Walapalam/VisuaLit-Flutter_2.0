@@ -385,7 +385,14 @@ class _MarketplaceScreenState extends ConsumerState<MarketplaceScreen> {
                                             as Map<String, dynamic>?;
                                     return formats != null &&
                                         (formats['image/jpeg'] != null ||
-                                            formats.containsKey('image/jpeg'));
+                                            formats.containsKey(
+                                              'image/jpeg',
+                                            )) &&
+                                        (formats['application/epub+zip'] !=
+                                                null ||
+                                            formats.containsKey(
+                                              'application/epub+zip',
+                                            ));
                                   })
                                   .take(5)
                                   .toList(),
@@ -403,7 +410,11 @@ class _MarketplaceScreenState extends ConsumerState<MarketplaceScreen> {
                                   book['formats'] as Map<String, dynamic>?;
                               return formats != null &&
                                   (formats['image/jpeg'] != null ||
-                                      formats.containsKey('image/jpeg'));
+                                      formats.containsKey('image/jpeg')) &&
+                                  (formats['application/epub+zip'] != null ||
+                                      formats.containsKey(
+                                        'application/epub+zip',
+                                      ));
                             }).toList(),
                           ),
                         ),

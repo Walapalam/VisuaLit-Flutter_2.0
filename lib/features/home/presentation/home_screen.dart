@@ -207,23 +207,6 @@ class HomeScreen extends ConsumerWidget {
                               crossAxisAlignment: CrossAxisAlignment.center,
                               children: [
                                 const SizedBox(height: 20),
-                                Padding(
-                                  padding: EdgeInsets.symmetric(
-                                    horizontal: 10.0,
-                                  ),
-                                  child: Text(
-                                    'Continue Reading',
-                                    textAlign: TextAlign.center, // Centered
-                                    style: TextStyle(
-                                      color: Theme.of(
-                                        context,
-                                      ).colorScheme.onSurface,
-                                      fontSize: 24,
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  ),
-                                ),
-                                const SizedBox(height: 16),
                                 CurrentlyReadingCarousel(books: recentBooks),
                               ],
                             ),

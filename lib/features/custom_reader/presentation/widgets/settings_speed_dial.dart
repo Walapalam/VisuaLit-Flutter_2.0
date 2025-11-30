@@ -9,6 +9,8 @@ class SettingsSpeedDial extends StatelessWidget {
   final VoidCallback onShowBookmark;
   final VoidCallback onShare;
   final VoidCallback onSearch;
+  final VoidCallback onTogglePagination;
+  final bool isPaginatedMode;
   final bool isVisible;
 
   const SettingsSpeedDial({
@@ -19,6 +21,8 @@ class SettingsSpeedDial extends StatelessWidget {
     required this.onShowBookmark,
     required this.onShare,
     required this.onSearch,
+    required this.onTogglePagination,
+    required this.isPaginatedMode,
     required this.isVisible,
   }) : super(key: key);
 
@@ -63,6 +67,15 @@ class SettingsSpeedDial extends StatelessWidget {
           child: const Icon(Icons.tune_outlined),
           label: 'Theme & Settings',
           onTap: onShowSettingsPanel,
+        ),
+        SpeedDialChild(
+          child: Icon(
+            isPaginatedMode
+                ? Icons.view_stream_outlined
+                : Icons.view_day_outlined,
+          ),
+          label: isPaginatedMode ? 'Scroll Mode' : 'Paginated Mode',
+          onTap: onTogglePagination,
         ),
       ],
     );

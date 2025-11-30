@@ -4,8 +4,6 @@ import 'dart:developer';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_html/flutter_html.dart';
-import 'package:flutter_html_table/flutter_html_table.dart';
-import 'package:flutter_html_svg/flutter_html_svg.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:visualit/core/providers/isar_provider.dart';
@@ -17,17 +15,22 @@ import 'package:visualit/features/custom_reader/application/epub_parser_service.
 import 'package:visualit/features/custom_reader/application/css_parser_service.dart';
 import 'package:visualit/features/reader/data/book_data.dart';
 import 'package:visualit/features/custom_reader/presentation/reading_preferences_controller.dart';
-import 'package:visualit/features/custom_reader/presentation/widgets/custom_reading_settings_panel.dart';
-import 'package:visualit/features/custom_reader/presentation/widgets/apple_reading_settings_panel.dart';
-import 'package:visualit/features/custom_reader/presentation/widgets/chapter_list_sheet.dart';
+import 'package:visualit/features/custom_reader/presentation/widgets/apple_reading_settings_dialog.dart';
 import 'package:visualit/features/custom_reader/presentation/widgets/book_visualization_overlay.dart';
-import 'package:visualit/core/services/toast_service.dart';
-import 'package:visualit/features/custom_reader/presentation/widgets/reading_app_bar.dart';
+import 'package:visualit/features/custom_reader/presentation/widgets/chapter_content.dart';
+
 import 'package:visualit/features/custom_reader/presentation/widgets/reading_navigation_bar.dart';
 import 'package:visualit/features/custom_reader/presentation/widgets/settings_speed_dial.dart';
 import 'package:visualit/features/custom_reader/presentation/widgets/visualization_speed_dial.dart';
+import 'package:visualit/features/custom_reader/presentation/widgets/reading_app_bar.dart';
 import 'package:visualit/features/custom_reader/presentation/reading_constants.dart';
+import 'package:visualit/features/custom_reader/presentation/widgets/chapter_list_sheet.dart';
+import 'package:visualit/core/services/toast_service.dart';
 import 'package:visualit/features/reader/application/throttled_reading_progress_notifier.dart';
+import 'package:visualit/features/custom_reader/presentation/controllers/pagination_controller.dart';
+import 'package:visualit/features/custom_reader/presentation/controllers/book_progress_controller.dart';
+import 'package:visualit/features/custom_reader/application/epub_paginator_service.dart';
+import 'package:visualit/features/custom_reader/presentation/widgets/paginated_reading_view.dart';
 
 class ReadingScreen extends ConsumerStatefulWidget {
   final int bookId;
@@ -64,6 +67,9 @@ class _ReadingScreenState extends ConsumerState<ReadingScreen> {
   bool _isSettingsOverlayVisible = false;
   bool _isVisualizationOverlayVisible = false;
   String? _activeSettingsCategory; // null, 'text', 'theme', or 'layout'
+
+  List<PageContent> _paginatedPages = [];
+  bool _isPaginating = false;
 
   @override
   void initState() {
@@ -140,6 +146,10 @@ class _ReadingScreenState extends ConsumerState<ReadingScreen> {
     _startHideOverlayTimer();
   }
 
+  void _togglePaginationMode() {
+    ref.read(paginationControllerProvider.notifier).togglePaginationMode();
+  }
+
   void _hideOverlay() {
     setState(() {
       if (_showOverlay) {
@@ -200,7 +210,17 @@ class _ReadingScreenState extends ConsumerState<ReadingScreen> {
 
       setState(() {
         _epubData = epubData;
+        _isLoading = false;
       });
+
+      // Analyze book for progress estimation
+      ref.read(bookProgressControllerProvider.notifier).analyzeBook(epubData);
+
+      // Restore last read position
+      _restoreReadingProgress();
+
+      // Initial pagination
+      _paginateChapter();
 
       // We'll handle navigation to the correct chapter elsewhere
     } catch (e) {
@@ -583,9 +603,7 @@ class _ReadingScreenState extends ConsumerState<ReadingScreen> {
                   }
                 },
                 child: GestureDetector(
-                  onTap: _isLocked
-                      ? null
-                      : _toggleOverlay, // Use the new toggle method
+                  onDoubleTap: _isLocked ? null : _toggleOverlay,
                   child: PageView.builder(
                     controller: _pageController,
                     itemCount: _epubData?.chapters.length ?? 0,
@@ -607,6 +625,8 @@ class _ReadingScreenState extends ConsumerState<ReadingScreen> {
                         scrollOffset:
                             0.0, // Starting at the top of the new chapter
                       );
+
+                      _paginateChapter(); // Re-paginate for new chapter
 
                       _currentScrollOffset = 0.0;
                       // Debug log
@@ -695,176 +715,120 @@ class _ReadingScreenState extends ConsumerState<ReadingScreen> {
                         chapterScrollController = ScrollController();
                       }
 
-                      return Container(
-                        color: prefs.pageColor,
-                        padding: EdgeInsets.only(
-                          left: 2.0, //prefs.leftPadding,
-                          right: 2.0, //prefs.rightPadding,
-                          top: 0.0,
-                          bottom: prefs.bottomPadding,
-                        ),
-                        child: SingleChildScrollView(
-                          controller: chapterScrollController,
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 0.0,
-                            vertical: 100.0,
-                          ),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              const SizedBox(height: 16),
-                              Html(
-                                data: chapter
-                                    .content, // Use processed content with local file URIs
-                                style: htmlStyles,
-                                extensions: [
-                                  // Existing img tag extension
-                                  TagExtension(
-                                    tagsToExtend: {"img"},
-                                    builder: (context) {
-                                      final src = context.attributes['src'];
-                                      if (src != null && src.isNotEmpty) {
-                                        return _buildImageWidget(
-                                          src,
-                                          _epubData!
-                                              .chapters[_currentChapterIndex]
-                                              .href,
-                                        );
-                                      }
-                                      return const SizedBox.shrink();
-                                    },
-                                  ),
-
-                                  // NEW: Separate SVG image extension
-                                  TagExtension(
-                                    tagsToExtend: {"image"},
-                                    builder: (context) {
-                                      print(
-                                        'DEBUG: Processing SVG image element',
-                                      );
-                                      print(
-                                        'DEBUG: All attributes: ${context.attributes}',
-                                      );
-
-                                      // Get the href from xlink:href or href attribute
-                                      final xlinkHref =
-                                          context.attributes['xlink:href'];
-                                      final href = context.attributes['href'];
-                                      final imageRef = xlinkHref ?? href;
-
-                                      print(
-                                        'DEBUG: xlink:href=$xlinkHref, href=$href, final=$imageRef',
-                                      );
-
-                                      if (imageRef != null &&
-                                          imageRef.isNotEmpty) {
-                                        print(
-                                          'DEBUG: Building SVG image widget for: $imageRef',
-                                        );
-                                        return _buildImageWidget(
-                                          imageRef,
-                                          _epubData!
-                                              .chapters[_currentChapterIndex]
-                                              .href,
-                                        );
-                                      }
-
-                                      print(
-                                        'DEBUG: No valid href found in SVG image element',
-                                      );
-                                      return const SizedBox.shrink();
-                                    },
-                                  ),
-
-                                  ImageExtension(
-                                    builder: (extensionContext) {
-                                      final src =
-                                          extensionContext.attributes['src'];
-                                      if (src != null && src.isNotEmpty) {
-                                        return _buildImageWidget(
-                                          src,
-                                          _epubData!
-                                              .chapters[_currentChapterIndex]
-                                              .href,
-                                        );
-                                      }
-                                      return const SizedBox.shrink();
-                                    },
-                                  ),
-
-                                  TableHtmlExtension(),
-
-                                  TagExtension(
-                                    tagsToExtend: {"svg"},
-                                    builder: (context) {
-                                      print(
-                                        'DEBUG: Processing SVG element with attributes: ${context.attributes}',
-                                      );
-
-                                      // Get the raw SVG content
-                                      final element = context.element;
-                                      if (element != null) {
-                                        print(
-                                          'DEBUG: Full SVG element HTML: ${element.outerHtml}',
-                                        );
-                                        print(
-                                          'DEBUG: SVG children count: ${element.children.length}',
-                                        );
-
-                                        // Check each child element
-                                        for (
-                                          int i = 0;
-                                          i < element.children.length;
-                                          i++
-                                        ) {
-                                          final child = element.children[i];
-                                          print(
-                                            'DEBUG: SVG child $i: tag=${child.localName}, attributes=${child.attributes}',
-                                          );
-
-                                          if (child.localName == 'image') {
-                                            // print(child.attributes.entries.last.value);
-                                            final xlinkHref = child
-                                                .attributes
-                                                .entries
-                                                .last
-                                                .value;
-                                            final href =
-                                                child.attributes['href'];
-                                            final imageRef = xlinkHref ?? href;
-
-                                            print(
-                                              'DEBUG: Found image child with href: $imageRef',
-                                            );
-
-                                            if (imageRef != null &&
-                                                imageRef.isNotEmpty) {
-                                              return _buildImageWidget(
-                                                imageRef,
-                                                _epubData!
-                                                    .chapters[_currentChapterIndex]
-                                                    .href,
-                                              );
-                                            }
-                                          }
+                      return Stack(
+                        children: [
+                          // Vertical View (Always present, but hidden in paginated mode)
+                          IgnorePointer(
+                            ignoring: ref
+                                .watch(paginationControllerProvider)
+                                .isPaginatedMode,
+                            child: Opacity(
+                              opacity:
+                                  ref
+                                      .watch(paginationControllerProvider)
+                                      .isPaginatedMode
+                                  ? 0.0
+                                  : 1.0,
+                              child: Container(
+                                color: prefs.pageColor,
+                                padding: EdgeInsets.only(
+                                  left: 2.0, //prefs.leftPadding,
+                                  right: 2.0, //prefs.rightPadding,
+                                  top: 0.0,
+                                  bottom: prefs.bottomPadding,
+                                ),
+                                child: NotificationListener<Notification>(
+                                  onNotification: (notification) {
+                                    if (notification
+                                        is OverscrollNotification) {
+                                      if (notification.overscroll > 0) {
+                                        // Overscroll at bottom -> Next Chapter
+                                        if (_currentChapterIndex <
+                                            (_epubData?.chapters.length ?? 0) -
+                                                1) {
+                                          _goToNextChapter();
+                                        }
+                                      } else if (notification.overscroll < 0) {
+                                        // Overscroll at top -> Previous Chapter
+                                        if (_currentChapterIndex > 0) {
+                                          _goToPreviousChapter();
                                         }
                                       }
+                                    }
 
-                                      return const SizedBox.shrink();
-                                    },
-                                  ),
+                                    if (notification
+                                        is ScrollMetricsNotification) {
+                                      ref
+                                          .read(
+                                            paginationControllerProvider
+                                                .notifier,
+                                          )
+                                          .updateMetrics(notification.metrics);
+                                      final paginationState = ref.read(
+                                        paginationControllerProvider,
+                                      );
+                                      ref
+                                          .read(
+                                            bookProgressControllerProvider
+                                                .notifier,
+                                          )
+                                          .updateProgress(
+                                            currentChapterIndex:
+                                                _currentChapterIndex,
+                                            currentChapterPage:
+                                                paginationState.currentPage,
+                                            totalChapterPages:
+                                                paginationState.totalPages,
+                                          );
+                                    }
 
-                                  SvgHtmlExtension(
-                                    networkSchemas: ["https", "http", "file"],
-                                    extension: "svg",
-                                    dataEncoding: "base64",
-                                    dataMimeType: "image/svg+xml",
+                                    return false;
+                                  },
+                                  child: SingleChildScrollView(
+                                    physics:
+                                        ref
+                                            .watch(paginationControllerProvider)
+                                            .isPaginatedMode
+                                        ? const NeverScrollableScrollPhysics() // Disable user scroll in paginated mode
+                                        : const ClampingScrollPhysics(),
+                                    controller: chapterScrollController,
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 0.0,
+                                      vertical: 100.0,
+                                    ),
+                                    child: ChapterContent(
+                                      chapter: chapter,
+                                      chapterHref: _epubData!
+                                          .chapters[_currentChapterIndex]
+                                          .href,
+                                      htmlStyles: htmlStyles,
+                                      imageBuilder: (src, chapterHref) =>
+                                          _buildImageWidget(src, chapterHref),
+                                    ),
                                   ),
-                                ],
+                                ),
                               ),
-                            ],
+                            ),
                           ),
-                        ),
+
+                          // Horizontal View (Only in paginated mode)
+                          // Horizontal View (Only in paginated mode)
+                          if (ref
+                              .watch(paginationControllerProvider)
+                              .isPaginatedMode)
+                            if (_isPaginating)
+                              const Center(child: CircularProgressIndicator())
+                            else
+                              PaginatedReadingView(
+                                pages: _paginatedPages,
+                                initialPageIndex: 0,
+                                onPageChanged: (index) {
+                                  // TODO: Update progress
+                                },
+                                onNextChapter: _goToNextChapter,
+                                onPreviousChapter: _goToPreviousChapter,
+                              ),
+                        ],
                       );
                     },
                   ),
@@ -907,18 +871,12 @@ class _ReadingScreenState extends ConsumerState<ReadingScreen> {
                     child: SafeArea(
                       child: ReadingNavigationBar(
                         onPreviousChapter: _currentChapterIndex > 0
-                            ? () {
-                                _cancelHideOverlayTimer();
-                                _previousChapter();
-                              }
+                            ? _goToPreviousChapter
                             : null,
                         onNextChapter:
                             _currentChapterIndex <
                                 (_epubData?.chapters.length ?? 0) - 1
-                            ? () {
-                                _cancelHideOverlayTimer();
-                                _nextChapter();
-                              }
+                            ? _goToNextChapter
                             : null,
                         onChapterListTap: () {
                           _cancelHideOverlayTimer();
@@ -926,6 +884,18 @@ class _ReadingScreenState extends ConsumerState<ReadingScreen> {
                         },
                         currentChapterIndex: _currentChapterIndex,
                         totalChapters: _epubData?.chapters.length ?? 0,
+                        currentPage: ref
+                            .watch(paginationControllerProvider)
+                            .currentPage,
+                        totalPages: ref
+                            .watch(paginationControllerProvider)
+                            .totalPages,
+                        currentBookPage: ref
+                            .watch(bookProgressControllerProvider)
+                            .currentBookPage,
+                        totalBookPages: ref
+                            .watch(bookProgressControllerProvider)
+                            .totalBookPages,
                         settingsSpeedDial: SettingsSpeedDial(
                           isLocked: _isLocked,
                           onToggleLock: () {
@@ -957,6 +927,10 @@ class _ReadingScreenState extends ConsumerState<ReadingScreen> {
                               type: ToastType.info,
                             );
                           },
+                          onTogglePagination: _togglePaginationMode,
+                          isPaginatedMode: ref
+                              .watch(paginationControllerProvider)
+                              .isPaginatedMode,
                           isVisible: _showOverlay,
                         ),
                         visualizationSpeedDial: VisualizationSpeedDial(
@@ -1007,23 +981,6 @@ class _ReadingScreenState extends ConsumerState<ReadingScreen> {
                 ),
               ),
 
-            if (_isSettingsOverlayVisible)
-              GestureDetector(
-                onTap: _hideSettingsPanel,
-                behavior: HitTestBehavior.opaque,
-                child: Container(
-                  color: Colors.transparent,
-                  width: double.infinity,
-                  height: double.infinity,
-                ),
-              ),
-            if (_isSettingsOverlayVisible)
-              CustomReadingSettingsPanel(
-                category: 'text',
-                onBack: _hideSettingsPanel,
-                scrollController:
-                    ScrollController(), // <-- provide a controller
-              ),
             if (_isVisualizationOverlayVisible)
               Positioned(
                 top: kReadingTopBarHeight,
@@ -1147,43 +1104,23 @@ class _ReadingScreenState extends ConsumerState<ReadingScreen> {
     );
   }
 
-  void _showAdvancedSettings() {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (context) => DraggableScrollableSheet(
-        initialChildSize: 0.6,
-        minChildSize: 0.3,
-        maxChildSize: 0.95,
-        expand: false,
-        builder: (context, scrollController) => CustomReadingSettingsPanel(
-          category: 'advanced',
-          onBack: () => Navigator.pop(context),
-          scrollController: scrollController, // <-- add this
-        ),
-      ),
-    );
-  }
-
   void _showSettingsPanel() {
     _cancelHideOverlayTimer();
-    showModalBottomSheet(
+    setState(() {
+      _isSettingsOverlayVisible = true;
+    });
+
+    showDialog(
       context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      isDismissible: true,
-      builder: (context) => DraggableScrollableSheet(
-        initialChildSize: 0.5,
-        minChildSize: 0.4,
-        maxChildSize: 0.8,
-        expand: false,
-        builder: (context, scrollController) => AppleReadingSettingsPanel(
-          onBack: () => Navigator.pop(context),
-          scrollController: scrollController,
-        ),
-      ),
-    );
+      barrierColor: Colors.transparent,
+      builder: (context) => const AppleReadingSettingsDialog(),
+    ).then((_) {
+      if (mounted) {
+        setState(() {
+          _isSettingsOverlayVisible = false;
+        });
+      }
+    });
   }
 
   void _showBookOverviewDialog() {
@@ -1200,41 +1137,21 @@ class _ReadingScreenState extends ConsumerState<ReadingScreen> {
     });
   }
 
-  void _hideSettingsPanel() {
-    setState(() {
-      _isSettingsOverlayVisible = false;
-    });
+  void _goToPreviousChapter() {
+    if (_currentChapterIndex > 0) {
+      _cancelHideOverlayTimer();
+      _previousChapter();
+    }
   }
 
-  void _showBookOverview() {
-    // Will implement this method to show book info/visualization
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Book Overview'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('Title: ${_epubData?.title ?? "Unknown"}'),
-            const SizedBox(height: 8),
-            Text('Author: ${_epubData?.author ?? "Unknown"}'),
-            const SizedBox(height: 8),
-            Text('${_epubData?.chapters.length ?? 0} chapters'),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Close'),
-          ),
-        ],
-      ),
-    );
+  void _goToNextChapter() {
+    if (_currentChapterIndex < (_epubData?.chapters.length ?? 0) - 1) {
+      _cancelHideOverlayTimer();
+      _nextChapter();
+    }
   }
 
   void _previousChapter() {
-    _cancelHideOverlayTimer();
     if (_currentChapterIndex > 0) {
       _pageController.previousPage(
         duration: const Duration(milliseconds: 300),
@@ -1244,49 +1161,12 @@ class _ReadingScreenState extends ConsumerState<ReadingScreen> {
   }
 
   void _nextChapter() {
-    _cancelHideOverlayTimer();
-    if (_currentChapterIndex < (_epubData?.chapters.length ?? 1) - 1) {
+    if (_currentChapterIndex < (_epubData?.chapters.length ?? 0) - 1) {
       _pageController.nextPage(
         duration: const Duration(milliseconds: 300),
         curve: Curves.easeInOut,
       );
     }
-  }
-
-  void _showChapterList() {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Chapters'),
-        content: SizedBox(
-          width: double.maxFinite,
-          child: ListView.builder(
-            shrinkWrap: true,
-            itemCount: _epubData?.chapters.length ?? 0,
-            itemBuilder: (context, index) {
-              final chapter = _epubData!.chapters[index];
-              return ListTile(
-                title: Text(chapter.title),
-                onTap: () {
-                  Navigator.pop(context);
-                  _pageController.animateToPage(
-                    index,
-                    duration: const Duration(milliseconds: 300),
-                    curve: Curves.easeInOut,
-                  );
-                },
-              );
-            },
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Close'),
-          ),
-        ],
-      ),
-    );
   }
 
   void _debugPrintChapterCssLinks(EpubChapter chapter) {
@@ -1336,12 +1216,9 @@ class _ReadingScreenState extends ConsumerState<ReadingScreen> {
   }
 
   @override
-  void dispose() {
-    _hideOverlayTimer?.cancel();
-    // First, cancel any pending debounced saves
-    _saveDebounceTimer?.cancel();
-
-    // Force a final save with the current position
+  void deactivate() {
+    // Force a final save with the current position when leaving the screen
+    // We do this in deactivate because ref is still valid here, but not in dispose
     if (_readingController != null && !_isLoading) {
       _saveProgress(
         bookIndex: widget.bookId,
@@ -1349,6 +1226,14 @@ class _ReadingScreenState extends ConsumerState<ReadingScreen> {
         scrollOffset: _currentScrollOffset,
       );
     }
+    super.deactivate();
+  }
+
+  @override
+  void dispose() {
+    _hideOverlayTimer?.cancel();
+    // First, cancel any pending debounced saves
+    _saveDebounceTimer?.cancel();
 
     // Then dispose of controllers
     _scrollController.dispose();
@@ -1361,5 +1246,61 @@ class _ReadingScreenState extends ConsumerState<ReadingScreen> {
     );
 
     super.dispose();
+  }
+
+  Future<void> _paginateChapter() async {
+    if (_epubData == null) return;
+
+    setState(() {
+      _isPaginating = true;
+    });
+
+    final chapter = _epubData!.chapters[_currentChapterIndex];
+    final prefs = ref.read(readingPreferencesProvider);
+    final isar = await ref.read(isarInstanceProvider.future);
+    final paginator = EpubPaginatorService(isar);
+
+    // Calculate available size
+    final screenSize = MediaQuery.of(context).size;
+    final padding = EdgeInsets.only(
+      top: 24.0, // Safe area + padding
+      bottom: 24.0,
+      left: 16.0,
+      right: 16.0,
+    );
+
+    // Base style
+    final baseStyle = TextStyle(
+      fontSize: prefs.fontSize,
+      fontFamily: prefs.fontFamily,
+      height: prefs.lineHeight,
+      color: prefs.textColor,
+    );
+
+    print('DEBUG: Pagination BaseStyle Color: ${baseStyle.color}');
+    print('DEBUG: Pagination PageColor: ${prefs.pageColor}');
+
+    final pages = await paginator.paginateChapter(
+      bookId: widget.bookId,
+      chapterHref: chapter.href,
+      htmlContent: chapter.content,
+      baseStyle: baseStyle,
+      pageSize: screenSize,
+      padding: padding,
+    );
+
+    if (mounted) {
+      setState(() {
+        _paginatedPages = pages;
+        _isPaginating = false;
+      });
+    }
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // Trigger pagination when dependencies (media query) change
+    _paginateChapter();
   }
 }

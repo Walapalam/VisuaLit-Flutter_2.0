@@ -8,6 +8,8 @@ import 'package:visualit/shared_widgets/auth_button.dart';
 import 'package:visualit/shared_widgets/glass_text_field.dart';
 import 'package:visualit/shared_widgets/password_strength_indicator.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:visualit/features/auth/presentation/widgets/auth_error_message.dart';
+import 'package:visualit/features/auth/presentation/widgets/auth_divider.dart';
 
 class SignUpScreen extends ConsumerStatefulWidget {
   const SignUpScreen({super.key});

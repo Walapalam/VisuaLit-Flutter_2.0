@@ -4,6 +4,10 @@ import 'package:visualit/core/theme/app_theme.dart';
 import 'package:visualit/core/providers/theme_provider.dart';
 import 'package:visualit/features/auth/presentation/auth_controller.dart';
 import 'package:go_router/go_router.dart';
+import 'package:visualit/features/widgets/drawer_header.dart' as custom;
+import 'package:visualit/features/widgets/drawer_menu_item.dart';
+import 'package:visualit/features/widgets/theme_toggle_item.dart';
+import 'package:visualit/features/widgets/drawer_action_button.dart';
 
 class AppDrawer extends ConsumerWidget {
   const AppDrawer({super.key});
@@ -14,7 +18,6 @@ class AppDrawer extends ConsumerWidget {
     final user = authState.user;
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final backgroundColor = Theme.of(context).scaffoldBackgroundColor;
-    final textColor = Theme.of(context).colorScheme.onBackground;
 
     return Drawer(
       backgroundColor: backgroundColor,
@@ -38,61 +41,9 @@ class AppDrawer extends ConsumerWidget {
             child: Column(
               children: [
                 // Header Section - Compact
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(24, 16, 24, 24),
-                  child: Column(
-                    children: [
-                      // Profile Avatar - Smaller
-                      Container(
-                        width: 64,
-                        height: 64,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          color: AppTheme.primaryGreen,
-                          boxShadow: [
-                            BoxShadow(
-                              color: AppTheme.primaryGreen.withOpacity(0.3),
-                              blurRadius: 16,
-                              offset: const Offset(0, 4),
-                            ),
-                          ],
-                        ),
-                        child: Center(
-                          child: Text(
-                            user?.displayName?.isNotEmpty == true
-                                ? user!.displayName![0].toUpperCase()
-                                : 'G',
-                            style: const TextStyle(
-                              fontSize: 28,
-                              fontWeight: FontWeight.bold,
-                              color: AppTheme.black, // Always black on green
-                            ),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-                      // User Name
-                      Text(
-                        user?.displayName ?? 'Guest User',
-                        style: TextStyle(
-                          color: textColor,
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      // Email
-                      Text(
-                        user?.email ?? 'Sign in for full features',
-                        style: TextStyle(
-                          color: textColor.withOpacity(0.5),
-                          fontSize: 13,
-                        ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ],
-                  ),
+                custom.AppDrawerHeader(
+                  displayName: user?.displayName ?? 'Guest User',
+                  email: user?.email ?? 'Sign in for full features',
                 ),
 
                 // Thin divider
@@ -113,8 +64,7 @@ class AppDrawer extends ConsumerWidget {
                 const SizedBox(height: 24),
 
                 // Menu Items - Simpler design
-                _buildSimpleMenuItem(
-                  context,
+                DrawerMenuItem(
                   icon: Icons.person_outline,
                   label: 'My Profile',
                   onTap: () {
@@ -123,8 +73,7 @@ class AppDrawer extends ConsumerWidget {
                   },
                 ),
                 const SizedBox(height: 8),
-                _buildSimpleMenuItem(
-                  context,
+                DrawerMenuItem(
                   icon: Icons.leaderboard_outlined,
                   label: 'Leaderboards',
                   onTap: () {
@@ -135,56 +84,11 @@ class AppDrawer extends ConsumerWidget {
                 const SizedBox(height: 8),
 
                 // Theme Toggle
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 24),
-                  child: Material(
-                    color: Colors.transparent,
-                    child: InkWell(
-                      onTap: () {
-                        ref
-                            .read(themeControllerProvider.notifier)
-                            .toggleTheme();
-                      },
-                      borderRadius: BorderRadius.circular(12),
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 16,
-                          vertical: 14,
-                        ),
-                        child: Row(
-                          children: [
-                            Icon(
-                              isDark
-                                  ? Icons.dark_mode_outlined
-                                  : Icons.light_mode_outlined,
-                              color: AppTheme.primaryGreen,
-                              size: 22,
-                            ),
-                            const SizedBox(width: 16),
-                            Expanded(
-                              child: Text(
-                                isDark ? 'Dark Mode' : 'Light Mode',
-                                style: TextStyle(
-                                  color: textColor,
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.w500,
-                                ),
-                              ),
-                            ),
-                            Switch(
-                              value: !isDark,
-                              onChanged: (value) {
-                                ref
-                                    .read(themeControllerProvider.notifier)
-                                    .toggleTheme();
-                              },
-                              activeColor: AppTheme.primaryGreen,
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ),
+                ThemeToggleItem(
+                  isDark: isDark,
+                  onToggle: () {
+                    ref.read(themeControllerProvider.notifier).toggleTheme();
+                  },
                 ),
 
                 const Spacer(),
@@ -195,7 +99,7 @@ class AppDrawer extends ConsumerWidget {
                   child:
                       authState.status == AuthStatus.authenticated ||
                           authState.status == AuthStatus.guest
-                      ? _buildCleanActionButton(
+                      ? DrawerActionButton(
                           icon: Icons.logout,
                           label: 'Logout',
                           onTap: () {
@@ -203,7 +107,7 @@ class AppDrawer extends ConsumerWidget {
                             ref.read(authControllerProvider.notifier).logout();
                           },
                         )
-                      : _buildCleanActionButton(
+                      : DrawerActionButton(
                           icon: Icons.login,
                           label: 'Login',
                           onTap: () {
@@ -215,82 +119,6 @@ class AppDrawer extends ConsumerWidget {
                 const SizedBox(height: 16),
               ],
             ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildSimpleMenuItem(
-    BuildContext context, {
-    required IconData icon,
-    required String label,
-    required VoidCallback onTap,
-  }) {
-    final textColor = Theme.of(context).colorScheme.onBackground;
-
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 24),
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          onTap: onTap,
-          borderRadius: BorderRadius.circular(12),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-            child: Row(
-              children: [
-                Icon(icon, color: AppTheme.primaryGreen, size: 22),
-                const SizedBox(width: 16),
-                Text(
-                  label,
-                  style: TextStyle(
-                    color: textColor,
-                    fontSize: 16,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildCleanActionButton({
-    required IconData icon,
-    required String label,
-    required VoidCallback onTap,
-  }) {
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(12),
-        child: Container(
-          padding: const EdgeInsets.symmetric(vertical: 14),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(
-              color: AppTheme.primaryGreen.withOpacity(0.3),
-              width: 1,
-            ),
-          ),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(icon, color: AppTheme.primaryGreen, size: 20),
-              const SizedBox(width: 10),
-              Text(
-                label,
-                style: const TextStyle(
-                  color: AppTheme.primaryGreen,
-                  fontSize: 16,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ],
           ),
         ),
       ),

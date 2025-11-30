@@ -34,41 +34,39 @@ class ReadingAppBar extends StatelessWidget {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Text(
-                bookTitle.toUpperCase(),
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: titleSize,
-                  fontWeight: FontWeight.bold,
-                  letterSpacing: 0.5,
+              Flexible(
+                child: Text(
+                  bookTitle.toUpperCase(),
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: titleSize,
+                    fontWeight: FontWeight.bold,
+                    letterSpacing: 0.5,
+                  ),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  textAlign: TextAlign.center,
                 ),
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-                textAlign: TextAlign.center,
               ),
               const SizedBox(height: 2),
-              Text(
-                chapterTitle,
-                style: TextStyle(
-                  color: Colors.grey[300],
-                  fontSize: subtitleSize,
-                  fontWeight: FontWeight.normal,
+              Flexible(
+                child: Text(
+                  chapterTitle,
+                  style: TextStyle(
+                    color: Colors.grey[300],
+                    fontSize: subtitleSize,
+                    fontWeight: FontWeight.normal,
+                  ),
+                  maxLines: 1, // Reduced to 1 line to save space
+                  overflow: TextOverflow.ellipsis,
+                  textAlign: TextAlign.center,
                 ),
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-                textAlign: TextAlign.center,
               ),
               Padding(
                 padding: const EdgeInsets.only(top: 4.0, bottom: 2.0),
                 child: IconButton(
-                  icon: const Icon(
-                    Icons.close,
-                    color: Colors.white,
-                    size: 20, // Reduced size as requested
-                  ),
-                  padding: const EdgeInsets.all(
-                    12.0,
-                  ), // Increased padding to maintain touch target
+                  icon: const Icon(Icons.close, color: Colors.white, size: 20),
+                  padding: const EdgeInsets.all(12.0),
                   onPressed: () => context.go("/home"),
                 ),
               ),

@@ -9,6 +9,8 @@ import 'package:visualit/shared_widgets/glass_text_field.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'dart:ui';
 import 'package:visualit/core/services/toast_service.dart';
+import 'package:visualit/features/auth/presentation/widgets/auth_error_message.dart';
+import 'package:visualit/features/auth/presentation/widgets/auth_divider.dart';
 
 class LoginScreen extends ConsumerStatefulWidget {
   const LoginScreen({super.key});
@@ -221,35 +223,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                         // Error Message
                         if (_errorMessage != null) ...[
                           const SizedBox(height: 16),
-                          Container(
-                            padding: const EdgeInsets.all(12),
-                            decoration: BoxDecoration(
-                              color: Colors.red.withOpacity(0.1),
-                              borderRadius: BorderRadius.circular(12),
-                              border: Border.all(
-                                color: Colors.red.withOpacity(0.3),
-                              ),
-                            ),
-                            child: Row(
-                              children: [
-                                const Icon(
-                                  Icons.error_outline,
-                                  color: Colors.red,
-                                  size: 20,
-                                ),
-                                const SizedBox(width: 8),
-                                Expanded(
-                                  child: Text(
-                                    _errorMessage!,
-                                    style: const TextStyle(
-                                      color: Colors.red,
-                                      fontSize: 12,
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
+                          AuthErrorMessage(message: _errorMessage!),
                         ],
 
                         const SizedBox(height: 8),
@@ -289,34 +263,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                         const SizedBox(height: 24),
 
                         // Divider
-                        Row(
-                          children: [
-                            Expanded(
-                              child: Container(
-                                height: 1,
-                                color: Colors.white.withOpacity(0.2),
-                              ),
-                            ),
-                            Padding(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 16,
-                              ),
-                              child: Text(
-                                'OR',
-                                style: TextStyle(
-                                  color: Colors.white.withOpacity(0.5),
-                                  fontSize: 14,
-                                ),
-                              ),
-                            ),
-                            Expanded(
-                              child: Container(
-                                height: 1,
-                                color: Colors.white.withOpacity(0.2),
-                              ),
-                            ),
-                          ],
-                        ),
+                        const AuthDivider(),
 
                         const SizedBox(height: 24),
 

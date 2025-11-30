@@ -1,14 +1,9 @@
-import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:visualit/features/library/presentation/library_controller.dart';
-import 'package:visualit/features/reader/data/book_data.dart' as db;
-import 'package:visualit/shared_widgets/book_card.dart';
 import 'package:visualit/shared_widgets/expandable_import_button.dart';
-import 'package:visualit/shared_widgets/streak_widget.dart';
 import 'package:visualit/features/marketplace/presentation/marketplace_providers.dart';
-import 'package:visualit/features/auth/presentation/auth_controller.dart';
 import '../../../core/providers/isar_provider.dart';
 import 'widgets/home_background.dart';
 import 'widgets/glass_search_bar.dart';
@@ -16,6 +11,9 @@ import 'widgets/currently_reading_carousel.dart';
 import 'widgets/section_header.dart';
 import 'widgets/empty_library_view.dart';
 import 'package:visualit/core/services/toast_service.dart';
+import 'widgets/horizontal_book_list.dart';
+import 'widgets/horizontal_marketplace_book_list.dart';
+import 'widgets/home_greeting_header.dart';
 
 class HomeScreen extends ConsumerWidget {
   const HomeScreen({super.key});
@@ -80,64 +78,7 @@ class HomeScreen extends ConsumerWidget {
                               children: [
                                 Consumer(
                                   builder: (context, ref, child) {
-                                    final authState = ref.watch(
-                                      authControllerProvider,
-                                    );
-                                    final user = authState.user;
-                                    final firstName =
-                                        user?.displayName?.split(' ').first ??
-                                        'Reader';
-                                    final displayName = firstName.isEmpty
-                                        ? 'Reader'
-                                        : firstName;
-
-                                    // Greeting Logic
-                                    final hour = DateTime.now().hour;
-                                    String greeting;
-                                    if (hour >= 2 && hour < 5) {
-                                      greeting = 'No Sleep? 😴';
-                                    } else if (hour >= 5 && hour < 12) {
-                                      greeting = 'Good Morning,';
-                                    } else if (hour >= 12 && hour < 17) {
-                                      greeting = 'Good Afternoon,';
-                                    } else {
-                                      greeting = 'Good Evening,';
-                                    }
-
-                                    return Row(
-                                      mainAxisAlignment:
-                                          MainAxisAlignment.spaceBetween,
-                                      children: [
-                                        Column(
-                                          crossAxisAlignment:
-                                              CrossAxisAlignment.start,
-                                          children: [
-                                            Text(
-                                              greeting,
-                                              style: TextStyle(
-                                                color: Theme.of(context)
-                                                    .colorScheme
-                                                    .onSurface
-                                                    .withOpacity(0.7),
-                                                fontSize: 16,
-                                              ),
-                                            ),
-                                            Text(
-                                              displayName,
-                                              style: TextStyle(
-                                                color: Theme.of(
-                                                  context,
-                                                ).colorScheme.onSurface,
-                                                fontSize: 28,
-                                                fontWeight: FontWeight.bold,
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                        // Streak Widget instead of profile icon
-                                        const StreakWidget(), // TODO: Get actual streak from user data
-                                      ],
-                                    );
+                                    return const HomeGreetingHeader();
                                   },
                                 ),
                                 const SizedBox(height: 24),
@@ -188,7 +129,7 @@ class HomeScreen extends ConsumerWidget {
                                       onActionTap: () =>
                                           context.go('/marketplace'),
                                     ),
-                                    _HorizontalMarketplaceBookList(
+                                    HorizontalMarketplaceBookList(
                                       books: randomBooks,
                                     ),
                                   ],
@@ -221,7 +162,7 @@ class HomeScreen extends ConsumerWidget {
                                   title: 'My Books',
                                   onActionTap: () => context.go('/library'),
                                 ),
-                                _HorizontalBookList(books: books),
+                                HorizontalBookList(books: books),
                               ],
                             ),
                           ),
@@ -254,7 +195,7 @@ class HomeScreen extends ConsumerWidget {
                                       onActionTap: () =>
                                           context.go('/marketplace'),
                                     ),
-                                    _HorizontalMarketplaceBookList(
+                                    HorizontalMarketplaceBookList(
                                       books: randomBooks,
                                     ),
                                   ],
@@ -288,124 +229,6 @@ class HomeScreen extends ConsumerWidget {
           ),
         );
       },
-    );
-  }
-}
-
-class _HorizontalBookList extends StatelessWidget {
-  final List<db.Book> books;
-
-  const _HorizontalBookList({required this.books});
-
-  @override
-  Widget build(BuildContext context) {
-    if (books.isEmpty) {
-      return Container(
-        height: 150,
-        margin: const EdgeInsets.symmetric(horizontal: 20),
-        decoration: BoxDecoration(
-          color: Theme.of(context).colorScheme.onSurface.withOpacity(0.03),
-          borderRadius: BorderRadius.circular(16),
-        ),
-        child: Center(
-          child: Text(
-            'No books available',
-            style: TextStyle(
-              color: Theme.of(context).colorScheme.onSurface.withOpacity(0.4),
-            ),
-          ),
-        ),
-      );
-    }
-
-    return SizedBox(
-      height: 240, // Height for BookCard + Text
-      child: ListView.builder(
-        scrollDirection: Axis.horizontal,
-        padding: const EdgeInsets.symmetric(horizontal: 20),
-        itemCount: books.length,
-        itemBuilder: (context, index) {
-          final book = books[index];
-          return BookCard(
-            imageBytes: book.coverImageBytes != null
-                ? Uint8List.fromList(book.coverImageBytes!)
-                : null,
-            title: book.title ?? 'No Title',
-            author: book.author ?? 'Unknown',
-            onTap: () {
-              if (book.status == db.ProcessingStatus.ready) {
-                context.pushNamed(
-                  'epubReader',
-                  pathParameters: {'bookId': book.id.toString()},
-                );
-              } else {
-                ToastService.show(
-                  context,
-                  '${book.title ?? 'Book'} is still processing...',
-                  type: ToastType.info,
-                );
-              }
-            },
-          );
-        },
-      ),
-    );
-  }
-}
-
-// Widget for displaying marketplace books (different structure from local books)
-class _HorizontalMarketplaceBookList extends StatelessWidget {
-  final List<dynamic> books;
-
-  const _HorizontalMarketplaceBookList({required this.books});
-
-  @override
-  Widget build(BuildContext context) {
-    if (books.isEmpty) {
-      return Container(
-        height: 150,
-        margin: const EdgeInsets.symmetric(horizontal: 20),
-        decoration: BoxDecoration(
-          color: Theme.of(context).colorScheme.onSurface.withOpacity(0.03),
-          borderRadius: BorderRadius.circular(16),
-        ),
-        child: Center(
-          child: Text(
-            'No books available',
-            style: TextStyle(
-              color: Theme.of(context).colorScheme.onSurface.withOpacity(0.4),
-            ),
-          ),
-        ),
-      );
-    }
-
-    return SizedBox(
-      height: 240, // Height for BookCard + Text
-      child: ListView.builder(
-        scrollDirection: Axis.horizontal,
-        padding: const EdgeInsets.symmetric(horizontal: 20),
-        itemCount: books.length,
-        itemBuilder: (context, index) {
-          final book = books[index];
-          final coverUrl = book['formats']?['image/jpeg'] as String?;
-          final title = book['title'] as String? ?? 'No Title';
-          final author = book['authors']?.isNotEmpty == true
-              ? book['authors'][0]['name'] as String? ?? 'Unknown'
-              : 'Unknown';
-
-          return BookCard(
-            imageBytes: null, // Marketplace books use URLs, not bytes
-            title: title,
-            author: author,
-            coverUrl: coverUrl, // Pass URL for network image
-            onTap: () {
-              // Navigate to marketplace detail or download
-              context.push('/marketplace');
-            },
-          );
-        },
-      ),
     );
   }
 }

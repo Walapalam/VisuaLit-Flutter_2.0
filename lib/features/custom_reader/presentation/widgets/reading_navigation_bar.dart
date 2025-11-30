@@ -8,6 +8,10 @@ class ReadingNavigationBar extends StatelessWidget {
   final VoidCallback onChapterListTap;
   final int currentChapterIndex;
   final int totalChapters;
+  final int currentPage;
+  final int totalPages;
+  final int currentBookPage;
+  final int totalBookPages;
   final Widget settingsSpeedDial;
   final Widget visualizationSpeedDial;
   final Color? backgroundColor;
@@ -19,6 +23,10 @@ class ReadingNavigationBar extends StatelessWidget {
     required this.onChapterListTap,
     required this.currentChapterIndex,
     required this.totalChapters,
+    required this.currentPage,
+    required this.totalPages,
+    this.currentBookPage = 0,
+    this.totalBookPages = 0,
     required this.settingsSpeedDial,
     required this.visualizationSpeedDial,
     this.backgroundColor,
@@ -28,7 +36,7 @@ class ReadingNavigationBar extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       height: kReadingBottomBarHeight,
-      padding: const EdgeInsets.symmetric(vertical: 16.0),
+      padding: const EdgeInsets.symmetric(vertical: 12.0),
       color: backgroundColor ?? Colors.black.withOpacity(0.8),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.center,
@@ -63,9 +71,24 @@ class ReadingNavigationBar extends StatelessWidget {
                       onTap: onChapterListTap,
                       child: Padding(
                         padding: const EdgeInsets.symmetric(horizontal: 8.0),
-                        child: Text(
-                          'Chapter ${currentChapterIndex + 1} of $totalChapters',
-                          style: const TextStyle(color: Colors.white),
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              'Chapter ${currentChapterIndex + 1} of $totalChapters',
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 12,
+                              ),
+                            ),
+                            Text(
+                              'Page $currentPage of $totalPages',
+                              style: const TextStyle(
+                                color: Colors.white70,
+                                fontSize: 10,
+                              ),
+                            ),
+                          ],
                         ),
                       ),
                     ),

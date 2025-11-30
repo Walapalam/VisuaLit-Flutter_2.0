@@ -6,8 +6,10 @@ import 'package:go_router/go_router.dart';
 
 import 'package:visualit/features/library/presentation/library_controller.dart';
 import 'package:visualit/features/library/presentation/widgets/book_details_sheet.dart';
-import 'package:shimmer/shimmer.dart';
 import 'package:visualit/core/theme/app_theme.dart';
+import 'package:visualit/features/library/presentation/widgets/library_book_card_skeleton.dart';
+import 'package:visualit/features/library/presentation/widgets/library_list_card_skeleton.dart';
+import 'package:visualit/features/library/presentation/widgets/library_states.dart';
 
 import '../../reader/data/book_data.dart';
 
@@ -31,7 +33,8 @@ class LibraryScreen extends ConsumerWidget {
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: libraryState.when(
         loading: () => _buildLoadingState(context, viewMode),
-        error: (err, stack) => _buildErrorState(context, err.toString()),
+        error: (err, stack) =>
+            LibraryStates.buildErrorState(context, err.toString()),
         data: (books) {
           if (books.isEmpty) {
             return _buildEmptyState(context, libraryController);
@@ -91,39 +94,6 @@ class LibraryScreen extends ConsumerWidget {
           ),
         );
       },
-    );
-  }
-
-  Widget _buildErrorState(BuildContext context, String error) {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(
-            Icons.error_outline,
-            size: 64,
-            color: Colors.red.withOpacity(0.7),
-          ),
-          const SizedBox(height: 16),
-          Text(
-            'Error loading library',
-            style: TextStyle(
-              color: Theme.of(context).colorScheme.onSurface,
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            error,
-            style: TextStyle(
-              color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6),
-              fontSize: 14,
-            ),
-            textAlign: TextAlign.center,
-          ),
-        ],
-      ),
     );
   }
 
@@ -365,10 +335,10 @@ class LibraryScreen extends ConsumerWidget {
                         Uint8List.fromList(book.coverImageBytes!),
                         fit: BoxFit.cover,
                         errorBuilder: (context, error, stackTrace) {
-                          return _buildPlaceholder();
+                          return LibraryStates.buildPlaceholder();
                         },
                       )
-                    : _buildPlaceholder(),
+                    : LibraryStates.buildPlaceholder(),
               ),
 
               // Gradient Overlay
@@ -541,10 +511,10 @@ class LibraryScreen extends ConsumerWidget {
                         Uint8List.fromList(book.coverImageBytes!),
                         fit: BoxFit.cover,
                         errorBuilder: (context, error, stackTrace) {
-                          return _buildPlaceholder();
+                          return LibraryStates.buildPlaceholder();
                         },
                       )
-                    : _buildPlaceholder(),
+                    : LibraryStates.buildPlaceholder(),
               ),
             ),
 
@@ -617,107 +587,6 @@ class LibraryScreen extends ConsumerWidget {
                 color: Theme.of(context).colorScheme.onSurface.withOpacity(0.3),
                 size: 24,
               ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildPlaceholder() {
-    return Container(
-      color: Colors.grey[900],
-      child: Center(child: Icon(Icons.book, size: 40, color: Colors.grey[700])),
-    );
-  }
-}
-
-class LibraryBookCardSkeleton extends StatelessWidget {
-  const LibraryBookCardSkeleton({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final baseColor = isDark ? Colors.grey[900]! : Colors.grey[300]!;
-    final highlightColor = isDark ? Colors.grey[800]! : Colors.grey[100]!;
-
-    return Shimmer.fromColors(
-      baseColor: baseColor,
-      highlightColor: highlightColor,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Expanded(
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(12),
-              child: Container(color: baseColor),
-            ),
-          ),
-          const SizedBox(height: 8),
-          ClipRRect(
-            borderRadius: BorderRadius.circular(4),
-            child: Container(
-              height: 12,
-              width: double.infinity,
-              color: baseColor,
-            ),
-          ),
-          const SizedBox(height: 4),
-          ClipRRect(
-            borderRadius: BorderRadius.circular(4),
-            child: Container(height: 12, width: 60, color: baseColor),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class LibraryListCardSkeleton extends StatelessWidget {
-  const LibraryListCardSkeleton({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final baseColor = isDark ? Colors.grey[900]! : Colors.grey[300]!;
-    final highlightColor = isDark ? Colors.grey[800]! : Colors.grey[100]!;
-
-    return Shimmer.fromColors(
-      baseColor: baseColor,
-      highlightColor: highlightColor,
-      child: Container(
-        margin: const EdgeInsets.only(bottom: 12),
-        padding: const EdgeInsets.all(12),
-        decoration: BoxDecoration(
-          color: Theme.of(context).colorScheme.onSurface.withOpacity(0.03),
-          borderRadius: BorderRadius.circular(12),
-        ),
-        child: Row(
-          children: [
-            ClipRRect(
-              borderRadius: BorderRadius.circular(8),
-              child: Container(width: 60, height: 85, color: baseColor),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  ClipRRect(
-                    borderRadius: BorderRadius.circular(4),
-                    child: Container(
-                      height: 14,
-                      width: double.infinity,
-                      color: baseColor,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  ClipRRect(
-                    borderRadius: BorderRadius.circular(4),
-                    child: Container(height: 12, width: 100, color: baseColor),
-                  ),
-                ],
-              ),
-            ),
           ],
         ),
       ),

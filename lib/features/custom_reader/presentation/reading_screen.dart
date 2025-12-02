@@ -3,6 +3,7 @@ import 'dart:io';
 import 'dart:developer';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:flutter_html/flutter_html.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -69,7 +70,7 @@ class _ReadingScreenState extends ConsumerState<ReadingScreen> {
   String? _activeSettingsCategory; // null, 'text', 'theme', or 'layout'
 
   List<PageContent> _paginatedPages = [];
-  bool _isPaginating = false;
+  bool _isPaginating = true;
 
   @override
   void initState() {
@@ -215,14 +216,6 @@ class _ReadingScreenState extends ConsumerState<ReadingScreen> {
 
       // Analyze book for progress estimation
       ref.read(bookProgressControllerProvider.notifier).analyzeBook(epubData);
-
-      // Restore last read position
-      _restoreReadingProgress();
-
-      // Initial pagination
-      _paginateChapter();
-
-      // We'll handle navigation to the correct chapter elsewhere
     } catch (e) {
       setState(() {
         _error = e.toString();
@@ -249,20 +242,72 @@ class _ReadingScreenState extends ConsumerState<ReadingScreen> {
 
       // Then load reading progress
       final progress = await _readingController!.loadProgress(widget.bookId);
+      final isPaginated = ref
+          .read(paginationControllerProvider)
+          .isPaginatedMode;
 
       if (progress != null) {
-        _currentChapterIndex = _getChapterIndexFromHref(
-          progress.lastChapterHref,
-        );
-        _currentScrollOffset = progress.lastScrollOffset;
-        log(
-          'Restored progress: ChapterIndex=$_currentChapterIndex, ScrollOffset=$_currentScrollOffset',
-          name: '_ReadingScreenState',
-        );
+        if (isPaginated) {
+          // Load Paginated Progress
+          if (progress.lastPaginatedChapterHref != null) {
+            _currentChapterIndex = _getChapterIndexFromHref(
+              progress.lastPaginatedChapterHref!,
+            );
+            log(
+              'Restored PAGINATED progress: ChapterIndex=$_currentChapterIndex, Page=${progress.lastPaginatedPageIndex}',
+              name: '_ReadingScreenState',
+            );
+          } else {
+            // No paginated progress found, start from beginning or default
+            _currentChapterIndex = 0;
+            log(
+              'No PAGINATED progress found, starting at Chapter 0',
+              name: '_ReadingScreenState',
+            );
+          }
+        } else {
+          // Load Scroll Progress
+          // We use lastChapterHref for scroll mode (legacy/default)
+          if (progress.lastChapterHref.isNotEmpty) {
+            _currentChapterIndex = _getChapterIndexFromHref(
+              progress.lastChapterHref,
+            );
+            _currentScrollOffset = progress.lastScrollOffset;
+            log(
+              'Restored SCROLL progress: ChapterIndex=$_currentChapterIndex, ScrollOffset=$_currentScrollOffset',
+              name: '_ReadingScreenState',
+            );
+          } else {
+            _currentChapterIndex = 0;
+            _currentScrollOffset = 0.0;
+            log(
+              'No SCROLL progress found, starting at Chapter 0',
+              name: '_ReadingScreenState',
+            );
+          }
+        }
       }
 
       // Initialize PageController with the correct starting page
       _pageController = PageController(initialPage: _currentChapterIndex);
+
+      // Initial pagination
+      await _paginateChapter();
+
+      // Restore page index if paginated
+      if (isPaginated &&
+          progress?.lastPaginatedPageIndex != null &&
+          _paginatedPages.isNotEmpty) {
+        final pageIndex = progress!.lastPaginatedPageIndex!;
+        if (pageIndex < _paginatedPages.length) {
+          // We need to wait for the view to build before jumping
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (_pageController.hasClients) {
+              _pageController.jumpToPage(pageIndex);
+            }
+          });
+        }
+      }
 
       // Complete initialization
       setState(() {
@@ -346,45 +391,6 @@ class _ReadingScreenState extends ConsumerState<ReadingScreen> {
     return htmlContent;
   }
 
-  Future<void> _restoreReadingProgress() async {
-    try {
-      // Add null check to ensure _readingController is not null
-      if (_readingController == null) {
-        log(
-          'Cannot restore reading progress: _readingController is null',
-          name: '_ReadingScreenState',
-        );
-        return;
-      }
-
-      final progress = await _readingController!.loadProgress(widget.bookId);
-      if (progress != null && _epubData != null) {
-        // Find the chapter index from href
-        int chapterIndex = _epubData!.chapters.indexWhere(
-          (chapter) => chapter.href == progress.lastChapterHref,
-        );
-
-        if (chapterIndex >= 0) {
-          setState(() {
-            _currentChapterIndex = chapterIndex;
-            // Store the scroll offset to be applied when the page is built
-            _pendingScrollOffset = progress.lastScrollOffset;
-          });
-
-          log(
-            'Restored progress: ChapterIndex=$chapterIndex, ScrollOffset=${progress.lastScrollOffset}',
-            name: '_ReadingScreenState',
-          );
-
-          // Change the page - this will trigger the itemBuilder
-          _pageController.jumpToPage(chapterIndex);
-        }
-      }
-    } catch (e) {
-      log('Error restoring reading progress: $e', name: '_ReadingScreenState');
-    }
-  }
-
   void _onScroll() {
     if (_scrollController.hasClients) {
       _currentScrollOffset = _scrollController.offset;
@@ -427,28 +433,35 @@ class _ReadingScreenState extends ConsumerState<ReadingScreen> {
     required int bookIndex,
     required int chapterIndex,
     required double scrollOffset,
+    int? pageIndex,
   }) async {
     final sessionStart = ref.read(readingSessionStartProvider);
-    if (sessionStart != null) {
-      final elapsed = DateTime.now().difference(sessionStart);
-      print(
-        '📖 Reading Progress: Saving after ${elapsed.inMinutes} min ${elapsed.inSeconds % 60} sec of reading',
-      );
-    }
+    final isPaginated = ref.read(paginationControllerProvider).isPaginatedMode;
 
     log(
-      'Saving progress: BookId=$bookIndex, ChapterIndex=$chapterIndex, ScrollOffset=$scrollOffset',
+      'Saving progress: BookId=$bookIndex, ChapterIndex=$chapterIndex, ScrollOffset=$scrollOffset, PageIndex=$pageIndex, Mode=${isPaginated ? "PAGINATED" : "SCROLL"}',
       name: '_ReadingScreenState',
     );
     if (_readingController != null && _epubData != null) {
       final chapterHref = _getChapterHrefFromIndex(chapterIndex);
       if (chapterHref.isNotEmpty) {
-        await _readingController!.saveProgress(
-          bookIndex,
-          chapterHref,
-          scrollOffset,
-          sessionStart: sessionStart,
-        );
+        if (isPaginated) {
+          await _readingController!.saveProgress(
+            bookIndex,
+            chapterHref,
+            null, // No scroll offset for pagination
+            paginatedChapterHref: chapterHref,
+            paginatedPageIndex: pageIndex ?? 0,
+            sessionStart: sessionStart,
+          );
+        } else {
+          await _readingController!.saveProgress(
+            bookIndex,
+            chapterHref,
+            scrollOffset,
+            sessionStart: sessionStart,
+          );
+        }
       } else {
         log(
           'Warning: Could not save progress - invalid chapter href',
@@ -458,11 +471,32 @@ class _ReadingScreenState extends ConsumerState<ReadingScreen> {
     }
   }
 
+  EdgeInsets _getReadingPadding(MediaQueryData mediaQuery) {
+    final safePadding = mediaQuery.padding;
+    return EdgeInsets.only(
+      top: safePadding.top, // Minimized top padding
+      bottom: safePadding.bottom + 100.0,
+      left: 24.0,
+      right: 24.0,
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
+    // Listen to preferences changes to re-paginate
+    ref.listen(readingPreferencesProvider, (previous, next) {
+      if (previous != next &&
+          ref.read(paginationControllerProvider).isPaginatedMode) {
+        _paginateChapter();
+      }
+    });
+
     if (_isLoading) {
       return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
+
+    final mediaQuery = MediaQuery.of(context);
+    final padding = _getReadingPadding(mediaQuery);
 
     if (_error != null) {
       return Scaffold(
@@ -823,10 +857,48 @@ class _ReadingScreenState extends ConsumerState<ReadingScreen> {
                                 pages: _paginatedPages,
                                 initialPageIndex: 0,
                                 onPageChanged: (index) {
-                                  // TODO: Update progress
+                                  // Update pagination controller
+                                  ref
+                                      .read(
+                                        paginationControllerProvider.notifier,
+                                      )
+                                      .updatePage(index);
+
+                                  // Update book progress
+                                  final paginationState = ref.read(
+                                    paginationControllerProvider,
+                                  );
+                                  ref
+                                      .read(
+                                        bookProgressControllerProvider.notifier,
+                                      )
+                                      .updateProgress(
+                                        currentChapterIndex:
+                                            _currentChapterIndex,
+                                        currentChapterPage:
+                                            index + 1, // 1-based for display
+                                        totalChapterPages:
+                                            paginationState.totalPages,
+                                      );
+
+                                  // Save progress for pagination
+                                  _saveProgress(
+                                    bookIndex: widget.bookId,
+                                    chapterIndex: _currentChapterIndex,
+                                    scrollOffset:
+                                        0, // Ignored in pagination mode
+                                    pageIndex: index,
+                                  );
                                 },
                                 onNextChapter: _goToNextChapter,
                                 onPreviousChapter: _goToPreviousChapter,
+                                imageBuilder: (src) => _buildImageWidget(
+                                  src,
+                                  _epubData!
+                                      .chapters[_currentChapterIndex]
+                                      .href,
+                                ),
+                                padding: padding,
                               ),
                         ],
                       );
@@ -1009,6 +1081,16 @@ class _ReadingScreenState extends ConsumerState<ReadingScreen> {
     if (src.startsWith('file://')) {
       final filePath = Uri.parse(src).toFilePath();
       if (File(filePath).existsSync()) {
+        if (filePath.toLowerCase().endsWith('.svg')) {
+          return Center(
+            child: SvgPicture.file(
+              File(filePath),
+              fit: BoxFit.contain,
+              placeholderBuilder: (context) =>
+                  const CircularProgressIndicator(),
+            ),
+          );
+        }
         return Center(
           child: Image.file(
             File(filePath),
@@ -1047,6 +1129,15 @@ class _ReadingScreenState extends ConsumerState<ReadingScreen> {
 
     final localFile = _epubData!.images[resolvedPath];
     if (localFile != null && File(localFile).existsSync()) {
+      if (localFile.toLowerCase().endsWith('.svg')) {
+        return Center(
+          child: SvgPicture.file(
+            File(localFile),
+            fit: BoxFit.contain,
+            placeholderBuilder: (context) => const CircularProgressIndicator(),
+          ),
+        );
+      }
       return Center(
         child: Image.file(
           File(localFile),
@@ -1261,35 +1352,46 @@ class _ReadingScreenState extends ConsumerState<ReadingScreen> {
     final paginator = EpubPaginatorService(isar);
 
     // Calculate available size
-    final screenSize = MediaQuery.of(context).size;
-    final padding = EdgeInsets.only(
-      top: 24.0, // Safe area + padding
-      bottom: 24.0,
-      left: 16.0,
-      right: 16.0,
-    );
+    final mediaQuery = MediaQuery.of(context);
+    final screenSize = mediaQuery.size;
+    final padding = _getReadingPadding(mediaQuery);
 
     // Base style
-    final baseStyle = TextStyle(
+    final baseStyle = prefs.baseTextStyle.copyWith(
       fontSize: prefs.fontSize,
       fontFamily: prefs.fontFamily,
       height: prefs.lineHeight,
       color: prefs.textColor,
     );
 
-    print('DEBUG: Pagination BaseStyle Color: ${baseStyle.color}');
-    print('DEBUG: Pagination PageColor: ${prefs.pageColor}');
+    // Tag styles
+    final tagStyles = <String, TextStyle>{};
+    for (int i = 1; i <= 6; i++) {
+      final headingStyle = prefs.getStyleForHeading(i);
+      tagStyles['h$i'] = baseStyle.copyWith(
+        fontSize: headingStyle.fontSize ?? prefs.fontSize,
+        fontWeight: headingStyle.fontWeight,
+        // Add other properties if needed
+      );
+    }
+    // Add other tags if needed (p, div, etc.)
+    // Note: flutter_html styles are 'Style', we need 'TextStyle'.
+    // We are manually constructing basic tag styles here.
 
     final pages = await paginator.paginateChapter(
       bookId: widget.bookId,
       chapterHref: chapter.href,
       htmlContent: chapter.content,
       baseStyle: baseStyle,
+      tagStyles: tagStyles,
       pageSize: screenSize,
       padding: padding,
     );
 
     if (mounted) {
+      ref
+          .read(paginationControllerProvider.notifier)
+          .updateTotalPages(pages.length);
       setState(() {
         _paginatedPages = pages;
         _isPaginating = false;

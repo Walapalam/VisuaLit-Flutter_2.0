@@ -28,8 +28,23 @@ const NewReadingProgressSchema = CollectionSchema(
       name: r'lastChapterHref',
       type: IsarType.string,
     ),
-    r'lastScrollOffset': PropertySchema(
+    r'lastPaginatedChapterHref': PropertySchema(
       id: 2,
+      name: r'lastPaginatedChapterHref',
+      type: IsarType.string,
+    ),
+    r'lastPaginatedPageIndex': PropertySchema(
+      id: 3,
+      name: r'lastPaginatedPageIndex',
+      type: IsarType.long,
+    ),
+    r'lastScrollChapterHref': PropertySchema(
+      id: 4,
+      name: r'lastScrollChapterHref',
+      type: IsarType.string,
+    ),
+    r'lastScrollOffset': PropertySchema(
+      id: 5,
       name: r'lastScrollOffset',
       type: IsarType.double,
     )
@@ -69,6 +84,18 @@ int _newReadingProgressEstimateSize(
 ) {
   var bytesCount = offsets.last;
   bytesCount += 3 + object.lastChapterHref.length * 3;
+  {
+    final value = object.lastPaginatedChapterHref;
+    if (value != null) {
+      bytesCount += 3 + value.length * 3;
+    }
+  }
+  {
+    final value = object.lastScrollChapterHref;
+    if (value != null) {
+      bytesCount += 3 + value.length * 3;
+    }
+  }
   return bytesCount;
 }
 
@@ -80,7 +107,10 @@ void _newReadingProgressSerialize(
 ) {
   writer.writeLong(offsets[0], object.bookId);
   writer.writeString(offsets[1], object.lastChapterHref);
-  writer.writeDouble(offsets[2], object.lastScrollOffset);
+  writer.writeString(offsets[2], object.lastPaginatedChapterHref);
+  writer.writeLong(offsets[3], object.lastPaginatedPageIndex);
+  writer.writeString(offsets[4], object.lastScrollChapterHref);
+  writer.writeDouble(offsets[5], object.lastScrollOffset);
 }
 
 NewReadingProgress _newReadingProgressDeserialize(
@@ -93,7 +123,10 @@ NewReadingProgress _newReadingProgressDeserialize(
   object.bookId = reader.readLong(offsets[0]);
   object.id = id;
   object.lastChapterHref = reader.readString(offsets[1]);
-  object.lastScrollOffset = reader.readDouble(offsets[2]);
+  object.lastPaginatedChapterHref = reader.readStringOrNull(offsets[2]);
+  object.lastPaginatedPageIndex = reader.readLongOrNull(offsets[3]);
+  object.lastScrollChapterHref = reader.readStringOrNull(offsets[4]);
+  object.lastScrollOffset = reader.readDouble(offsets[5]);
   return object;
 }
 
@@ -109,6 +142,12 @@ P _newReadingProgressDeserializeProp<P>(
     case 1:
       return (reader.readString(offset)) as P;
     case 2:
+      return (reader.readStringOrNull(offset)) as P;
+    case 3:
+      return (reader.readLongOrNull(offset)) as P;
+    case 4:
+      return (reader.readStringOrNull(offset)) as P;
+    case 5:
       return (reader.readDouble(offset)) as P;
     default:
       throw IsarError('Unknown property with id $propertyId');
@@ -617,6 +656,391 @@ extension NewReadingProgressQueryFilter
   }
 
   QueryBuilder<NewReadingProgress, NewReadingProgress, QAfterFilterCondition>
+      lastPaginatedChapterHrefIsNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(const FilterCondition.isNull(
+        property: r'lastPaginatedChapterHref',
+      ));
+    });
+  }
+
+  QueryBuilder<NewReadingProgress, NewReadingProgress, QAfterFilterCondition>
+      lastPaginatedChapterHrefIsNotNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(const FilterCondition.isNotNull(
+        property: r'lastPaginatedChapterHref',
+      ));
+    });
+  }
+
+  QueryBuilder<NewReadingProgress, NewReadingProgress, QAfterFilterCondition>
+      lastPaginatedChapterHrefEqualTo(
+    String? value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'lastPaginatedChapterHref',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<NewReadingProgress, NewReadingProgress, QAfterFilterCondition>
+      lastPaginatedChapterHrefGreaterThan(
+    String? value, {
+    bool include = false,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        include: include,
+        property: r'lastPaginatedChapterHref',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<NewReadingProgress, NewReadingProgress, QAfterFilterCondition>
+      lastPaginatedChapterHrefLessThan(
+    String? value, {
+    bool include = false,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.lessThan(
+        include: include,
+        property: r'lastPaginatedChapterHref',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<NewReadingProgress, NewReadingProgress, QAfterFilterCondition>
+      lastPaginatedChapterHrefBetween(
+    String? lower,
+    String? upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.between(
+        property: r'lastPaginatedChapterHref',
+        lower: lower,
+        includeLower: includeLower,
+        upper: upper,
+        includeUpper: includeUpper,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<NewReadingProgress, NewReadingProgress, QAfterFilterCondition>
+      lastPaginatedChapterHrefStartsWith(
+    String value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.startsWith(
+        property: r'lastPaginatedChapterHref',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<NewReadingProgress, NewReadingProgress, QAfterFilterCondition>
+      lastPaginatedChapterHrefEndsWith(
+    String value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.endsWith(
+        property: r'lastPaginatedChapterHref',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<NewReadingProgress, NewReadingProgress, QAfterFilterCondition>
+      lastPaginatedChapterHrefContains(String value,
+          {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.contains(
+        property: r'lastPaginatedChapterHref',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<NewReadingProgress, NewReadingProgress, QAfterFilterCondition>
+      lastPaginatedChapterHrefMatches(String pattern,
+          {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.matches(
+        property: r'lastPaginatedChapterHref',
+        wildcard: pattern,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<NewReadingProgress, NewReadingProgress, QAfterFilterCondition>
+      lastPaginatedChapterHrefIsEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'lastPaginatedChapterHref',
+        value: '',
+      ));
+    });
+  }
+
+  QueryBuilder<NewReadingProgress, NewReadingProgress, QAfterFilterCondition>
+      lastPaginatedChapterHrefIsNotEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        property: r'lastPaginatedChapterHref',
+        value: '',
+      ));
+    });
+  }
+
+  QueryBuilder<NewReadingProgress, NewReadingProgress, QAfterFilterCondition>
+      lastPaginatedPageIndexIsNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(const FilterCondition.isNull(
+        property: r'lastPaginatedPageIndex',
+      ));
+    });
+  }
+
+  QueryBuilder<NewReadingProgress, NewReadingProgress, QAfterFilterCondition>
+      lastPaginatedPageIndexIsNotNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(const FilterCondition.isNotNull(
+        property: r'lastPaginatedPageIndex',
+      ));
+    });
+  }
+
+  QueryBuilder<NewReadingProgress, NewReadingProgress, QAfterFilterCondition>
+      lastPaginatedPageIndexEqualTo(int? value) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'lastPaginatedPageIndex',
+        value: value,
+      ));
+    });
+  }
+
+  QueryBuilder<NewReadingProgress, NewReadingProgress, QAfterFilterCondition>
+      lastPaginatedPageIndexGreaterThan(
+    int? value, {
+    bool include = false,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        include: include,
+        property: r'lastPaginatedPageIndex',
+        value: value,
+      ));
+    });
+  }
+
+  QueryBuilder<NewReadingProgress, NewReadingProgress, QAfterFilterCondition>
+      lastPaginatedPageIndexLessThan(
+    int? value, {
+    bool include = false,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.lessThan(
+        include: include,
+        property: r'lastPaginatedPageIndex',
+        value: value,
+      ));
+    });
+  }
+
+  QueryBuilder<NewReadingProgress, NewReadingProgress, QAfterFilterCondition>
+      lastPaginatedPageIndexBetween(
+    int? lower,
+    int? upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.between(
+        property: r'lastPaginatedPageIndex',
+        lower: lower,
+        includeLower: includeLower,
+        upper: upper,
+        includeUpper: includeUpper,
+      ));
+    });
+  }
+
+  QueryBuilder<NewReadingProgress, NewReadingProgress, QAfterFilterCondition>
+      lastScrollChapterHrefIsNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(const FilterCondition.isNull(
+        property: r'lastScrollChapterHref',
+      ));
+    });
+  }
+
+  QueryBuilder<NewReadingProgress, NewReadingProgress, QAfterFilterCondition>
+      lastScrollChapterHrefIsNotNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(const FilterCondition.isNotNull(
+        property: r'lastScrollChapterHref',
+      ));
+    });
+  }
+
+  QueryBuilder<NewReadingProgress, NewReadingProgress, QAfterFilterCondition>
+      lastScrollChapterHrefEqualTo(
+    String? value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'lastScrollChapterHref',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<NewReadingProgress, NewReadingProgress, QAfterFilterCondition>
+      lastScrollChapterHrefGreaterThan(
+    String? value, {
+    bool include = false,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        include: include,
+        property: r'lastScrollChapterHref',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<NewReadingProgress, NewReadingProgress, QAfterFilterCondition>
+      lastScrollChapterHrefLessThan(
+    String? value, {
+    bool include = false,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.lessThan(
+        include: include,
+        property: r'lastScrollChapterHref',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<NewReadingProgress, NewReadingProgress, QAfterFilterCondition>
+      lastScrollChapterHrefBetween(
+    String? lower,
+    String? upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.between(
+        property: r'lastScrollChapterHref',
+        lower: lower,
+        includeLower: includeLower,
+        upper: upper,
+        includeUpper: includeUpper,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<NewReadingProgress, NewReadingProgress, QAfterFilterCondition>
+      lastScrollChapterHrefStartsWith(
+    String value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.startsWith(
+        property: r'lastScrollChapterHref',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<NewReadingProgress, NewReadingProgress, QAfterFilterCondition>
+      lastScrollChapterHrefEndsWith(
+    String value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.endsWith(
+        property: r'lastScrollChapterHref',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<NewReadingProgress, NewReadingProgress, QAfterFilterCondition>
+      lastScrollChapterHrefContains(String value, {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.contains(
+        property: r'lastScrollChapterHref',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<NewReadingProgress, NewReadingProgress, QAfterFilterCondition>
+      lastScrollChapterHrefMatches(String pattern,
+          {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.matches(
+        property: r'lastScrollChapterHref',
+        wildcard: pattern,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<NewReadingProgress, NewReadingProgress, QAfterFilterCondition>
+      lastScrollChapterHrefIsEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'lastScrollChapterHref',
+        value: '',
+      ));
+    });
+  }
+
+  QueryBuilder<NewReadingProgress, NewReadingProgress, QAfterFilterCondition>
+      lastScrollChapterHrefIsNotEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        property: r'lastScrollChapterHref',
+        value: '',
+      ));
+    });
+  }
+
+  QueryBuilder<NewReadingProgress, NewReadingProgress, QAfterFilterCondition>
       lastScrollOffsetEqualTo(
     double value, {
     double epsilon = Query.epsilon,
@@ -720,6 +1144,48 @@ extension NewReadingProgressQuerySortBy
   }
 
   QueryBuilder<NewReadingProgress, NewReadingProgress, QAfterSortBy>
+      sortByLastPaginatedChapterHref() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'lastPaginatedChapterHref', Sort.asc);
+    });
+  }
+
+  QueryBuilder<NewReadingProgress, NewReadingProgress, QAfterSortBy>
+      sortByLastPaginatedChapterHrefDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'lastPaginatedChapterHref', Sort.desc);
+    });
+  }
+
+  QueryBuilder<NewReadingProgress, NewReadingProgress, QAfterSortBy>
+      sortByLastPaginatedPageIndex() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'lastPaginatedPageIndex', Sort.asc);
+    });
+  }
+
+  QueryBuilder<NewReadingProgress, NewReadingProgress, QAfterSortBy>
+      sortByLastPaginatedPageIndexDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'lastPaginatedPageIndex', Sort.desc);
+    });
+  }
+
+  QueryBuilder<NewReadingProgress, NewReadingProgress, QAfterSortBy>
+      sortByLastScrollChapterHref() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'lastScrollChapterHref', Sort.asc);
+    });
+  }
+
+  QueryBuilder<NewReadingProgress, NewReadingProgress, QAfterSortBy>
+      sortByLastScrollChapterHrefDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'lastScrollChapterHref', Sort.desc);
+    });
+  }
+
+  QueryBuilder<NewReadingProgress, NewReadingProgress, QAfterSortBy>
       sortByLastScrollOffset() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'lastScrollOffset', Sort.asc);
@@ -779,6 +1245,48 @@ extension NewReadingProgressQuerySortThenBy
   }
 
   QueryBuilder<NewReadingProgress, NewReadingProgress, QAfterSortBy>
+      thenByLastPaginatedChapterHref() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'lastPaginatedChapterHref', Sort.asc);
+    });
+  }
+
+  QueryBuilder<NewReadingProgress, NewReadingProgress, QAfterSortBy>
+      thenByLastPaginatedChapterHrefDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'lastPaginatedChapterHref', Sort.desc);
+    });
+  }
+
+  QueryBuilder<NewReadingProgress, NewReadingProgress, QAfterSortBy>
+      thenByLastPaginatedPageIndex() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'lastPaginatedPageIndex', Sort.asc);
+    });
+  }
+
+  QueryBuilder<NewReadingProgress, NewReadingProgress, QAfterSortBy>
+      thenByLastPaginatedPageIndexDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'lastPaginatedPageIndex', Sort.desc);
+    });
+  }
+
+  QueryBuilder<NewReadingProgress, NewReadingProgress, QAfterSortBy>
+      thenByLastScrollChapterHref() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'lastScrollChapterHref', Sort.asc);
+    });
+  }
+
+  QueryBuilder<NewReadingProgress, NewReadingProgress, QAfterSortBy>
+      thenByLastScrollChapterHrefDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'lastScrollChapterHref', Sort.desc);
+    });
+  }
+
+  QueryBuilder<NewReadingProgress, NewReadingProgress, QAfterSortBy>
       thenByLastScrollOffset() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'lastScrollOffset', Sort.asc);
@@ -811,6 +1319,29 @@ extension NewReadingProgressQueryWhereDistinct
   }
 
   QueryBuilder<NewReadingProgress, NewReadingProgress, QDistinct>
+      distinctByLastPaginatedChapterHref({bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'lastPaginatedChapterHref',
+          caseSensitive: caseSensitive);
+    });
+  }
+
+  QueryBuilder<NewReadingProgress, NewReadingProgress, QDistinct>
+      distinctByLastPaginatedPageIndex() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'lastPaginatedPageIndex');
+    });
+  }
+
+  QueryBuilder<NewReadingProgress, NewReadingProgress, QDistinct>
+      distinctByLastScrollChapterHref({bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'lastScrollChapterHref',
+          caseSensitive: caseSensitive);
+    });
+  }
+
+  QueryBuilder<NewReadingProgress, NewReadingProgress, QDistinct>
       distinctByLastScrollOffset() {
     return QueryBuilder.apply(this, (query) {
       return query.addDistinctBy(r'lastScrollOffset');
@@ -836,6 +1367,27 @@ extension NewReadingProgressQueryProperty
       lastChapterHrefProperty() {
     return QueryBuilder.apply(this, (query) {
       return query.addPropertyName(r'lastChapterHref');
+    });
+  }
+
+  QueryBuilder<NewReadingProgress, String?, QQueryOperations>
+      lastPaginatedChapterHrefProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'lastPaginatedChapterHref');
+    });
+  }
+
+  QueryBuilder<NewReadingProgress, int?, QQueryOperations>
+      lastPaginatedPageIndexProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'lastPaginatedPageIndex');
+    });
+  }
+
+  QueryBuilder<NewReadingProgress, String?, QQueryOperations>
+      lastScrollChapterHrefProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'lastScrollChapterHref');
     });
   }
 

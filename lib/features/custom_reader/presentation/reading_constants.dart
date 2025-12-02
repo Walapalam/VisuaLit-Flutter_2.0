@@ -1,2 +1,2 @@
-const double kReadingTopBarHeight = 210.0;
-const double kReadingBottomBarHeight = 80.0;
+const double kReadingTopBarHeight = 170.0;
+const double kReadingBottomBarHeight = 70.0;

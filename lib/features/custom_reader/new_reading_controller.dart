@@ -35,7 +35,9 @@ class NewReadingController {
   Future<void> saveProgress(
     int bookId,
     String chapterHref,
-    double scrollOffset, {
+    double? scrollOffset, {
+    String? paginatedChapterHref,
+    int? paginatedPageIndex,
     DateTime? sessionStart,
   }) async {
     log(
@@ -59,9 +61,23 @@ class NewReadingController {
       }
 
       // Update the properties of the (either existing or new) record.
-      progress
-        ..lastChapterHref = chapterHref
-        ..lastScrollOffset = scrollOffset;
+      // Update the properties of the (either existing or new) record.
+      if (scrollOffset != null) {
+        progress
+          ..lastChapterHref =
+              chapterHref // Global sync
+          ..lastScrollOffset = scrollOffset
+          ..lastScrollChapterHref =
+              chapterHref; // Track which chapter this scroll belongs to
+      }
+
+      if (paginatedChapterHref != null && paginatedPageIndex != null) {
+        progress
+          ..lastChapterHref =
+              paginatedChapterHref // Global sync
+          ..lastPaginatedChapterHref = paginatedChapterHref
+          ..lastPaginatedPageIndex = paginatedPageIndex;
+      }
 
       // 'put' will either insert the new record or update the existing one
       // because we are reusing the 'Id' if it exists.

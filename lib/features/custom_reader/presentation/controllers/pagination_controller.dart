@@ -67,6 +67,14 @@ class PaginationController extends StateNotifier<PaginationState> {
   void setPaginationMode(bool enabled) {
     state = state.copyWith(isPaginatedMode: enabled);
   }
+
+  void updatePage(int pageIndex) {
+    state = state.copyWith(currentPage: pageIndex + 1); // 1-based
+  }
+
+  void updateTotalPages(int totalPages) {
+    state = state.copyWith(totalPages: totalPages);
+  }
 }
 
 final paginationControllerProvider =

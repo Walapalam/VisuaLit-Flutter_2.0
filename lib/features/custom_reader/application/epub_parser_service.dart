@@ -27,6 +27,7 @@ class EpubChapter {
 class EpubMetadata {
   final String title;
   final String author;
+  final String? isbn; // ISBN extracted from EPUB metadata
   final List<EpubChapter> chapters;
   final Map<String, String> images;
   final Map<String, String> cssFiles;
@@ -34,6 +35,7 @@ class EpubMetadata {
   EpubMetadata({
     required this.title,
     required this.author,
+    this.isbn,
     required this.chapters,
     required this.images,
     Map<String, String>? cssFiles,
@@ -77,6 +79,24 @@ class EpubParserService {
     final metadataElement = opfXml.findAllElements('metadata').first;
     final title = metadataElement.findElements('dc:title').first.text;
     final author = metadataElement.findElements('dc:creator').first.text;
+
+    // Extract ISBN from dc:identifier elements
+    String? isbn;
+    for (final identifier in metadataElement.findElements('dc:identifier')) {
+      final scheme = identifier.getAttribute('opf:scheme')?.toUpperCase();
+      final text = identifier.text.trim();
+
+      // Check if scheme is ISBN or if text looks like an ISBN
+      if (scheme == 'ISBN' || _looksLikeIsbn(text)) {
+        isbn = text.replaceAll(RegExp(r'[-\s]'), ''); // Remove hyphens and spaces
+        print('📚 EPUB Parser: Found ISBN in metadata: $isbn');
+        break;
+      }
+    }
+
+    if (isbn == null) {
+      print('📚 EPUB Parser: No ISBN found in EPUB metadata');
+    }
 
     // Build manifest id -> href and href -> media-type maps
     final manifestHrefById = <String, String>{};
@@ -214,6 +234,7 @@ class EpubParserService {
     return EpubMetadata(
       title: title,
       author: author,
+      isbn: isbn,
       chapters: chapters,
       images: images,
       cssFiles: cssFiles,
@@ -404,6 +425,12 @@ class EpubParserService {
   bool _looksLikeImage(String path) {
     final ext = p.extension(path).toLowerCase();
     return ['.jpg', '.jpeg', '.png', '.gif', '.bmp', '.webp', '.svg'].contains(ext);
+  }
+
+  /// Check if a string looks like an ISBN (ISBN-10 or ISBN-13)
+  bool _looksLikeIsbn(String text) {
+    final cleaned = text.replaceAll(RegExp(r'[-\s]'), '');
+    return RegExp(r'^(97[89])?\d{9}[\dXx]$').hasMatch(cleaned);
   }
 
   String safeDecode(List<int> bytes) {

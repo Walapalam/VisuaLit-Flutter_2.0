@@ -8,6 +8,9 @@ import 'package:visualit/data/services/appwrite_service.dart';
 import 'package:visualit/features/reader/presentation/widgets/image_detail_dialog.dart';
 import 'package:visualit/features/reader/presentation/widgets/liquid_glass_container.dart';
 
+// Helper to replace deprecated withOpacity usage (keeps the same visual alpha)
+Color _withOpacity(Color base, double opacity) => base.withAlpha((opacity * 255).round());
+
 // A StateProvider to manage the loading state of the generation request
 final generationLoadingProvider = StateProvider.autoDispose<bool>((ref) {
   print('📚 DEBUG: Initializing generationLoadingProvider');
@@ -31,54 +34,60 @@ final bookDetailsByTitleProvider = FutureProvider.family<Book?, String>((ref, bo
   }
 });
 
-// FutureProvider to fetch chapters for a given Appwrite book ID
-final chaptersForAppwriteBookProvider = FutureProvider.family<List<Chapter>, String>((ref, appwriteBookId) async {
-  print('📚 DEBUG: Fetching chapters for book ID: $appwriteBookId');
-  final service = ref.watch(appwriteServiceProvider);
-  try {
-    final chapters = await service.getChaptersForBook(appwriteBookId);
-    print('📚 DEBUG: Found ${chapters.length} chapters for book ID: $appwriteBookId');
-    return chapters;
-  } catch (e) {
-    print('📚 DEBUG: Error fetching chapters: $e');
-    rethrow;
+// Provider to find ALL matching chapter documents by book ID and chapter number
+// Returns a list because there might be duplicate chapters in the DB
+final currentChapterProvider = FutureProvider.family.autoDispose<List<Chapter>, ({String bookTitle, int chapterNumber})>((ref, params) async {
+  print('📚 DEBUG: Finding chapters for number ${params.chapterNumber} of book "${params.bookTitle}"');
+
+  // First get the book
+  final bookAsync = await ref.watch(bookDetailsByTitleProvider(params.bookTitle).future);
+  if (bookAsync == null) {
+    print('📚 DEBUG: Book not found, cannot fetch chapters');
+    return [];
   }
+
+  // Then get all chapters for this book
+  final service = ref.watch(appwriteServiceProvider);
+  final chapters = await service.getChaptersForBook(bookAsync.id);
+  print('📚 DEBUG: Fetched ${chapters.length} chapters for book ${bookAsync.id}');
+
+  // Find all chapters matching the chapter number
+  final matchingChapters = chapters.where((ch) => ch.chapterNumber == params.chapterNumber).toList();
+  
+  if (matchingChapters.isEmpty) {
+    print('📚 DEBUG: No chapters found for number ${params.chapterNumber}. Available: ${chapters.map((c) => c.chapterNumber).toSet().join(", ")}');
+    return [];
+  }
+
+  print('📚 DEBUG: Found ${matchingChapters.length} matching chapters for number ${params.chapterNumber}');
+  matchingChapters.forEach((ch) => print('   - ID: ${ch.id}, Status: ${ch.status}'));
+  
+  return matchingChapters;
 });
 
-// FutureProvider to fetch all generated visuals for a given Appwrite book (indirectly via chapters)
-final generatedVisualsForAppwriteBookProvider = FutureProvider.family<List<GeneratedVisual>, String>((ref, appwriteBookId) async {
-  print('📚 DEBUG: Starting visual fetch process for book ID: $appwriteBookId');
-  final chaptersAsync = ref.watch(chaptersForAppwriteBookProvider(appwriteBookId));
+// Provider to fetch visuals for the current chapter(s)
+final currentChapterVisualsProvider = FutureProvider.family.autoDispose<List<GeneratedVisual>, ({String bookTitle, int chapterNumber})>((ref, params) async {
+  print('📚 DEBUG: Fetching visuals for chapter ${params.chapterNumber} of "${params.bookTitle}"');
 
-  return chaptersAsync.when(
-      data: (chapters) async {
-        print('📚 DEBUG: Processing ${chapters.length} chapters for visuals');
-        if (chapters.isEmpty) {
-          print('📚 DEBUG: No chapters found, returning empty visuals list');
-          return [];
-        }
-        final chapterIds = chapters.map((c) => c.id).toList();
-        print('📚 DEBUG: Fetching visuals for chapter IDs: $chapterIds');
-        final service = ref.watch(appwriteServiceProvider);
-        try {
-          final visuals = await service.getGeneratedVisualsForChapters(chapterIds);
-          print('📚 DEBUG: Retrieved ${visuals.length} visuals for book ID: $appwriteBookId');
-          return visuals;
-        } catch (e) {
-          print('📚 DEBUG: Error fetching visuals: $e');
-          rethrow;
-        }
-      },
-      loading: () {
-        print('📚 DEBUG: Chapters still loading, returning empty visuals list');
-        return [];
-      },
-      error: (err, stack) {
-        print('📚 DEBUG: Error in chapters fetch: $err');
-        print('📚 DEBUG: Stack trace: $stack');
-        throw Exception('Error loading chapters for visuals: $err');
-      }
-  );
+  final chaptersAsync = await ref.watch(currentChapterProvider(params).future);
+  if (chaptersAsync.isEmpty) {
+    print('📚 DEBUG: No matching chapters found, returning empty visuals list');
+    return [];
+  }
+
+  final chapterIds = chaptersAsync.map((ch) => ch.id).toList();
+  final service = ref.watch(appwriteServiceProvider);
+  
+  try {
+    print('📚 DEBUG: calling getGeneratedVisualsForChapters with IDs: $chapterIds');
+    // Use the bulk fetch method to check all candidate chapters
+    final visuals = await service.getGeneratedVisualsForChapters(chapterIds);
+    print('📚 DEBUG: Retrieved ${visuals.length} visuals total');
+    return visuals;
+  } catch (e) {
+    print('📚 DEBUG: Error fetching visuals for chapters: $e');
+    rethrow;
+  }
 });
 
 class BookVisualizationOverlay extends ConsumerWidget {
@@ -120,13 +129,14 @@ class BookVisualizationOverlay extends ConsumerWidget {
     });
 
     return Scaffold(
-      backgroundColor: Colors.black.withOpacity(0.0),
+      resizeToAvoidBottomInset: false,
+      backgroundColor: _withOpacity(Colors.black, 0.0),
       body: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 4.0),
         child: LiquidGlassContainer(
           borderRadius: BorderRadius.circular(20.0),
           padding: EdgeInsets.zero,
-          backgroundColor: Theme.of(context).colorScheme.surface.withOpacity(0.1),
+          backgroundColor: _withOpacity(Theme.of(context).colorScheme.surface, 0.1),
           child: Stack(
             children: [
               Column(
@@ -138,7 +148,8 @@ class BookVisualizationOverlay extends ConsumerWidget {
                         if (appwriteBook == null) {
                           return _buildGenerationRequestUI(context, ref, isGenerating);
                         } else {
-                          return _buildVisualsDisplay(context, ref, appwriteBook.id, appwriteBook.title);
+                          // Use chapter-scoped provider
+                          return _buildChapterVisualsDisplay(context, ref, appwriteBook.title);
                         }
                       },
                       loading: () => const Center(child: CircularProgressIndicator(color: Colors.white)),
@@ -166,26 +177,25 @@ class BookVisualizationOverlay extends ConsumerWidget {
     );
   }
 
-  Widget _buildVisualsDisplay(BuildContext context, WidgetRef ref, String appwriteBookId, String bookTitle) {
-    print('📚 DEBUG: Building visuals display for book ID: $appwriteBookId');
-    final visualsAsyncValue = ref.watch(generatedVisualsForAppwriteBookProvider(appwriteBookId));
+  /// Build the visuals display for the current chapter with sticky section headers
+  Widget _buildChapterVisualsDisplay(BuildContext context, WidgetRef ref, String bookTitle) {
+    print('📚 DEBUG: Building chapter visuals display for chapter $localChapterNumber');
 
-    visualsAsyncValue.whenData((visuals) {
-      print('📚 DEBUG: Loaded ${visuals.length} visuals for book');
-    });
+    final params = (bookTitle: bookTitle, chapterNumber: localChapterNumber);
+    final visualsAsyncValue = ref.watch(currentChapterVisualsProvider(params));
 
     return Column(
       children: [
         Padding(
           padding: const EdgeInsets.all(16.0),
           child: Text(
-            'Visuals for "$bookTitle"',
+            'Chapter $localChapterNumber Visualizations',
             style: Theme.of(context).textTheme.headlineMedium?.copyWith(
               color: Colors.white,
               fontWeight: FontWeight.bold,
               shadows: [
                 Shadow(
-                  color: Colors.black.withOpacity(0.3),
+                  color: _withOpacity(Colors.black, 0.3),
                   blurRadius: 5,
                   offset: const Offset(2, 2),
                 ),
@@ -198,28 +208,32 @@ class BookVisualizationOverlay extends ConsumerWidget {
           child: visualsAsyncValue.when(
             data: (visuals) {
               if (visuals.isEmpty) {
-                return const Center(
-                  child: Text('No visualizations found for this book yet. The backend might still be generating or failed to find relevant data.',
-                      textAlign: TextAlign.center, style: TextStyle(color: Colors.white70)),
-                );
+                return _buildEmptyState(context);
               }
-              return ListView.builder(
-                padding: const EdgeInsets.symmetric(horizontal: 16.0),
-                scrollDirection: Axis.horizontal,
-                itemCount: visuals.length,
-                itemBuilder: (context, index) {
-                  final visual = visuals[index];
-                  return Padding(
-                    padding: const EdgeInsets.all(8.0),
-                    child: _buildVisualCard(context, visual),
-                  );
-                },
-              );
+
+              // Separate visuals by type
+              print('📚 DEBUG: Processing ${visuals.length} visuals');
+              // Safely print the list of types for debugging
+              print('📚 DEBUG: Type values found: ${visuals.map((v) => v.type).toList()}');
+
+              // Log each visual individually for detailed inspection
+              for (var i = 0; i < visuals.length; i++) {
+                final v = visuals[i];
+                print('📚 DEBUG: Visual $i - Type: "${v.type}", Entity: "${v.entityName}", isScene: ${v.isScene}, isCharacter: ${v.isCharacter}');
+              }
+              
+              // Filter visuals by type (now handles IMAGE type via entityName patterns)
+              final scenes = visuals.where((v) => v.isScene).toList();
+              final characters = visuals.where((v) => v.isCharacter).toList();
+              
+              print('📚 DEBUG: Filtered - ${scenes.length} scenes, ${characters.length} characters');
+
+              return _buildSectionsScrollView(context, ref, scenes, characters);
             },
             loading: () => _buildShimmerLoading(context),
             error: (error, stack) => Center(
               child: _buildErrorWidget(context, "Failed to load visuals: $error", () {
-                ref.invalidate(generatedVisualsForAppwriteBookProvider(appwriteBookId));
+                ref.invalidate(currentChapterVisualsProvider(params));
               }),
             ),
           ),
@@ -228,65 +242,307 @@ class BookVisualizationOverlay extends ConsumerWidget {
     );
   }
 
-  Widget _buildVisualCard(BuildContext context, GeneratedVisual visual) {
-    final appwriteService = ProviderScope.containerOf(context).read(appwriteServiceProvider);
-    final imageUrl = appwriteService.getImageUrl(visual.imageFileId);
+  /// Build scrollable sections with sticky headers for scenes and characters
+  Widget _buildSectionsScrollView(BuildContext context, WidgetRef ref, List<GeneratedVisual> scenes, List<GeneratedVisual> characters) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        // Responsive grid: 2 columns on mobile, 3 on tablets/wide screens
+        final crossAxisCount = constraints.maxWidth >= 600 ? 3 : 2;
 
-    return SizedBox(
-      width: 150,
-      child: LiquidGlassContainer(
-        padding: const EdgeInsets.all(8.0),
-        backgroundColor: Colors.white.withOpacity(0.1),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Hero(
-              tag: 'visual_${visual.id}',
-              child: GestureDetector(
-                onTap: () {
-                  Navigator.of(context).push(
-                    PageRouteBuilder(
-                      opaque: false,
-                      pageBuilder: (context, animation, secondaryAnimation) =>
-                          ImageDetailDialog(
-                            tag: 'visual_${visual.id}',
-                            imageUrl: imageUrl,
-                            title: visual.entityName,
-                            description: visual.prompt,
-                            detail1Label: 'Chapter ID',
-                            detail1: visual.chapterId,
-                            detail2Label: 'Visual ID',
-                            detail2: visual.id,
-                          ),
-                      transitionsBuilder: (context, animation, secondaryAnimation, child) {
-                        return FadeTransition(opacity: animation, child: child);
-                      },
-                    ),
-                  );
-                },
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(8.0),
-                  child: CachedNetworkImage(
-                    imageUrl: imageUrl,
-                    fit: BoxFit.cover,
-                    width: 100,
-                    height: 100,
-                    placeholder: (context, url) => const CircularProgressIndicator(),
-                    errorWidget: (context, url, error) => const Icon(Icons.error, color: Colors.white),
+        return CustomScrollView(
+          slivers: [
+            // Scenes Section
+            _buildStickyHeader(context, 'Scenes', Icons.landscape, scenes.length),
+            if (scenes.isEmpty)
+              _buildEmptySectionPlaceholder(context, 'No scenes in this chapter')
+            else
+              _buildImageGrid(context, ref, scenes, crossAxisCount),
+
+            const SliverToBoxAdapter(child: SizedBox(height: 24)),
+
+            // Characters Section
+            _buildStickyHeader(context, 'Characters', Icons.people, characters.length),
+            if (characters.isEmpty)
+              _buildEmptySectionPlaceholder(context, 'No characters in this chapter')
+            else
+              _buildImageGrid(context, ref, characters, crossAxisCount),
+
+            const SliverToBoxAdapter(child: SizedBox(height: 16)),
+          ],
+        );
+      },
+    );
+  }
+
+  /// Build sticky section header
+  Widget _buildStickyHeader(BuildContext context, String title, IconData icon, int count) {
+    return SliverPersistentHeader(
+      pinned: true,
+      delegate: _StickyHeaderDelegate(
+        minHeight: 60,
+        maxHeight: 60,
+        child: LiquidGlassContainer(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          backgroundColor: _withOpacity(Theme.of(context).colorScheme.surface, 0.15),
+          borderRadius: BorderRadius.circular(12),
+          child: Row(
+            children: [
+              Icon(icon, color: Colors.white, size: 24),
+              const SizedBox(width: 12),
+              Text(
+                title,
+                style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                  color: Colors.white,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              const Spacer(),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                decoration: BoxDecoration(
+                  color: _withOpacity(Theme.of(context).colorScheme.secondary, 0.3),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Text(
+                  '$count',
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    color: Colors.white,
+                    fontWeight: FontWeight.bold,
                   ),
                 ),
               ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// Build responsive image grid
+  Widget _buildImageGrid(BuildContext context, WidgetRef ref, List<GeneratedVisual> visuals, int crossAxisCount) {
+    return SliverPadding(
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      sliver: SliverGrid(
+        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+          crossAxisCount: crossAxisCount,
+          childAspectRatio: 3 / 4, // Portrait aspect ratio
+          crossAxisSpacing: 12,
+          mainAxisSpacing: 12,
+        ),
+        delegate: SliverChildBuilderDelegate(
+          (context, index) {
+            final visual = visuals[index];
+            return _buildImageCard(context, ref, visual);
+          },
+          childCount: visuals.length,
+        ),
+      ),
+    );
+  }
+
+  /// Build individual image card with description overlay
+  Widget _buildImageCard(BuildContext context, WidgetRef ref, GeneratedVisual visual) {
+    final appwriteService = ref.read(appwriteServiceProvider);
+    final imageUrl = appwriteService.getImageUrl(visual.imageFileId);
+
+    return Hero(
+      tag: 'visual_${visual.id}',
+      child: GestureDetector(
+        onTap: () {
+          Navigator.of(context).push(
+            PageRouteBuilder(
+              opaque: false,
+              pageBuilder: (context, animation, secondaryAnimation) =>
+                  ImageDetailDialog(
+                    tag: 'visual_${visual.id}',
+                    imageUrl: imageUrl,
+                    title: visual.entityName,
+                    description: visual.prompt,
+                    detail1Label: 'Type',
+                    detail1: visual.type,
+                    detail2Label: 'Visual ID',
+                    detail2: visual.id,
+                  ),
+              transitionsBuilder: (context, animation, secondaryAnimation, child) {
+                return FadeTransition(opacity: animation, child: child);
+              },
+            ),
+          );
+        },
+        child: LiquidGlassContainer(
+          padding: EdgeInsets.zero,
+          backgroundColor: _withOpacity(Colors.white, 0.1),
+          borderRadius: BorderRadius.circular(12),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(12),
+            child: Stack(
+              fit: StackFit.expand,
+              children: [
+                // Image
+                CachedNetworkImage(
+                  imageUrl: imageUrl,
+                  fit: BoxFit.cover,
+                  placeholder: (context, url) => _buildImagePlaceholder(),
+                  errorWidget: (context, url, error) => _buildImageErrorCard(context, () {
+                    // Retry single image by invalidating cache
+                    CachedNetworkImage.evictFromCache(imageUrl);
+                    // Trigger rebuild
+                    (context as Element).markNeedsBuild();
+                  }),
+                ),
+                // Gradient overlay
+                Positioned(
+                  bottom: 0,
+                  left: 0,
+                  right: 0,
+                  child: Container(
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.bottomCenter,
+                        end: Alignment.topCenter,
+                        colors: [
+                          _withOpacity(Colors.black, 0.8),
+                          _withOpacity(Colors.black, 0.6),
+                          Colors.transparent,
+                        ],
+                      ),
+                    ),
+                    padding: const EdgeInsets.all(12),
+                    child: Text(
+                      visual.description,
+                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w600,
+                        shadows: [
+                          Shadow(
+                            color: _withOpacity(Colors.black, 0.5),
+                            blurRadius: 4,
+                          ),
+                        ],
+                      ),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// Build empty state when no visuals exist for the chapter
+  Widget _buildEmptyState(BuildContext context) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(32.0),
+        child: LiquidGlassContainer(
+          padding: const EdgeInsets.all(24),
+          backgroundColor: _withOpacity(Colors.white, 0.05),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                Icons.image_not_supported_outlined,
+                size: 64,
+                color: _withOpacity(Colors.white, 0.5),
+              ),
+              const SizedBox(height: 16),
+              Text(
+                'No Visualizations Yet',
+                style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                  color: Colors.white,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'Generate visuals for this chapter to see scenes and characters come to life.',
+                textAlign: TextAlign.center,
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                  color: Colors.white70,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// Build empty section placeholder
+  Widget _buildEmptySectionPlaceholder(BuildContext context, String message) {
+    return SliverToBoxAdapter(
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: LiquidGlassContainer(
+          padding: const EdgeInsets.all(16),
+          backgroundColor: _withOpacity(Colors.white, 0.05),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(Icons.info_outline, color: _withOpacity(Colors.white, 0.5), size: 20),
+              const SizedBox(width: 8),
+              Text(
+                message,
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                  color: _withOpacity(Colors.white, 0.6),
+                  fontStyle: FontStyle.italic,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// Build image placeholder (shimmer)
+  Widget _buildImagePlaceholder() {
+    return Container(
+      color: _withOpacity(Colors.white, 0.1),
+      child: Center(
+        child: CircularProgressIndicator(
+          color: _withOpacity(Colors.white, 0.5),
+          strokeWidth: 2,
+        ),
+      ),
+    );
+  }
+
+  /// Build image error card with tap to retry
+  Widget _buildImageErrorCard(BuildContext context, VoidCallback onRetry) {
+    return GestureDetector(
+      onTap: onRetry,
+      child: LiquidGlassContainer(
+        padding: const EdgeInsets.all(16),
+        backgroundColor: _withOpacity(Colors.red, 0.1),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              Icons.broken_image_outlined,
+              size: 40,
+              color: _withOpacity(Colors.white, 0.7),
             ),
             const SizedBox(height: 8),
             Text(
-              visual.entityName,
-              style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                color: Colors.white,
-                fontWeight: FontWeight.bold,
-              ),
+              "Couldn't load image",
               textAlign: TextAlign.center,
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                color: _withOpacity(Colors.white, 0.7),
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              'Tap to retry',
+              textAlign: TextAlign.center,
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                color: _withOpacity(Colors.white, 0.5),
+                fontSize: 11,
+              ),
             ),
           ],
         ),
@@ -298,11 +554,14 @@ class BookVisualizationOverlay extends ConsumerWidget {
     print('📚 DEBUG: Building generation request UI, isGenerating: $isGenerating');
     final appwriteService = ref.read(appwriteServiceProvider);
 
-    return Padding(
-      padding: const EdgeInsets.all(32.0),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
+    return Center(
+      child: SingleChildScrollView(
+        child: Padding(
+          padding: const EdgeInsets.all(32.0),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            mainAxisSize: MainAxisSize.min,
+            children: [
           Icon(
             isGenerating ? Icons.hourglass_empty : Icons.auto_awesome,
             size: 80,
@@ -312,7 +571,7 @@ class BookVisualizationOverlay extends ConsumerWidget {
           Text(
             isGenerating
                 ? 'Generating Visuals...'
-                : 'Visualizations for "$bookTitleForLookup" not found in Appwrite.',
+                : 'Visualizations for Chapter $localChapterNumber not found.',
             textAlign: TextAlign.center,
             style: Theme.of(context).textTheme.headlineSmall?.copyWith(color: Colors.white),
           ),
@@ -320,7 +579,7 @@ class BookVisualizationOverlay extends ConsumerWidget {
           Text(
             isGenerating
                 ? 'Processing chapter, extracting entities, generating images, and uploading to Appwrite.\n\nThis may take 1-2 minutes...'
-                : 'Do you want to request the backend to generate them?',
+                : 'Would you like to generate visuals for this chapter?',
             textAlign: TextAlign.center,
             style: Theme.of(context).textTheme.bodyLarge?.copyWith(color: Colors.white70),
           ),
@@ -328,11 +587,17 @@ class BookVisualizationOverlay extends ConsumerWidget {
           isGenerating
               ? Column(
             children: [
-              const CircularProgressIndicator(color: Colors.white, strokeWidth: 3),
+              CircularProgressIndicator(
+                color: Theme.of(context).colorScheme.secondary,
+                strokeWidth: 3,
+              ),
               const SizedBox(height: 16),
               Text(
-                'Please wait, backend is processing...',
-                style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: Colors.white60),
+                'Curating scenes for this chapter...',
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                  color: Colors.white60,
+                  fontStyle: FontStyle.italic,
+                ),
               ),
             ],
           )
@@ -378,6 +643,7 @@ class BookVisualizationOverlay extends ConsumerWidget {
 
                   // Invalidate to trigger immediate refresh to visuals display
                   ref.invalidate(bookDetailsByTitleProvider(bookTitleForLookup));
+                  ref.invalidate(currentChapterVisualsProvider((bookTitle: bookTitleForLookup, chapterNumber: localChapterNumber)));
 
                 } else {
                   // Failure - show specific error
@@ -420,7 +686,7 @@ class BookVisualizationOverlay extends ConsumerWidget {
               }
             },
             icon: const Icon(Icons.auto_awesome),
-            label: const Text('Generate Visuals'),
+            label: const Text('Generate Visuals for this Chapter'),
             style: ElevatedButton.styleFrom(
               backgroundColor: Theme.of(context).colorScheme.secondary,
               foregroundColor: Theme.of(context).colorScheme.onSecondary,
@@ -430,51 +696,91 @@ class BookVisualizationOverlay extends ConsumerWidget {
               ),
             ),
           ),
-        ],
+            ],
+          ),
+        ),
       ),
     );
   }
 
   Widget _buildShimmerLoading(BuildContext context) {
-    return ListView.builder(
-      scrollDirection: Axis.horizontal,
-      itemCount: 3,
-      itemBuilder: (context, index) {
-        return Padding(
-          padding: const EdgeInsets.all(8.0),
-          child: LiquidGlassContainer(
-            padding: const EdgeInsets.all(8.0),
-            backgroundColor: Colors.white.withOpacity(0.05),
-            child: SizedBox(
-              width: 150,
-              child: Column(
-                children: [
-                  Container(
-                    width: 100,
-                    height: 100,
-                    decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.2),
-                      borderRadius: BorderRadius.circular(8.0),
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Container(
-                    width: double.infinity,
-                    height: 16,
-                    color: Colors.white.withOpacity(0.2),
-                  ),
-                  const SizedBox(height: 4),
-                  Container(
-                    width: 80,
-                    height: 12,
-                    color: Colors.white.withOpacity(0.2),
-                  ),
-                ],
-              ),
-            ),
+    return Column(
+      children: [
+        const SizedBox(height: 40),
+        CircularProgressIndicator(
+          color: Theme.of(context).colorScheme.secondary,
+          strokeWidth: 3,
+        ),
+        const SizedBox(height: 24),
+        Text(
+          'Curating scenes for this chapter...',
+          style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+            color: Colors.white70,
+            fontStyle: FontStyle.italic,
           ),
-        );
-      },
+        ),
+        const SizedBox(height: 40),
+        Expanded(
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              final crossAxisCount = constraints.maxWidth >= 600 ? 3 : 2;
+              return GridView.builder(
+                padding: const EdgeInsets.all(16),
+                gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: crossAxisCount,
+                  childAspectRatio: 3 / 4,
+                  crossAxisSpacing: 12,
+                  mainAxisSpacing: 12,
+                ),
+                itemCount: 6, // Show 6 shimmer placeholders
+                itemBuilder: (context, index) {
+                  return LiquidGlassContainer(
+                    padding: EdgeInsets.zero,
+                    backgroundColor: _withOpacity(Colors.white, 0.05),
+                    borderRadius: BorderRadius.circular(12),
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(12),
+                      child: Stack(
+                        children: [
+                          Container(
+                            color: _withOpacity(Colors.white, 0.1),
+                          ),
+                          Positioned(
+                            bottom: 0,
+                            left: 0,
+                            right: 0,
+                            child: Container(
+                              height: 60,
+                              decoration: BoxDecoration(
+                                gradient: LinearGradient(
+                                  begin: Alignment.bottomCenter,
+                                  end: Alignment.topCenter,
+                                  colors: [
+                                    _withOpacity(Colors.black, 0.6),
+                                    Colors.transparent,
+                                  ],
+                                ),
+                              ),
+                              padding: const EdgeInsets.all(12),
+                              child: Container(
+                                height: 16,
+                                decoration: BoxDecoration(
+                                  color: _withOpacity(Colors.white, 0.2),
+                                  borderRadius: BorderRadius.circular(4),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  );
+                },
+              );
+            },
+          ),
+        ),
+      ],
     );
   }
 
@@ -500,5 +806,36 @@ class BookVisualizationOverlay extends ConsumerWidget {
         ),
       ],
     );
+  }
+}
+
+/// Delegate for sticky section headers
+class _StickyHeaderDelegate extends SliverPersistentHeaderDelegate {
+  final double minHeight;
+  final double maxHeight;
+  final Widget child;
+
+  _StickyHeaderDelegate({
+    required this.minHeight,
+    required this.maxHeight,
+    required this.child,
+  });
+
+  @override
+  double get minExtent => minHeight;
+
+  @override
+  double get maxExtent => maxHeight;
+
+  @override
+  Widget build(BuildContext context, double shrinkOffset, bool overlapsContent) {
+    return SizedBox.expand(child: child);
+  }
+
+  @override
+  bool shouldRebuild(_StickyHeaderDelegate oldDelegate) {
+    return maxHeight != oldDelegate.maxHeight ||
+        minHeight != oldDelegate.minHeight ||
+        child != oldDelegate.child;
   }
 }

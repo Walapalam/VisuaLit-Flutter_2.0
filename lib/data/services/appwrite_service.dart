@@ -86,20 +86,21 @@ class AppwriteService {
   Future<List<Chapter>> getChaptersForBook(String bookId) async {
     print('📚 DEBUG: Fetching chapters for book ID: "$bookId"');
     try {
-      print('📚 DEBUG: Requesting all chapters from database');
       final appwrite_models.DocumentList response = await _databases.listDocuments(
         databaseId: _databaseId,
         collectionId: _chaptersCollectionId,
+        queries: [
+          Query.equal('bookId', bookId),
+          Query.limit(100),
+        ],
       );
-      print('📚 DEBUG: Retrieved ${response.documents.length} total chapters');
+      print('📚 DEBUG: Retrieved ${response.documents.length} chapters for book $bookId');
 
       final filteredChapters = response.documents
           .map((doc) => Chapter.fromJson(doc.data))
-          .where((chapter) => chapter.bookId == bookId)
           .toList()
         ..sort((a, b) => a.chapterNumber.compareTo(b.chapterNumber));
 
-      print('📚 DEBUG: Filtered to ${filteredChapters.length} chapters for book $bookId');
       print('📚 DEBUG: Chapter numbers: ${filteredChapters.map((c) => c.chapterNumber).join(", ")}');
 
       return filteredChapters;
@@ -111,12 +112,7 @@ class AppwriteService {
 
   Future<List<GeneratedVisual>> getGeneratedVisualsForChapters(List<String> chapterIds) async {
     print('📚 DEBUG: Fetching visuals for ${chapterIds.length} chapters');
-    print('📚 DEBUG: Chapter IDs: ${chapterIds.join(", ")}');
-
-    if (chapterIds.isEmpty) {
-      print('📚 DEBUG: No chapter IDs provided, returning empty list');
-      return [];
-    }
+    if (chapterIds.isEmpty) return [];
 
     try {
       final appwrite_models.DocumentList response = await _databases.listDocuments(
@@ -128,9 +124,7 @@ class AppwriteService {
       );
 
       final visuals = response.documents.map((doc) => GeneratedVisual.fromJson(doc.data)).toList();
-      print('📚 DEBUG: Retrieved ${visuals.length} visuals');
-      print('📚 DEBUG: Visual IDs: ${visuals.map((v) => v.id).join(", ")}');
-
+      print('📚 DEBUG: Retrieved ${visuals.length} visuals for chapters: $chapterIds');
       return visuals;
     } catch (e) {
       print('📚 DEBUG: Error fetching generated visuals: $e');
@@ -138,7 +132,26 @@ class AppwriteService {
     }
   }
 
-  // Update this method in AppwriteService class
+  Future<List<GeneratedVisual>> getGeneratedVisualsForChapter(String chapterId) async {
+    print('📚 DEBUG: Fetching visuals for single chapter ID: $chapterId');
+    try {
+      final appwrite_models.DocumentList response = await _databases.listDocuments(
+        databaseId: _databaseId,
+        collectionId: _generatedVisualsCollectionId,
+        queries: [
+          Query.equal('chapterId', chapterId),
+        ],
+      );
+
+      final visuals = response.documents.map((doc) => GeneratedVisual.fromJson(doc.data)).toList();
+      print('📚 DEBUG: Retrieved ${visuals.length} visuals for chapter $chapterId');
+      return visuals;
+    } catch (e) {
+      print('📚 DEBUG: Error fetching visuals for chapter $chapterId: $e');
+      throw Exception('Failed to fetch visuals for chapter $chapterId from Appwrite: $e');
+    }
+  }
+
   String getImageUrl(String fileId) {
     print('📚 DEBUG: Generating URL for file ID: $fileId');
 

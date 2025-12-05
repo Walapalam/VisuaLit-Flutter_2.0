@@ -104,8 +104,11 @@ class _ReadingScreenState extends ConsumerState<ReadingScreen> {
     // Perform ISBN lookup if missing
     String? localBookISBN = localBook.isbn;
     if (localBookISBN == null || localBookISBN.isEmpty) {
-      localBookISBN = await IsbnLookupService.lookupIsbnByTitle(localBook.title!);
-      print("ISBN fetched");// Static method call
+      localBookISBN = await IsbnLookupService.lookupIsbnByTitle(
+        localBook.title!,
+        localBook.author ?? '', // Pass author for better ISBN lookup accuracy
+      );
+      print("ISBN fetched: $localBookISBN");
       // Optionally: Save the fetched ISBN to the local book model
     }
 

@@ -877,9 +877,27 @@ class _ReadingScreenState extends ConsumerState<ReadingScreen> {
   Future<void> _fetchBookIsbn() async {
     if (_epubData?.title != null && _epubData!.title.isNotEmpty) {
       try {
-        print('📚 DEBUG: Fetching ISBN for book: "${_epubData!.title}"');
-        _currentBookIsbn = await IsbnLookupService.lookupIsbnByTitle(_epubData!.title);
-        print('📚 DEBUG: Fetched ISBN: $_currentBookIsbn');
+        // First, check if ISBN is available in EPUB metadata
+        if (_epubData?.isbn != null && _epubData!.isbn!.isNotEmpty) {
+          _currentBookIsbn = _epubData!.isbn;
+          print('📚 DEBUG: Using ISBN from EPUB metadata: $_currentBookIsbn');
+          setState(() {}); // Update UI with fetched ISBN
+          return;
+        }
+
+        // Fallback to API lookup with both title and author
+        print('📚 DEBUG: No ISBN in EPUB metadata, fetching from API for book: "${_epubData!.title}" by "${_epubData!.author}"');
+        _currentBookIsbn = await IsbnLookupService.lookupIsbnByTitle(
+          _epubData!.title,
+          _epubData!.author,
+        );
+
+        if (_currentBookIsbn != null && _currentBookIsbn!.isNotEmpty) {
+          print('📚 DEBUG: Fetched ISBN from API: $_currentBookIsbn');
+        } else {
+          print('📚 DEBUG: Failed to fetch ISBN from API');
+          _currentBookIsbn = null;
+        }
         setState(() {}); // Update UI with fetched ISBN
       } catch (e) {
         print('📚 DEBUG: Failed to fetch ISBN: $e');

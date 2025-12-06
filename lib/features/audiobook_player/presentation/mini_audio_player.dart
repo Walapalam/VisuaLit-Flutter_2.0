@@ -2,6 +2,7 @@ import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:visualit/core/providers/isar_provider.dart';
 import 'package:visualit/features/audiobook_player/presentation/audiobook_player_service.dart';
 
 // --- MAIN WIDGET: The static container ---
@@ -11,6 +12,12 @@ class MiniAudioPlayer extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    // Ensure Isar is ready before accessing the service
+    final isarAsync = ref.watch(isarDBProvider);
+    if (isarAsync.isLoading || isarAsync.hasError) {
+      return const SizedBox.shrink();
+    }
+
     // This watch ensures the MiniPlayer appears/disappears when a book is loaded.
     final book = ref.watch(
       audiobookPlayerServiceProvider.select((s) => s.audiobook),

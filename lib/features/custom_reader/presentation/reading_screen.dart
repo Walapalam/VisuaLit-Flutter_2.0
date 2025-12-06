@@ -211,7 +211,7 @@ class _ReadingScreenState extends ConsumerState<ReadingScreen> {
 
       setState(() {
         _epubData = epubData;
-        _isLoading = false;
+        // _isLoading = false; // Moved to _initializeController to prevent race condition
       });
 
       // Analyze book for progress estimation
@@ -361,16 +361,23 @@ class _ReadingScreenState extends ConsumerState<ReadingScreen> {
       });
 
       _scrollController.addListener(_onScroll);
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
     } catch (e) {
       log(
         'Error initializing controller: $e',
         name: '_ReadingScreenState',
         error: e,
       );
-      setState(() {
-        _error = e.toString();
-        _isLoading = false;
-      });
+      if (mounted) {
+        setState(() {
+          _error = e.toString();
+          _isLoading = false;
+        });
+      }
     }
   }
 
